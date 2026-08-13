@@ -4,5 +4,5 @@ contact_links:
     url: https://sanityops.org
     about: Check the documentation for usage guides and API reference
   - name: GitHub Discussions
-    url: https://github.com/sanityops/sanityops-cli/discussions
+    url: https://github.com/sanityops-org/sanityops-cli/discussions
     about: Ask questions and discuss ideas with the community

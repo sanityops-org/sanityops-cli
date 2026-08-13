@@ -1,0 +1,39 @@
+# ============================================================================
+# Sanityops CLI - Inspect Configuration Template
+# ============================================================================
+# Usage:
+#   1. Copy this template to your project root (e.g. sanityops.yaml)
+#   2. Fill in the project id (UUID) and artifact file paths
+#   3. Run: sanityops-cli inspect --config sanityops.yaml
+# ============================================================================
+
+# Project metadata
+project:
+  id: "00000000-0000-0000-0000-000000000000"
+
+# Model configuration (optional). If this section is present, its values
+# take precedence over the LLM_* environment variables. If omitted, the
+# CLI falls back to environment-variable configuration.
+# model:
+#   provider: anthropic       # e.g. anthropic, openai, azure
+#   api_key: sk-ant-...       # direct value; keep this file out of git
+#   model_id: claude-sonnet-4-20250514
+#   base_url: ""              # optional; for custom/self-hosted endpoints
+
+# System Prompt file list (supports any plaintext file format)
+prompts:
+  - file: prompts/system_prompt.md
+  - file: prompts/fallback_prompt.py
+  - file: prompts/summary_prompt.ts
+
+# Tools Schema file list (supports any plaintext file format)
+tools:
+  - file: tools/search_tools.json
+  - file: tools/file_ops.py
+  - file: tools/code_tools.ts
+
+# Skills file list (file or directory)
+skills:
+  - file: skills/code_review.md
+  - file: skills/code_fix/skill.md
+  - file: skills/
