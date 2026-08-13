@@ -11,14 +11,15 @@
 project:
   id: "00000000-0000-0000-0000-000000000000"
 
-# Model configuration (optional). If this section is present, its values
-# take precedence over the LLM_* environment variables. If omitted, the
-# CLI falls back to environment-variable configuration.
+# Model configuration (optional).
+# If omitted, the CLI uses LLM_* environment variables.
+# Uncomment and fill in to override:
+#
 # model:
-#   provider: anthropic       # e.g. anthropic, openai, azure
-#   api_key: sk-ant-...       # direct value; keep this file out of git
-#   model_id: claude-sonnet-4-20250514
-#   base_url: ""              # optional; for custom/self-hosted endpoints
+#   provider: anthropic            # Required: anthropic, openai, azure, etc.
+#   api_key: sk-ant-...            # Required: your API key (keep this file out of git)
+#   model_id: claude-sonnet-4-20250514  # Required: model identifier
+#   base_url: ""                   # Optional: custom endpoint URL
 
 # System Prompt file list (supports any plaintext file format)
 prompts:
