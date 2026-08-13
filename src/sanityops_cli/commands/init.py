@@ -98,4 +98,4 @@ def _load_template() -> str:
         template_path = importlib.resources.files("sanityops_cli.templates") / "inspect_config.yaml"
         return template_path.read_text(encoding="utf-8")
 
-    return Path(template_path).read_text(encoding="utf-8")
+    return template_path.read_text(encoding="utf-8")
