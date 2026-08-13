@@ -1,0 +1,79 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sanityops-cli"
+version = "0.0.0"
+description = "CLI tool for static defect inspection of AI logical artifacts"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Apache-2.0"}
+authors = [
+    {name = "Sanityops Team"}
+]
+keywords = ["cli", "ai", "llm", "defect-detection", "static-analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.0",
+    "httpx>=0.27",
+    "tomli>=2.0",
+    "tomli-w>=1.0",
+    "defect-check",
+    "pyyaml>=6.0",
+    "sanityops-agent>=0.0.3",
+    "anyio>=4.0",
+]
+
+[project.scripts]
+sanityops-cli = "sanityops_cli.main:app"
+
+[project.urls]
+Homepage = "https://sanityops.org"
+Documentation = "https://sanityops.org"
+Repository = "https://github.com/sanityops-org/sanityops-cli"
+Issues = "https://github.com/sanityops-org/sanityops-cli/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sanityops_cli"]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-httpx>=0.30",
+]
+dev = [
+    "ruff>=0.6.0",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["sanityops_cli"]

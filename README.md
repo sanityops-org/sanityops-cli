@@ -2,7 +2,7 @@
 
 A command-line tool for static defect inspection of AI logical artifacts (System Prompts, Skills, Tool Schemas). Designed for local development and CI/CD integration.
 
-**[Documentation](https://sanityops.org)** | **[Report Bug](https://github.com/sanityops/sanityops-cli/issues)** | **[Request Feature](https://github.com/sanityops/sanityops-cli/issues)**
+**[Documentation](https://sanityops.org)** | **[Report Bug](https://github.com/sanityops-org/sanityops-cli/issues)** | **[Request Feature](https://github.com/sanityops-org/sanityops-cli/issues)**
 
 ## Features
 
@@ -46,7 +46,7 @@ pip install sanityops-cli
 ### From Source
 
 ```bash
-git clone https://github.com/sanityops/sanityops-cli.git
+git clone https://github.com/sanityops-org/sanityops-cli.git
 cd sanityops-cli
 pip install -e .
 ```
@@ -121,7 +121,7 @@ Full documentation is available at [sanityops.org](https://sanityops.org).
 
 ```bash
 # Clone the repository
-git clone https://github.com/sanityops/sanityops-cli.git
+git clone https://github.com/sanityops-org/sanityops-cli.git
 cd sanityops-cli
 
 # Create virtual environment
