@@ -4,7 +4,6 @@ import uuid
 from pathlib import Path
 
 import typer
-import yaml
 from rich.console import Console
 
 from sanityops_cli.commands.inspect import inspect_app
