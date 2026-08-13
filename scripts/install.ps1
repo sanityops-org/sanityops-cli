@@ -29,9 +29,9 @@ if ([string]::IsNullOrWhiteSpace($rawArchitecture)) {
 }
 
 switch ($rawArchitecture.ToLowerInvariant()) {
-    "amd64" { $asset = "sanityops-cli-win-x64.exe" }
-    "x64" { $asset = "sanityops-cli-win-x64.exe" }
-    "arm64" { $asset = "sanityops-cli-win-arm64.exe" }
+    "amd64" { $architecture = "x64"; $asset = "sanityops-cli-win-x64.exe" }
+    "x64" { $architecture = "x64"; $asset = "sanityops-cli-win-x64.exe" }
+    "arm64" { $architecture = "arm64"; $asset = "sanityops-cli-win-arm64.exe" }
     default { Fail "Unsupported Windows architecture: $rawArchitecture" }
 }
 
