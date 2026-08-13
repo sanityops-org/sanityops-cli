@@ -168,7 +168,7 @@ class TestInitConfigPreservesComments:
         # Assert
         config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
         content = config_file.read_text()
-        assert "# provider:" in content or "provider:" in content, "Provider field comment should be preserved"
+        assert "provider: anthropic" in content, "Provider field comment should be preserved"
 
     def test_generated_config_contains_required_optional_labels(self, tmp_path: Path, monkeypatch):
         """Should preserve Required/Optional labels in comments."""
