@@ -356,7 +356,7 @@ jobs:
           name: release-${{ needs.prepare.outputs.version }}
           path: release/
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           name: Release v${{ needs.prepare.outputs.version }}
