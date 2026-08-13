@@ -4,7 +4,6 @@ import uuid
 from pathlib import Path
 
 import typer
-import yaml
 from rich.console import Console
 
 from sanityops_cli.commands.inspect import inspect_app
@@ -57,17 +56,21 @@ def init_config() -> None:
 
     # Load template and generate UUID
     try:
-        template = _load_template()
+        template_content = _load_template()
     except (FileNotFoundError, ModuleNotFoundError, OSError) as e:
         console.print(f"[red]✗ Internal error: template not found ({e})[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
 
-    template["project"]["id"] = str(uuid.uuid4())
+    # Replace placeholder UUID with generated one
+    template_content = template_content.replace(
+        "00000000-0000-0000-0000-000000000000",
+        str(uuid.uuid4())
+    )
 
     # Write config file
     try:
         with open(config_file, "w", encoding="utf-8") as f:
-            yaml.dump(template, f)
+            f.write(template_content)
     except OSError as e:
         console.print(f"[red]✗ Cannot write config file: {e}[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
@@ -76,11 +79,12 @@ def init_config() -> None:
     console.print("  Edit this file to add your prompts, tools, and skills.")
 
 
-def _load_template() -> dict:
-    """Load the inspect_config.yaml template.
+def _load_template() -> str:
+    """Load the inspect_config.yaml template as a string.
 
     Returns:
-        Template as dictionary with placeholder UUID.
+        Template content with placeholder UUID. Returns as string
+        to preserve YAML comments.
     """
     import sys
 
@@ -92,8 +96,6 @@ def _load_template() -> dict:
         import importlib.resources
 
         template_path = importlib.resources.files("sanityops_cli.templates") / "inspect_config.yaml"
-        with template_path.open("r", encoding="utf-8") as f:
-            return yaml.safe_load(f)
+        return template_path.read_text(encoding="utf-8")
 
-    with open(template_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    return template_path.read_text(encoding="utf-8")

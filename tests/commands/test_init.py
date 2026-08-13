@@ -135,3 +135,71 @@ class TestInitConfig:
 
         command_names = [cmd.name for cmd in inspect_app.registered_commands]
         assert "init" in command_names, "'init' should remain under 'inspect' for backward compat"
+
+
+class TestInitConfigPreservesComments:
+    """Test that init preserves YAML comments in template."""
+
+    def test_generated_config_contains_model_comment(self, tmp_path: Path, monkeypatch):
+        """Should preserve '# Model configuration' comment in output."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        from sanityops_cli.commands.init import init_config
+
+        # Act
+        init_config()
+
+        # Assert
+        config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
+        content = config_file.read_text()
+        assert "# Model configuration" in content, "Model configuration header comment should be preserved"
+
+    def test_generated_config_contains_provider_comment(self, tmp_path: Path, monkeypatch):
+        """Should preserve provider field comment with examples."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        from sanityops_cli.commands.init import init_config
+
+        # Act
+        init_config()
+
+        # Assert
+        config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
+        content = config_file.read_text()
+        assert "provider: anthropic" in content, "Provider field comment should be preserved"
+
+    def test_generated_config_contains_required_optional_labels(self, tmp_path: Path, monkeypatch):
+        """Should preserve Required/Optional labels in comments."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        from sanityops_cli.commands.init import init_config
+
+        # Act
+        init_config()
+
+        # Assert
+        config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
+        content = config_file.read_text()
+        assert "Required:" in content or "# Required" in content, "Required labels should be in comments"
+
+    def test_generated_config_has_valid_uuid_not_placeholder(self, tmp_path: Path, monkeypatch):
+        """Should replace placeholder UUID with real UUID."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        from sanityops_cli.commands.init import init_config
+
+        # Act
+        init_config()
+
+        # Assert
+        config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
+        content = config_file.read_text()
+        assert "00000000-0000-0000-0000-000000000000" not in content, "Placeholder UUID should be replaced"
+
+        # Verify the actual UUID is valid
+        data = yaml.safe_load(content)
+        uuid.UUID(data["project"]["id"])  # raises if invalid
