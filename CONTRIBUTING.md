@@ -164,7 +164,7 @@ test(commands): add tests for init command
 
 ## Questions?
 
-- Open a [GitHub Discussion](https://github.com/sanityops/sanityops-cli/discussions) for general questions
-- Open an [Issue](https://github.com/sanityops/sanityops-cli/issues) for bug reports or feature requests
+- Open a [GitHub Discussion](https://github.com/sanityops-org/sanityops-cli/discussions) for general questions
+- Open an [Issue](https://github.com/sanityops-org/sanityops-cli/issues) for bug reports or feature requests
 
 Thank you for contributing!

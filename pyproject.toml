@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sanityops-cli"
-version = "0.0.1"
+version = "0.0.0"
 description = "CLI tool for static defect inspection of AI logical artifacts"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -43,8 +43,8 @@ sanityops-cli = "sanityops_cli.main:app"
 [project.urls]
 Homepage = "https://sanityops.org"
 Documentation = "https://sanityops.org"
-Repository = "https://github.com/sanityops/sanityops-cli"
-Issues = "https://github.com/sanityops/sanityops-cli/issues"
+Repository = "https://github.com/sanityops-org/sanityops-cli"
+Issues = "https://github.com/sanityops-org/sanityops-cli/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sanityops_cli"]
