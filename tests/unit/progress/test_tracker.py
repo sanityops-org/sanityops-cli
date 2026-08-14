@@ -74,6 +74,13 @@ class TestProgressTracker:
             # multiple objects into a single row.
             assert step._live_console._lines[-1].plain == "a b"
 
+    def test_step_name_with_markup_chars_is_preserved(self, tmp_path):
+        """A step name containing markup characters renders literally."""
+        tracker, console, _ = self._tracker(tmp_path)
+        with tracker.step("Analyze [a-z]"):
+            pass
+        assert "[a-z]" in console.export_text()
+
     def test_verbose_mode_failure_collapses_to_error_summary(self, tmp_path):
         tracker, console, _ = self._tracker(tmp_path, verbose=True)
         with pytest.raises(RuntimeError, match="boom"):
