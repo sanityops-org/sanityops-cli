@@ -41,7 +41,7 @@ class ScannerAgent:
         self.timeout = timeout
         self.verbose = verbose
         self.console = console or Console()
-        self.logger = logger
+        self.logger: Logger | None = logger
 
     async def scan(
         self,

@@ -16,6 +16,8 @@ from sanityops_cli.logging.logger import Logger
 #: Refresh rate for spinner/live displays (Hz).
 _REFRESH_PER_SECOND = 10
 
+__all__ = ["ProgressTracker", "StepContext"]
+
 
 class ProgressTracker:
     """Tracks sequential steps: spinner progress, per-step timing, logging."""

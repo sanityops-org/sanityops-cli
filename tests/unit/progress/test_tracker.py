@@ -57,6 +57,8 @@ class TestProgressTracker:
         with step:
             assert step.console is not tracker.console
             step.console.print("  [dim]detail line[/]")
+            # Intentionally inspect the Live sink's accumulated lines: verifies
+            # the duck-typed console routes output into the Live display.
             assert step._live_console._lines[0].plain == "  detail line"
         text = console.export_text()
         assert "Analyzing artifacts..." in text
@@ -68,6 +70,8 @@ class TestProgressTracker:
         step = tracker.step("Analyzing artifacts...")
         with step:
             step.console.print("a", "b")
+            # Private attr access is intentional: verifies the Live sink merges
+            # multiple objects into a single row.
             assert step._live_console._lines[-1].plain == "a b"
 
     def test_verbose_mode_failure_collapses_to_error_summary(self, tmp_path):
