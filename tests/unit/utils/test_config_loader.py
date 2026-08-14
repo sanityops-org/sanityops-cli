@@ -300,3 +300,45 @@ class TestModelSectionValidation:
         with pytest.raises(ValidationError) as excinfo:
             loader.load()
         assert "model" in str(excinfo.value).lower()
+
+
+class TestSkillsSectionFilesOnly:
+    """Skills entries must be existing files, not directories."""
+
+    def _write_config(self, tmp_path: Path, skills_entries: list) -> Path:
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-0000000000aa"},
+            "skills": skills_entries,
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+        return config_file
+
+    def test_skills_file_resolves_absolute_path(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        skill_file = tmp_path / "code_review.md"
+        skill_file.write_text("# code review\n")
+        config_file = self._write_config(tmp_path, [{"file": "code_review.md"}])
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["skills"] == [str(skill_file.resolve())]
+
+    def test_skills_directory_raises_error(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "skills_dir").mkdir()
+        config_file = self._write_config(tmp_path, [{"file": "skills_dir"}])
+        loader = InspectConfigLoader(str(config_file))
+        with pytest.raises(ValidationError) as excinfo:
+            loader.load()
+        assert "not a file" in str(excinfo.value).lower()
+
+    def test_skills_missing_file_raises_error(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        config_file = self._write_config(tmp_path, [{"file": "missing.md"}])
+        loader = InspectConfigLoader(str(config_file))
+        with pytest.raises(ValidationError) as excinfo:
+            loader.load()
+        assert "not found" in str(excinfo.value).lower()
