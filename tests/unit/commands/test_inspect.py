@@ -178,3 +178,57 @@ def test_inspect_config_error_shows_guidance_without_log_hint(monkeypatch, tmp_p
     assert "Config error" in text
     assert "Config file not found" in text
     assert "See log for details" not in text
+
+
+def test_banner_line_contains_version_python_and_platform():
+    import platform
+
+    from sanityops_cli import __version__
+    from sanityops_cli.commands.inspect import _banner_line
+
+    line = _banner_line()
+    assert f"sanityops-cli v{__version__}" in line
+    assert platform.python_version() in line
+    assert "|" in line
+
+
+def test_inspect_prints_banner_before_project_id(monkeypatch, tmp_path):
+    """The run banner should appear directly before the Project ID line."""
+    from sanityops_cli import __version__
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text("---\nname: s\ndescription: d\n---\n# X\n")
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    class FakeAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            return _findings()
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FakeAgent(),
+    )
+
+    output = io.StringIO()
+    test_console = Console(file=output, record=True)
+    monkeypatch.setattr("sanityops_cli.commands.inspect.console", test_console)
+
+    result = runner.invoke(app, ["inspect", "--config", str(cfg), "--skip-defect-check"])
+    assert result.exit_code == 0
+    text = output.getvalue()
+    assert f"sanityops-cli v{__version__}" in text
+    assert "Project ID: 00000000-0000-0000-0000-000000000000" in text
+    # the Project ID line must immediately follow the banner line (no intervening output)
+    lines = text.splitlines()
+    banner_line_idx = next(
+        i for i, line in enumerate(lines) if f"sanityops-cli v{__version__}" in line
+    )
+    assert (
+        "Project ID: 00000000-0000-0000-0000-000000000000"
+        in lines[banner_line_idx + 1]
+    )
