@@ -33,7 +33,7 @@ dependencies = [
     "tomli-w>=1.0",
     "defect-check",
     "pyyaml>=6.0",
-    "sanityops-agent>=0.0.3",
+    "sanityops-agent>=0.0.4",
     "anyio>=4.0",
 ]
 
