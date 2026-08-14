@@ -8,24 +8,9 @@ import yaml
 
 from sanityops_cli.exceptions.base_exceptions import ValidationError
 
-# Reuse excluded directories from validators
-from sanityops_cli.utils.validators import EXCLUDED_DIRS
-
 # Default config file location
 DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
-
-# Regex pattern for skill.md frontmatter (YAML frontmatter with name & description)
-_SKILL_FRONTMATTER_RE = re.compile(
-    r"^---\s*\n"
-    r"(?:.*\n)*?"
-    r"name\s*:\s*.+\n"
-    r"(?:.*\n)*?"
-    r"description\s*:\s*.+\n"
-    r"(?:.*\n)*?"
-    r"^---\s*$",
-    re.MULTILINE,
-)
 
 
 class InspectConfigLoader:
@@ -196,7 +181,7 @@ class InspectConfigLoader:
         return self._process_file_entries(entries, "tools")
 
     def _process_file_entries(self, entries: list, label: str) -> list[str]:
-        """Common logic for prompts and tools: each entry must be a readable file."""
+        """Common logic for prompts, tools, and skills: each entry must be a readable file."""
         result: list[str] = []
         for i, entry in enumerate(entries):
             file_str = self._extract_file_value(entry, label, i)
@@ -217,71 +202,11 @@ class InspectConfigLoader:
     # ------------------------------------------------------------------
 
     def _process_skills(self) -> list[str]:
-        """Validate skill files/directories and return absolute file paths.
-
-        For directories, recursively find files matching skill.md format.
-        """
+        """Validate skill files and return absolute paths (files only)."""
         entries = self._config.get("skills", [])
         if entries is None:
             entries = []
-
-        result: list[str] = []
-        for i, entry in enumerate(entries):
-            file_str = self._extract_file_value(entry, "skills", i)
-            abs_path = self._resolve_file_path(file_str)
-
-            if not abs_path.exists():
-                raise ValidationError(
-                    f"[skills] path not found: {file_str} (resolved: {abs_path})"
-                )
-
-            if abs_path.is_file():
-                result.append(str(abs_path))
-            elif abs_path.is_dir():
-                result.extend(self._find_skill_files_in_dir(abs_path))
-            else:
-                raise ValidationError(
-                    f"[skills] path is neither file nor directory: {file_str}"
-                )
-
-        return result
-
-    def _find_skill_files_in_dir(self, dir_path: Path) -> list[str]:
-        """Recursively find skill.md format files in a directory."""
-        found: list[str] = []
-        for item in sorted(dir_path.rglob("*")):
-            # skip excluded directories
-            if any(part in EXCLUDED_DIRS for part in item.parts):
-                continue
-            if not item.is_file():
-                continue
-            if self._is_skill_file(item):
-                found.append(str(item.resolve()))
-        return found
-
-    def _is_skill_file(self, file_path: Path) -> bool:
-        """Check if a file matches skill.md standard format.
-
-        A skill.md file should:
-        - Have .md extension
-        - Contain YAML frontmatter with 'name' and 'description' fields
-          OR be named 'skill.md'
-        """
-        # Must be a markdown file
-        if file_path.suffix.lower() != ".md":
-            return False
-
-        # File named skill.md is always considered a skill file
-        if file_path.name.lower() == "skill.md":
-            return True
-
-        # Otherwise check for valid frontmatter
-        try:
-            content = file_path.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError):
-            return False
-
-        return bool(_SKILL_FRONTMATTER_RE.search(content))
+        return self._process_file_entries(entries, "skills")
 
     # ------------------------------------------------------------------
     # Entry parsing helper
