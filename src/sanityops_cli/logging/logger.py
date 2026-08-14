@@ -13,6 +13,8 @@ _SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(api[_-]?key\s*[:=]\s*)[^\s\"',}]+", re.IGNORECASE), r"\1***"),
 ]
 
+__all__ = ["Logger"]
+
 
 class Logger:
     """Appends timestamped, leveled messages to a dated log file.
@@ -63,6 +65,16 @@ class Logger:
 
     def get_log_path(self) -> Path:
         return self.log_file
+
+    def close(self) -> None:
+        """Close and remove the file handler, releasing the open handle.
+
+        Safe to call more than once; after closing, further log calls are
+        dropped (no handler remains to write them).
+        """
+        for handler in self._logger.handlers[:]:
+            handler.close()
+            self._logger.removeHandler(handler)
 
     @staticmethod
     def redact(message: str) -> str:

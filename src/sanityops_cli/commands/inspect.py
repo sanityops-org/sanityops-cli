@@ -22,9 +22,17 @@ inspect_app = typer.Typer()
 ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
 
 
-def _report_program_error(logger: Logger, step_name: str, error: Exception) -> None:
-    """Print a concise program-error summary and point to the log file."""
-    console.print(f"[red]✗ Error in step \"{step_name}\"[/]")
+def _report_program_error(
+    logger: Logger, step_name: str, error: Exception, *, step_summary_shown: bool = False
+) -> None:
+    """Print a concise program-error summary and point to the log file.
+
+    In verbose mode the failing step's ``StepContext`` already collapsed to a
+    ``✗ {name} ({duration}s)`` line, so the step-error headline is skipped to
+    avoid reporting the same failure twice.
+    """
+    if not step_summary_shown:
+        console.print(f"[red]✗ Error in step \"{step_name}\"[/]")
     console.print(f"  Message: {error}")
     console.print(f"\nSee log for details: {logger.get_log_path()}")
     console.print("To report this issue, attach the log file to:")
@@ -68,7 +76,7 @@ def inspect(
         console.print(f"[red]✗ Config error: {e}[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
     except Exception as e:
-        _report_program_error(logger, "Loading configuration...", e)
+        _report_program_error(logger, "Loading configuration...", e, step_summary_shown=verbose)
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     project_id = artifacts["project_id"]
@@ -121,7 +129,7 @@ def inspect(
                 skills=skill_files,
             )
     except Exception as e:
-        _report_program_error(logger, "Analyzing artifacts...", e)
+        _report_program_error(logger, "Analyzing artifacts...", e, step_summary_shown=verbose)
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     if not result.skills and not result.tools and not result.prompts:
@@ -143,7 +151,7 @@ def inspect(
         with tracker.step("Running defect check..."):
             response = anyio.run(run_check)
     except Exception as e:
-        _report_program_error(logger, "Running defect check...", e)
+        _report_program_error(logger, "Running defect check...", e, step_summary_shown=verbose)
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     tracker.summary()
