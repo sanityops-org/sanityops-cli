@@ -76,7 +76,7 @@ def inspect(
     tool_files = artifacts["tools"]
     skill_files = artifacts["skills"]
 
-    # Step 2: Display resolved artifacts
+    # Display resolved artifacts
     table = Table(title="[bold]Inspect Artifacts[/]", border_style="blue")
     table.add_column("Type", style="bold cyan", no_wrap=True)
     table.add_column("Absolute Path", style="white")
@@ -93,7 +93,7 @@ def inspect(
         f"{len(tool_files)} tools, {len(skill_files)} skills[/dim]\n"
     )
 
-    # Step 3: Run ScannerAgent analysis
+    # Step 2: Run ScannerAgent analysis
     try:
         with tracker.step("Analyzing artifacts...") as step:
             # Resolve LLM config (config file model section or env vars)
@@ -129,7 +129,7 @@ def inspect(
         tracker.summary()
         raise typer.Exit()
 
-    # Step 4: Run defect check and render (unless skipped)
+    # Step 3: Run defect check and render (unless skipped)
     if skip_defect_check:
         console.print("[dim]Defect check skipped (--skip-defect-check).[/dim]")
         tracker.summary()

@@ -66,7 +66,12 @@ class Logger:
 
     @staticmethod
     def redact(message: str) -> str:
-        """Mask API keys and secret-bearing substrings before logging."""
+        """Mask API keys and secret-bearing substrings before logging.
+
+        Coverage is intentionally limited to OpenAI-style ``sk-...`` keys and
+        ``api_key=`` / ``api-key:`` assignments; other credential formats
+        (e.g. AWS, Azure) are not matched and should not be logged.
+        """
         for pattern, repl in _SECRET_PATTERNS:
             message = pattern.sub(repl, message)
         return message
