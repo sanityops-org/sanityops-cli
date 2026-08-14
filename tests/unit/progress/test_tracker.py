@@ -62,3 +62,10 @@ class TestProgressTracker:
         assert "Analyzing artifacts..." in text
         # detail lines collapse on completion; only the summary remains
         assert "detail line" not in text
+
+    def test_verbose_live_console_merges_multiple_objects(self, tmp_path):
+        tracker, console, _ = self._tracker(tmp_path, verbose=True)
+        step = tracker.step("Analyzing artifacts...")
+        with step:
+            step.console.print("a", "b")
+            assert step._live_console._lines[-1].plain == "a b"
