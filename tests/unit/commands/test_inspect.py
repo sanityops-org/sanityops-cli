@@ -102,7 +102,8 @@ def test_inspect_program_error_points_to_log_file(monkeypatch, tmp_path):
 
     class FailingAgent:
         def analyze_files_sync(self, prompts, tools, skills):
-            raise RuntimeError("LLM API timeout")
+            # brackets in the message would be eaten as Rich markup if unescaped
+            raise RuntimeError("LLM API timeout [a-z]")
 
     monkeypatch.setattr(
         "sanityops_cli.commands.inspect.ScannerAgent",
@@ -117,7 +118,7 @@ def test_inspect_program_error_points_to_log_file(monkeypatch, tmp_path):
     assert result.exit_code == EXIT_FAILURE
     text = output.getvalue()
     assert "Error in step" in text
-    assert "LLM API timeout" in text
+    assert "LLM API timeout [a-z]" in text
     assert "See log for details" in text
     assert "github.com/sanityops-org/sanityops-cli/issues" in text
 
