@@ -11,10 +11,24 @@ from sanityops_cli.defect_checker.checker import DefectChecker
 from sanityops_cli.defect_checker.llm_config import resolve_llm_config
 from sanityops_cli.defect_checker.renderer import DefectRenderer
 from sanityops_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.logging.logger import Logger
+from sanityops_cli.progress.tracker import ProgressTracker
 from sanityops_cli.utils.config_loader import InspectConfigLoader
 
 console = Console()
 inspect_app = typer.Typer()
+
+#: URL users attach log files to when reporting issues.
+ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
+
+
+def _report_program_error(logger: Logger, step_name: str, error: Exception) -> None:
+    """Print a concise program-error summary and point to the log file."""
+    console.print(f"[red]✗ Error in step \"{step_name}\"[/]")
+    console.print(f"  Message: {error}")
+    console.print(f"\nSee log for details: {logger.get_log_path()}")
+    console.print("To report this issue, attach the log file to:")
+    console.print(ISSUE_URL)
 
 
 @inspect_app.callback(invoke_without_command=True)
@@ -42,12 +56,19 @@ def inspect(
         console.print(f"[red]✗ Invalid check level: {check_level} (must be L1/L2/L3)[/red]")
         raise typer.Exit(code=EXIT_FAILURE)
 
+    logger = Logger()
+    tracker = ProgressTracker(console, logger, verbose=verbose)
+
     # Step 1: Load and validate config
     try:
-        loader = InspectConfigLoader(config)
-        artifacts = loader.load()
+        with tracker.step("Loading configuration..."):
+            loader = InspectConfigLoader(config)
+            artifacts = loader.load()
     except ValidationError as e:
         console.print(f"[red]✗ Config error: {e}[/red]")
+        raise typer.Exit(code=EXIT_FAILURE) from None
+    except Exception as e:
+        _report_program_error(logger, "Loading configuration...", e)
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     project_id = artifacts["project_id"]
@@ -74,38 +95,44 @@ def inspect(
 
     # Step 3: Run ScannerAgent analysis
     try:
-        # Pass config path for model section resolution
-        # Use the same path that InspectConfigLoader resolved
-        llm_config = resolve_llm_config(config)
+        with tracker.step("Analyzing artifacts...") as step:
+            # Resolve LLM config (config file model section or env vars)
+            llm_config = resolve_llm_config(config)
+
+            from sanityops_agent.config import ProviderConfig
+            from sanityops_agent.llm.factory import ProviderFactory
+
+            provider_config = ProviderConfig(
+                LLM_PROVIDER=llm_config["llm_provider"],
+                API_KEY=llm_config["llm_api_key"],
+                MODEL_ID=llm_config["llm_model_id"],
+                BASE_URL=llm_config["llm_base_url"] or None,
+            )
+            provider = ProviderFactory.create(provider_config)
+            agent = ScannerAgent(
+                provider=provider,
+                verbose=verbose,
+                console=step.console,
+                logger=logger,
+            )
+            result = agent.analyze_files_sync(
+                prompts=prompt_files,
+                tools=tool_files,
+                skills=skill_files,
+            )
     except Exception as e:
-        console.print(f"[red]✗ Failed to resolve LLM configuration: {e}[/red]")
+        _report_program_error(logger, "Analyzing artifacts...", e)
         raise typer.Exit(code=EXIT_FAILURE) from None
-
-    from sanityops_agent.config import ProviderConfig
-    from sanityops_agent.llm.factory import ProviderFactory
-
-    # Construct ProviderConfig from resolved llm_config (config file or env vars)
-    provider_config = ProviderConfig(
-        LLM_PROVIDER=llm_config["llm_provider"],
-        API_KEY=llm_config["llm_api_key"],
-        MODEL_ID=llm_config["llm_model_id"],
-        BASE_URL=llm_config["llm_base_url"] or None,
-    )
-    provider = ProviderFactory.create(provider_config)
-    agent = ScannerAgent(provider=provider, verbose=verbose)
-    result = agent.analyze_files_sync(
-        prompts=prompt_files,
-        tools=tool_files,
-        skills=skill_files,
-    )
 
     if not result.skills and not result.tools and not result.prompts:
         console.print("[yellow]No artifacts found to check.[/yellow]")
+        tracker.summary()
         raise typer.Exit()
 
     # Step 4: Run defect check and render (unless skipped)
     if skip_defect_check:
         console.print("[dim]Defect check skipped (--skip-defect-check).[/dim]")
+        tracker.summary()
         raise typer.Exit()
 
     async def run_check():
@@ -113,9 +140,11 @@ def inspect(
         return await checker.check(result, check_level=check_level)
 
     try:
-        response = anyio.run(run_check)
+        with tracker.step("Running defect check..."):
+            response = anyio.run(run_check)
     except Exception as e:
-        console.print(f"[red]✗ Defect check failed: {e}[/red]")
+        _report_program_error(logger, "Running defect check...", e)
         raise typer.Exit(code=EXIT_FAILURE) from None
 
+    tracker.summary()
     DefectRenderer(console).render(response)
