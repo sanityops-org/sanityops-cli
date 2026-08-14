@@ -16,6 +16,7 @@ from sanityops_cli.agents.scanner_agent.prompts import (
     TOOL_FINDER_RULES,
 )
 from sanityops_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.logging.logger import Logger
 
 # ============================================================================
 # ScannerAgent Class
@@ -33,7 +34,7 @@ class ScannerAgent:
         timeout: int = 120,
         verbose: bool = False,
         console: Console | None = None,
-        logger=None,
+        logger: Logger | None = None,
     ):
         self.provider = provider
         self.max_loops = max_loops
