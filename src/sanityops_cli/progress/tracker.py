@@ -17,6 +17,9 @@ from sanityops_cli.logging.logger import Logger
 #: Refresh rate for spinner/live displays (Hz).
 _REFRESH_PER_SECOND = 10
 
+#: Width of the summary divider, in characters.
+_DIVIDER_LENGTH = 30
+
 __all__ = ["ProgressTracker", "StepContext"]
 
 
@@ -36,7 +39,7 @@ class ProgressTracker:
     def summary(self) -> None:
         """Print a divider and the total elapsed time across all steps."""
         total = sum(duration for _, duration in self.step_times)
-        self.console.print(f"[dim]{'─' * 30}[/]")
+        self.console.print(f"[dim]{'─' * _DIVIDER_LENGTH}[/]")
         self.console.print(f"[bold]Total time:[/] {total:.2f}s")
 
 
@@ -59,6 +62,9 @@ class _LiveConsole:
         Multiple objects are joined with spaces (rich's default); a ``style``
         kwarg is honored. Other rich keyword options are ignored — each print
         is rendered as its own row in the Live display.
+
+        Callers must pass pre-escaped markup (see ``rich.markup.escape``),
+        mirroring ``Console.print`` semantics: the message is parsed as markup.
         """
         message = " ".join(str(obj) for obj in objects) if objects else ""
         line = Text.from_markup(message, style=kwargs.get("style"))

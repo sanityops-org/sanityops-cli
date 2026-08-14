@@ -51,6 +51,16 @@ class TestLogger:
         assert "sk-abc123DEF456" not in content
         assert "sk-proj-9f8e7d6c5b4a3a" not in content
 
+    def test_redact_masks_value_with_backslash(self, tmp_path: Path):
+        # regression: values containing backslashes must still be redacted
+        # (the api_key pattern uses [^\s\"',}]+ — the escaped quote does not
+        # exclude backslashes from the match)
+        logger = Logger(tmp_path)
+        logger.info("using api_key=sk-abc\\def token")
+        content = logger.get_log_path().read_text()
+        assert "api_key=***" in content
+        assert "sk-abc" not in content
+
     def test_redact_static(self):
         assert "sk-***" in Logger.redact("key=sk-abcdefghijklmn")
         assert Logger.redact("plain message") == "plain message"
