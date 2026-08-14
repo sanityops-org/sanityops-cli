@@ -33,8 +33,7 @@ tools:
   - file: tools/file_ops.py
   - file: tools/code_tools.ts
 
-# Skills file list (file or directory)
+# Skills file list (supports any plaintext file format)
 skills:
   - file: skills/code_review.md
   - file: skills/code_fix/skill.md
-  - file: skills/
