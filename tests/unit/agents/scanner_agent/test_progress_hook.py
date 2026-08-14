@@ -30,9 +30,9 @@ class _FakeLogger:
         self.error_calls.append(message)
 
 
-def _make_hook(logger):
+def _make_hook(logger, verbose=False):
     console = Console(record=True, file=io.StringIO())
-    hook = ProgressHook(console=console, verbose=False, logger=logger)
+    hook = ProgressHook(console=console, verbose=verbose, logger=logger)
     hook._get_events = lambda: _FakeEvents()  # type: ignore[method-assign]
     return hook, console
 
@@ -73,3 +73,19 @@ class TestProgressHookLogging:
         await hook.handle(_ctx("after_tool_exec", {"tool_name": "task"}, is_error=True))
         # console output still appears without a logger
         assert "LLM call" in console.export_text()
+
+    @pytest.mark.anyio
+    async def test_grep_pattern_with_markup_chars_is_preserved(self):
+        logger = _FakeLogger()
+        # grep detail lines are only emitted in verbose mode
+        hook, _ = _make_hook(logger, verbose=True)
+        await hook.handle(
+            _ctx(
+                "before_tool_exec",
+                {
+                    "tool_name": "grep",
+                    "tool_input": {"pattern": "[a-z]", "path": "/p"},
+                },
+            )
+        )
+        assert any("[a-z]" in m for m in logger.debug_calls)
