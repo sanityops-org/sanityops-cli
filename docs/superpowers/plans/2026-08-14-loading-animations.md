@@ -543,7 +543,7 @@ Add the `_emit` helper (place it right before `async def handle`):
         """Print a progress line to console and mirror it to the logger at DEBUG."""
         self.console.print(message)
         if self.logger is not None:
-            self.logger.debug(Text.from_markup(message).plain)
+            self.logger.debug(Text.from_markup(message).plain.strip())
 ```
 
 Replace every `self.console.print(...)` call inside `handle()` with `self._emit(...)` **except** the `AFTER_TOOL_EXEC` task-failure branch, which becomes:
