@@ -284,8 +284,12 @@ class TestProgressTracker:
         step = tracker.step("Analyzing artifacts...")
         with step:
             assert step.console is not tracker.console
+            step.console.print("  [dim]detail line[/]")
+            assert step._live_console._lines[0].plain == "  detail line"
         text = console.export_text()
         assert "Analyzing artifacts..." in text
+        # detail lines collapse on completion; only the summary remains
+        assert "detail line" not in text
 ```
 
 Create empty `__init__.py` files for `src/sanityops_cli/progress/__init__.py` and `tests/unit/progress/__init__.py`.
@@ -305,8 +309,9 @@ Create `src/sanityops_cli/progress/tracker.py`:
 from __future__ import annotations
 
 import time
+from typing import Any
 
-from rich.console import Console
+from rich.console import Console, Group, RenderableType
 from rich.live import Live
 from rich.spinner import Spinner
 from rich.status import Status
@@ -338,6 +343,29 @@ class ProgressTracker:
         self.console.print(f"[bold]Total time:[/] {total:.2f}s")
 
 
+class _LiveConsole:
+    """Console-like sink that appends printed lines into a step's Live display.
+
+    Duck-types ``Console.print`` so an agent's ProgressHook can stream detail
+    lines into the step's Live renderable (expand). The accumulated lines
+    collapse away when the Live stops, replaced by the step summary.
+    """
+
+    def __init__(self, live: Live, step_name: str) -> None:
+        self._live = live
+        self._step_name = step_name
+        self._lines: list[RenderableType] = []
+
+    def print(self, message: str = "", **kwargs: Any) -> None:
+        self._lines.append(Text.from_markup(message))
+        self._live.update(
+            Group(
+                Spinner("dots", text=f"[bold cyan]{self._step_name}[/]"),
+                *self._lines,
+            )
+        )
+
+
 class StepContext:
     """Context manager for a single tracked step."""
 
@@ -347,12 +375,13 @@ class StepContext:
         self._start: float = 0.0
         self._live: Live | None = None
         self._status: Status | None = None
+        self._live_console: _LiveConsole | None = None
 
     @property
     def console(self) -> Console:
-        """Console to route agent progress output into (Live console in verbose mode)."""
-        if self._live is not None:
-            return self._live.console
+        """Console to route agent progress output into (Live sink in verbose mode)."""
+        if self._live_console is not None:
+            return self._live_console
         return self.tracker.console
 
     def __enter__(self) -> "StepContext":
@@ -364,6 +393,7 @@ class StepContext:
             )
             self._live.start()
             self._live.update(Spinner("dots", text=f"[bold cyan]{self.name}[/]"))
+            self._live_console = _LiveConsole(self._live, self.name)
         else:
             self._status = self.tracker.console.status(f"[bold cyan]{self.name}[/]")
             self._status.start()
@@ -379,6 +409,7 @@ class StepContext:
                 self._live.update(summary)
                 self._live.stop()
                 self._live = None
+                self._live_console = None
             else:
                 self._status.stop()
                 self._status = None
@@ -388,6 +419,7 @@ class StepContext:
             if self._live is not None:
                 self._live.stop()
                 self._live = None
+                self._live_console = None
             else:
                 self._status.stop()
                 self._status = None
