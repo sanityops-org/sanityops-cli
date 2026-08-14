@@ -194,6 +194,8 @@ def test_banner_line_contains_version_python_and_platform():
 
 def test_inspect_prints_banner_before_project_id(monkeypatch, tmp_path):
     """The run banner should appear directly before the Project ID line."""
+    from sanityops_cli import __version__
+
     monkeypatch.setenv("HOME", str(tmp_path))
     skill_file = tmp_path / "skill.md"
     skill_file.write_text("---\nname: s\ndescription: d\n---\n# X\n")
@@ -219,7 +221,14 @@ def test_inspect_prints_banner_before_project_id(monkeypatch, tmp_path):
     result = runner.invoke(app, ["inspect", "--config", str(cfg), "--skip-defect-check"])
     assert result.exit_code == 0
     text = output.getvalue()
-    assert "sanityops-cli v0.0.2" in text
+    assert f"sanityops-cli v{__version__}" in text
     assert "Project ID: 00000000-0000-0000-0000-000000000000" in text
-    # banner line precedes the Project ID line
-    assert text.index("sanityops-cli v0.0.2") < text.index("Project ID:")
+    # the Project ID line must immediately follow the banner line (no intervening output)
+    lines = text.splitlines()
+    banner_line_idx = next(
+        i for i, line in enumerate(lines) if f"sanityops-cli v{__version__}" in line
+    )
+    assert (
+        "Project ID: 00000000-0000-0000-0000-000000000000"
+        in lines[banner_line_idx + 1]
+    )
