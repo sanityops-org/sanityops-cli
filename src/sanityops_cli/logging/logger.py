@@ -9,7 +9,7 @@ from pathlib import Path
 
 #: Patterns used to redact secrets before writing to disk.
 _SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
-    (re.compile(r"sk-[A-Za-z0-9_\-]{8,}"), "sk-***"),
+    (re.compile(r"sk-[A-Za-z0-9_-]{8,}"), "sk-***"),
     (re.compile(r"(api[_-]?key\s*[:=]\s*)[^\s\"',}]+", re.IGNORECASE), r"\1***"),
 ]
 
@@ -21,6 +21,10 @@ class Logger:
 
     Each instance owns its own stdlib logger and file handler so multiple
     instances (e.g. in tests) do not share handlers.
+
+    Process-scoped usage (the CLI) intentionally relies on interpreter exit to
+    flush and close the handler; ``close()`` is provided for long-lived callers
+    and tests to release the handle explicitly.
     """
 
     def __init__(self, log_dir: Path | None = None) -> None:

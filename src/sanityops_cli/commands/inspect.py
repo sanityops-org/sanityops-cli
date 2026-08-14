@@ -3,6 +3,7 @@
 import anyio
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from sanityops_cli.agents.scanner_agent.agent import ScannerAgent
@@ -32,8 +33,8 @@ def _report_program_error(
     avoid reporting the same failure twice.
     """
     if not step_summary_shown:
-        console.print(f"[red]✗ Error in step \"{step_name}\"[/]")
-    console.print(f"  Message: {error}")
+        console.print(f"[red]✗ Error in step \"{escape(step_name)}\"[/]")
+    console.print(f"  Message: {escape(str(error))}")
     console.print(f"\nSee log for details: {logger.get_log_path()}")
     console.print("To report this issue, attach the log file to:")
     console.print(ISSUE_URL)
@@ -61,7 +62,7 @@ def inspect(
 ):
     """Inspect and defect-check the configured artifacts."""
     if check_level not in {"L1", "L2", "L3"}:
-        console.print(f"[red]✗ Invalid check level: {check_level} (must be L1/L2/L3)[/red]")
+        console.print(f"[red]✗ Invalid check level: {escape(check_level)} (must be L1/L2/L3)[/red]")
         raise typer.Exit(code=EXIT_FAILURE)
 
     logger = Logger()
@@ -73,7 +74,7 @@ def inspect(
             loader = InspectConfigLoader(config)
             artifacts = loader.load()
     except ValidationError as e:
-        console.print(f"[red]✗ Config error: {e}[/red]")
+        console.print(f"[red]✗ Config error: {escape(str(e))}[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
     except Exception as e:
         _report_program_error(logger, "Loading configuration...", e, step_summary_shown=verbose)
