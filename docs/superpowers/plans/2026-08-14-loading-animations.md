@@ -1,6 +1,6 @@
 # Loading Animations for Async Operations — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add spinner progress with per-step and total timing to every async wait in the `inspect` command, and record all operation levels to a dated log file that errors point the user to.
 
@@ -41,7 +41,7 @@
   - `logger.get_log_path() -> Path`
   - `Logger.redact(message: str) -> str` (static)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/unit/logging/test_logger.py`:
 
@@ -106,12 +106,12 @@ class TestLogger:
 
 Create empty `__init__.py` files for `src/sanityops_cli/logging/__init__.py` and `tests/unit/logging/__init__.py`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/unit/logging/test_logger.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'sanityops_cli.logging'`.
 
-- [ ] **Step 3: Implement the Logger**
+- [x] **Step 3: Implement the Logger**
 
 Create `src/sanityops_cli/logging/logger.py`:
 
@@ -190,12 +190,12 @@ class Logger:
         return message
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/unit/logging/test_logger.py -q`
 Expected: 7 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sanityops_cli/logging tests/unit/logging
@@ -221,7 +221,7 @@ git commit -m "feat(logging): add leveled file Logger with redaction"
   - `tracker.step_times: list[tuple[str, float]]`
   - `StepContext` is a context manager with a `console: Console` property (routes agent output into the Live display in verbose mode).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/unit/progress/test_tracker.py`:
 
@@ -294,12 +294,12 @@ class TestProgressTracker:
 
 Create empty `__init__.py` files for `src/sanityops_cli/progress/__init__.py` and `tests/unit/progress/__init__.py`.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/unit/progress/test_tracker.py -q`
 Expected: FAIL with `ModuleNotFoundError: No module named 'sanityops_cli.progress'`.
 
-- [ ] **Step 3: Implement ProgressTracker**
+- [x] **Step 3: Implement ProgressTracker**
 
 Create `src/sanityops_cli/progress/tracker.py`:
 
@@ -434,12 +434,12 @@ class StepContext:
         return False
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/unit/progress/test_tracker.py -q`
 Expected: 5 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sanityops_cli/progress tests/unit/progress
@@ -460,7 +460,7 @@ git commit -m "feat(progress): add ProgressTracker with Status/Live step display
   - `ProgressHook(console: Console, verbose: bool = True, logger: Logger | None = None)`
   - New private helper `_emit(message: str) -> None`: prints to console and mirrors plain text to `logger.debug`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/unit/agents/scanner_agent/test_progress_hook.py`:
 
@@ -542,12 +542,12 @@ class TestProgressHookLogging:
         assert "LLM call" in console.export_text()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/unit/agents/scanner_agent/test_progress_hook.py -q`
 Expected: FAIL with `TypeError: ProgressHook.__init__() got an unexpected keyword argument 'logger'`.
 
-- [ ] **Step 3: Implement the ProgressHook changes**
+- [x] **Step 3: Implement the ProgressHook changes**
 
 Modify `src/sanityops_cli/agents/scanner_agent/hooks/progress_hook.py`:
 
@@ -605,12 +605,12 @@ Replace every `self.console.print(...)` call inside `handle()` with `self._emit(
                     self._emit("  [green]✓ Sub Agent completed[/]")
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/unit/agents/scanner_agent/test_progress_hook.py -q`
 Expected: 4 passed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sanityops_cli/agents/scanner_agent/hooks/progress_hook.py tests/unit/agents/scanner_agent/test_progress_hook.py
@@ -631,7 +631,7 @@ git commit -m "feat(progress-hook): mirror agent progress to file logger at DEBU
   - `ScannerAgent(provider, max_loops=30, timeout=120, verbose=False, console=None, logger=None)`
   - The logger is forwarded to `ProgressHook` in both `scan()` and `analyze_files()`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/unit/agents/scanner_agent/test_agent.py`:
 
@@ -744,17 +744,17 @@ class TestScannerAgent:
         assert result.skills == []
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest tests/unit/agents/scanner_agent/test_agent.py -q`
 Expected: FAIL with `TypeError: __init__() got an unexpected keyword argument 'logger'`.
 
-- [ ] **Step 2b: Run the forwarding tests to verify they fail**
+- [x] **Step 2b: Run the forwarding tests to verify they fail**
 
 Run: `python -m pytest tests/unit/agents/scanner_agent/test_agent.py -q`
 After the constructor accepts `logger`, the two forwarding tests (`test_scan_forwards_logger_to_progress_hook`, `test_analyze_files_forwards_logger_to_progress_hook`) fail until `logger=self.logger` is added to BOTH `ProgressHook` registration sites. This is the RED evidence for the core deliverable of this task.
 
-- [ ] **Step 3: Implement the ScannerAgent changes**
+- [x] **Step 3: Implement the ScannerAgent changes**
 
 Modify `src/sanityops_cli/agents/scanner_agent/agent.py`.
 
@@ -792,12 +792,12 @@ with:
             )
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `python -m pytest tests/unit/agents/scanner_agent/test_agent.py tests/unit/agents/scanner_agent/test_progress_hook.py -q`
 Expected: 7 passed (3 agent tests + 4 from Task 3).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/sanityops_cli/agents/scanner_agent/agent.py tests/unit/agents/scanner_agent/test_agent.py
@@ -816,7 +816,7 @@ git commit -m "feat(scanner-agent): pass logger through to ProgressHook"
 - Consumes: `Logger` (Task 1), `ProgressTracker` (Task 2), `ScannerAgent(logger=...)` (Task 4).
 - Produces: modified `inspect` command behavior per spec: three tracked steps, per-step + total timing, user-error vs program-error handling.
 
-- [ ] **Step 1: Update the existing inspect test**
+- [x] **Step 1: Update the existing inspect test**
 
 Modify `tests/unit/commands/test_inspect.py`:
 1. Add `import io` to the imports.
@@ -824,7 +824,7 @@ Modify `tests/unit/commands/test_inspect.py`:
 3. Add `from sanityops_cli.constants.exit_codes import EXIT_FAILURE` to the imports.
 4. Add `monkeypatch.setenv("HOME", str(tmp_path))` as the first line of the existing `test_inspect_skips_defect_check_when_flag_set` so the Logger writes into `tmp_path` instead of the real home.
 
-- [ ] **Step 2: Write the new failing inspect tests**
+- [x] **Step 2: Write the new failing inspect tests**
 
 Append to `tests/unit/commands/test_inspect.py`:
 
@@ -908,12 +908,12 @@ def test_inspect_config_error_shows_guidance_without_log_hint(monkeypatch, tmp_p
     assert "See log for details" not in text
 ```
 
-- [ ] **Step 3: Run tests to verify the new ones fail**
+- [x] **Step 3: Run tests to verify the new ones fail**
 
 Run: `python -m pytest tests/unit/commands/test_inspect.py -q`
 Expected: the three new tests FAIL (import errors or assertions), existing test may still pass.
 
-- [ ] **Step 4: Implement the inspect command changes**
+- [x] **Step 4: Implement the inspect command changes**
 
 Rewrite `src/sanityops_cli/commands/inspect.py` in full:
 
@@ -1070,12 +1070,12 @@ def inspect(
     DefectRenderer(console).render(response)
 ```
 
-- [ ] **Step 5: Run the full inspect test file**
+- [x] **Step 5: Run the full inspect test file**
 
 Run: `python -m pytest tests/unit/commands/test_inspect.py -q`
 Expected: 4 passed.
 
-- [ ] **Step 6: Run the full suite + lint**
+- [x] **Step 6: Run the full suite + lint**
 
 ```bash
 python -m pytest -q
@@ -1084,7 +1084,7 @@ ruff check src tests
 
 Expected: all tests pass (59 existing + new); ruff clean.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/sanityops_cli/commands/inspect.py tests/unit/commands/test_inspect.py
