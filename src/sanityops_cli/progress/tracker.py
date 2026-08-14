@@ -50,8 +50,16 @@ class _LiveConsole:
         self._step_name = step_name
         self._lines: list[RenderableType] = []
 
-    def print(self, message: str = "", **kwargs: Any) -> None:
-        self._lines.append(Text.from_markup(message))
+    def print(self, *objects: Any, **kwargs: Any) -> None:
+        """Duck-type ``Console.print``: render objects into the Live display.
+
+        Multiple objects are joined with spaces (rich's default); a ``style``
+        kwarg is honored. Other rich keyword options are ignored — each print
+        is rendered as its own row in the Live display.
+        """
+        message = " ".join(str(obj) for obj in objects) if objects else ""
+        line = Text.from_markup(message, style=kwargs.get("style"))
+        self._lines.append(line)
         self._live.update(
             Group(
                 Spinner("dots", text=f"[bold cyan]{self._step_name}[/]"),
@@ -72,7 +80,7 @@ class StepContext:
         self._live_console: _LiveConsole | None = None
 
     @property
-    def console(self) -> Console:
+    def console(self) -> Console | _LiveConsole:
         """Console to route agent progress output into (Live sink in verbose mode)."""
         if self._live_console is not None:
             return self._live_console
