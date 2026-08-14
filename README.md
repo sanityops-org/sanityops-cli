@@ -59,7 +59,9 @@ pip install -e .
 sanityops-cli init
 ```
 
-This creates `.sanityops/inspect_config.yaml` in your current directory.
+This creates `.sanityops/inspect_config.yaml` in your current directory with a
+freshly generated project UUID. The generated file matches the template below —
+edit the artifact paths to point at your prompts, tools, and skills.
 
 ### 2. Configure Artifacts
 
@@ -67,16 +69,23 @@ Edit `.sanityops/inspect_config.yaml` to specify your artifacts:
 
 ```yaml
 project:
-  id: <your-project-id>
+  id: <your-project-id>          # required: UUID
+
+# Optional: omit to use LLM_* environment variables
+# model:
+#   provider: anthropic
+#   api_key: sk-ant-...
+#   model_id: claude-sonnet-4-20250514
+#   base_url: ""
 
 prompts:
-  - path/to/system_prompt.md
+  - file: prompts/system_prompt.md
 
 tools:
-  - path/to/tool_schema.json
+  - file: tools/search_tools.json
 
 skills:
-  - path/to/skill.yaml
+  - file: skills/code_review.md   # file only, not directories
 ```
 
 ### 3. Run Inspection
