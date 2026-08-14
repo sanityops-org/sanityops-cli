@@ -89,3 +89,11 @@ class TestProgressHookLogging:
             )
         )
         assert any("[a-z]" in m for m in logger.debug_calls)
+
+    @pytest.mark.anyio
+    async def test_termination_reason_with_markup_chars_is_preserved(self):
+        logger = _FakeLogger()
+        hook, console = _make_hook(logger)
+        await hook.handle(_ctx("on_termination", {"reason": "error [a-z]"}))
+        assert any("[a-z]" in m for m in logger.debug_calls)
+        assert "[a-z]" in console.export_text()
