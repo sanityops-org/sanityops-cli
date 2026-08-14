@@ -332,7 +332,7 @@ class ProgressTracker:
         self.verbose = verbose
         self.step_times: list[tuple[str, float]] = []
 
-    def step(self, name: str) -> "StepContext":
+    def step(self, name: str) -> StepContext:
         """Start a new tracked step, returning its context manager."""
         return StepContext(self, name)
 
@@ -384,7 +384,7 @@ class StepContext:
             return self._live_console
         return self.tracker.console
 
-    def __enter__(self) -> "StepContext":
+    def __enter__(self) -> StepContext:
         self._start = time.perf_counter()
         self.tracker.logger.step_started(self.name)
         if self.tracker.verbose:
