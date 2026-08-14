@@ -16,6 +16,7 @@ from sanityops_cli.agents.scanner_agent.prompts import (
     TOOL_FINDER_RULES,
 )
 from sanityops_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.logging.logger import Logger
 
 # ============================================================================
 # ScannerAgent Class
@@ -33,12 +34,14 @@ class ScannerAgent:
         timeout: int = 120,
         verbose: bool = False,
         console: Console | None = None,
+        logger: Logger | None = None,
     ):
         self.provider = provider
         self.max_loops = max_loops
         self.timeout = timeout
         self.verbose = verbose
         self.console = console or Console()
+        self.logger: Logger | None = logger
 
     async def scan(
         self,
@@ -83,7 +86,9 @@ class ScannerAgent:
         hook_executor = HookExecutor()
         if self.verbose:
             from sanityops_cli.agents.scanner_agent.hooks.progress_hook import ProgressHook
-            hook_executor.register(ProgressHook(self.console, verbose=self.verbose))
+            hook_executor.register(
+                ProgressHook(self.console, verbose=self.verbose, logger=self.logger)
+            )
 
         factory = AgentFactory(
             provider=self.provider,
@@ -184,7 +189,9 @@ class ScannerAgent:
         hook_executor = HookExecutor()
         if self.verbose:
             from sanityops_cli.agents.scanner_agent.hooks.progress_hook import ProgressHook
-            hook_executor.register(ProgressHook(self.console, verbose=self.verbose))
+            hook_executor.register(
+                ProgressHook(self.console, verbose=self.verbose, logger=self.logger)
+            )
 
         # Create and run agent
         factory = AgentFactory(
