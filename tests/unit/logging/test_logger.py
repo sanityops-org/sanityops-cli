@@ -54,3 +54,15 @@ class TestLogger:
     def test_redact_static(self):
         assert "sk-***" in Logger.redact("key=sk-abcdefghijklmn")
         assert Logger.redact("plain message") == "plain message"
+
+    def test_close_removes_handlers(self, tmp_path: Path):
+        logger = Logger(tmp_path)
+        assert logger._logger.handlers
+        logger.close()
+        assert logger._logger.handlers == []
+
+    def test_close_is_idempotent(self, tmp_path: Path):
+        logger = Logger(tmp_path)
+        logger.close()
+        logger.close()  # second close must not raise
+        assert logger._logger.handlers == []
