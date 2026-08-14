@@ -126,6 +126,44 @@ def test_inspect_program_error_points_to_log_file(monkeypatch, tmp_path):
     assert "Step failed: Analyzing artifacts..." in logs[0].read_text()
 
 
+def test_inspect_program_error_verbose_shows_single_error_output(monkeypatch, tmp_path):
+    """Verbose mode: the failing step collapses to ✗ without a duplicate error report."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text("---\nname: s\ndescription: d\n---\n# X\n")
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    class FailingAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            raise RuntimeError("LLM API timeout")
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FailingAgent(),
+    )
+
+    output = io.StringIO()
+    test_console = Console(file=output, record=True)
+    monkeypatch.setattr("sanityops_cli.commands.inspect.console", test_console)
+
+    result = runner.invoke(
+        app, ["inspect", "--config", str(cfg), "--skip-defect-check", "--verbose"]
+    )
+    assert result.exit_code == EXIT_FAILURE
+    text = output.getvalue()
+    # the failing step collapses to a ✗ line inside the Live display
+    assert "✗ Analyzing artifacts..." in text
+    assert "LLM API timeout" in text
+    assert "See log for details" in text
+    assert "github.com/sanityops-org/sanityops-cli/issues" in text
+    # no duplicate headline: the step collapse already reported the failure
+    assert "Error in step" not in text
+
+
 def test_inspect_config_error_shows_guidance_without_log_hint(monkeypatch, tmp_path):
     """A missing config is a user error: guidance shown, no log reference."""
     monkeypatch.setenv("HOME", str(tmp_path))
