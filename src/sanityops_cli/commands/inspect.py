@@ -1,11 +1,15 @@
 """inspect command — Sanityops CLI Tool"""
 
+import platform
+import sys
+
 import anyio
 import typer
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
 
+from sanityops_cli import __version__
 from sanityops_cli.agents.scanner_agent.agent import ScannerAgent
 from sanityops_cli.constants.exit_codes import EXIT_FAILURE
 from sanityops_cli.defect_checker.checker import DefectChecker
@@ -21,6 +25,14 @@ inspect_app = typer.Typer()
 
 #: URL users attach log files to when reporting issues.
 ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
+
+
+def _banner_line() -> str:
+    """Return a one-line run banner: program version, Python version, platform."""
+    return (
+        f"sanityops-cli v{__version__} | Python {platform.python_version()} "
+        f"| {sys.platform}/{platform.machine()}"
+    )
 
 
 def _report_program_error(
@@ -96,6 +108,7 @@ def inspect(
     for f in skill_files:
         table.add_row("Skill", f)
     console.print(table)
+    console.print(f"[dim]{_banner_line()}[/dim]")
     console.print(f"[dim]Project ID: {project_id}[/dim]")
     console.print(
         f"[dim]Total: {len(prompt_files)} prompts, "
