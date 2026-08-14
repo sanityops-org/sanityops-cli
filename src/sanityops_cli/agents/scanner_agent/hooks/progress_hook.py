@@ -131,7 +131,7 @@ class ProgressHook:
 
         elif event == events.ON_TERMINATION:
             reason = data.get("reason", "unknown")
-            self._emit(f"[bold]⏹ Agent terminated[/]: {reason}")
+            self._emit(f"[bold]⏹ Agent terminated[/]: {escape(reason)}")
             self._emit(f"  [dim]Statistics: {self._tool_calls} tool calls, {self._sub_agent_count} sub Agents[/]")
 
         return ctx
