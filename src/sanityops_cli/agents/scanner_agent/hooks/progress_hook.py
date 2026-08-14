@@ -1,4 +1,5 @@
 from rich.console import Console
+from rich.markup import escape
 from rich.text import Text
 
 from sanityops_cli.logging.logger import Logger
@@ -96,23 +97,23 @@ class ProgressHook:
             if tool_name == "task":
                 goal = tool_input.get("goal", "unknown")[:50]
                 self._sub_agent_count += 1
-                self._emit(f"  [bold yellow]◇ Starting sub Agent #{self._sub_agent_count}[/]: {goal}...")
+                self._emit(f"  [bold yellow]◇ Starting sub Agent #{self._sub_agent_count}[/]: {escape(goal)}...")
             else:
                 if self.verbose:
                     if tool_name == "bash":
                         cmd = tool_input.get("command", "")[:60]
-                        self._emit(f"  [green]⚡ {tool_name}[/]: {cmd}")
+                        self._emit(f"  [green]⚡ {tool_name}[/]: {escape(cmd)}")
                     elif tool_name == "glob":
                         pattern = tool_input.get("pattern", "")
-                        self._emit(f"  [green]⚡ {tool_name}[/]: {pattern}")
+                        self._emit(f"  [green]⚡ {tool_name}[/]: {escape(pattern)}")
                     elif tool_name == "grep":
                         pattern = tool_input.get("pattern", "")[:40]
                         path = tool_input.get("path", "")[:30]
-                        self._emit(f"  [green]⚡ {tool_name}[/]: '{pattern}' in {path}")
+                        self._emit(f"  [green]⚡ {tool_name}[/]: '{escape(pattern)}' in {escape(path)}")
                     elif tool_name == "file_ops":
                         op = tool_input.get("operation", "")
                         path = tool_input.get("path", "")[:50]
-                        self._emit(f"  [green]⚡ {tool_name}[/]: {op} {path}")
+                        self._emit(f"  [green]⚡ {tool_name}[/]: {escape(op)} {escape(path)}")
                     else:
                         self._emit(f"  [green]⚡ {tool_name}[/]")
 

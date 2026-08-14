@@ -121,6 +121,10 @@ def test_inspect_program_error_points_to_log_file(monkeypatch, tmp_path):
     assert "See log for details" in text
     assert "github.com/sanityops-org/sanityops-cli/issues" in text
 
+    logs = list((tmp_path / ".sanityops" / "logs").glob("sanityops-cli-*.log"))
+    assert len(logs) == 1
+    assert "Step failed: Analyzing artifacts..." in logs[0].read_text()
+
 
 def test_inspect_config_error_shows_guidance_without_log_hint(monkeypatch, tmp_path):
     """A missing config is a user error: guidance shown, no log reference."""
