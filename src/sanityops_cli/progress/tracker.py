@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from types import TracebackType
 from typing import Any
 
 from rich.console import Console, Group, RenderableType
@@ -110,7 +111,12 @@ class StepContext:
             self._status.start()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool:
         duration = time.perf_counter() - self._start
         if exc_type is None:
             self.tracker.logger.step_completed(self.name, duration)

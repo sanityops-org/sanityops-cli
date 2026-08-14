@@ -50,6 +50,8 @@ class TestLogger:
         content = logger.get_log_path().read_text()
         assert "sk-abc123DEF456" not in content
         assert "sk-proj-9f8e7d6c5b4a3a" not in content
+        assert "api_key=***" in content
+        assert "sk-***" in content
 
     def test_redact_masks_value_with_backslash(self, tmp_path: Path):
         # regression: values containing backslashes must still be redacted
