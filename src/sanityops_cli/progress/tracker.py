@@ -119,6 +119,7 @@ class StepContext:
         else:
             self.tracker.logger.step_failed(self.name, str(exc_val))
             if self._live is not None:
+                self._live.update(Text.from_markup(f"[red]✗[/] {self.name} ({duration:.2f}s)"))
                 self._live.stop()
                 self._live = None
                 self._live_console = None

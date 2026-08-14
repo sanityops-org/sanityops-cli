@@ -69,3 +69,13 @@ class TestProgressTracker:
         with step:
             step.console.print("a", "b")
             assert step._live_console._lines[-1].plain == "a b"
+
+    def test_verbose_mode_failure_collapses_to_error_summary(self, tmp_path):
+        tracker, console, _ = self._tracker(tmp_path, verbose=True)
+        with pytest.raises(RuntimeError, match="boom"):
+            with tracker.step("Running defect check..."):
+                raise RuntimeError("boom")
+        text = console.export_text()
+        assert "Running defect check..." in text
+        assert "✗" in text  # failure summary rendered
+        assert tracker.step_times == []
