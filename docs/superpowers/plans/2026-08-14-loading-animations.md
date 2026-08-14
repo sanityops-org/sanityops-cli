@@ -501,7 +501,7 @@ def _make_hook(logger):
     console = Console(record=True, file=io.StringIO())
     hook = ProgressHook(console=console, verbose=False, logger=logger)
     hook._get_events = lambda: _FakeEvents()  # type: ignore[method-assign]
-    return hook
+    return hook, console
 
 
 def _ctx(event, data=None, is_error=False):
@@ -512,14 +512,14 @@ class TestProgressHookLogging:
     @pytest.mark.anyio
     async def test_before_llm_call_logs_debug(self):
         logger = _FakeLogger()
-        hook = _make_hook(logger)
+        hook, _ = _make_hook(logger)
         await hook.handle(_ctx("before_llm_call", {"iteration": 0}))
         assert any("LLM call" in m for m in logger.debug_calls)
 
     @pytest.mark.anyio
     async def test_task_completion_logs_plain_text(self):
         logger = _FakeLogger()
-        hook = _make_hook(logger)
+        hook, _ = _make_hook(logger)
         await hook.handle(
             _ctx("before_tool_exec", {"tool_name": "task", "tool_input": {"goal": "g"}})
         )
@@ -529,14 +529,17 @@ class TestProgressHookLogging:
     @pytest.mark.anyio
     async def test_task_failure_logs_error(self):
         logger = _FakeLogger()
-        hook = _make_hook(logger)
+        hook, _ = _make_hook(logger)
         await hook.handle(_ctx("after_tool_exec", {"tool_name": "task"}, is_error=True))
         assert any("Sub Agent failed" in m for m in logger.error_calls)
 
     @pytest.mark.anyio
     async def test_no_logger_does_not_crash(self):
-        hook = _make_hook(None)
+        hook, console = _make_hook(None)
         await hook.handle(_ctx("before_llm_call", {"iteration": 0}))
+        await hook.handle(_ctx("after_tool_exec", {"tool_name": "task"}, is_error=True))
+        # console output still appears without a logger
+        assert "LLM call" in console.export_text()
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
