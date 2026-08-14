@@ -181,7 +181,7 @@ class InspectConfigLoader:
         return self._process_file_entries(entries, "tools")
 
     def _process_file_entries(self, entries: list, label: str) -> list[str]:
-        """Common logic for prompts and tools: each entry must be a readable file."""
+        """Common logic for prompts, tools, and skills: each entry must be a readable file."""
         result: list[str] = []
         for i, entry in enumerate(entries):
             file_str = self._extract_file_value(entry, label, i)

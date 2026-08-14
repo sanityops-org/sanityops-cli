@@ -326,6 +326,15 @@ class TestSkillsSectionFilesOnly:
         result = loader.load()
         assert result["skills"] == [str(skill_file.resolve())]
 
+    def test_skills_bare_string_resolves_absolute_path(self, tmp_path: Path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        skill_file = tmp_path / "code_review.md"
+        skill_file.write_text("# code review\n")
+        config_file = self._write_config(tmp_path, ["code_review.md"])
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["skills"] == [str(skill_file.resolve())]
+
     def test_skills_directory_raises_error(self, tmp_path: Path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         (tmp_path / "skills_dir").mkdir()
