@@ -7,6 +7,7 @@ from typing import Any
 
 from rich.console import Console, Group, RenderableType
 from rich.live import Live
+from rich.markup import escape
 from rich.spinner import Spinner
 from rich.status import Status
 from rich.text import Text
@@ -64,7 +65,7 @@ class _LiveConsole:
         self._lines.append(line)
         self._live.update(
             Group(
-                Spinner("dots", text=f"[bold cyan]{self._step_name}[/]"),
+                Spinner("dots", text=f"[bold cyan]{escape(self._step_name)}[/]"),
                 *self._lines,
             )
         )
@@ -96,10 +97,10 @@ class StepContext:
                 console=self.tracker.console, refresh_per_second=_REFRESH_PER_SECOND
             )
             self._live.start()
-            self._live.update(Spinner("dots", text=f"[bold cyan]{self.name}[/]"))
+            self._live.update(Spinner("dots", text=f"[bold cyan]{escape(self.name)}[/]"))
             self._live_console = _LiveConsole(self._live, self.name)
         else:
-            self._status = self.tracker.console.status(f"[bold cyan]{self.name}[/]")
+            self._status = self.tracker.console.status(f"[bold cyan]{escape(self.name)}[/]")
             self._status.start()
         return self
 
@@ -108,7 +109,7 @@ class StepContext:
         if exc_type is None:
             self.tracker.logger.step_completed(self.name, duration)
             self.tracker.step_times.append((self.name, duration))
-            summary = Text.from_markup(f"[green]✓[/] {self.name} ({duration:.2f}s)")
+            summary = Text.from_markup(f"[green]✓[/] {escape(self.name)} ({duration:.2f}s)")
             if self._live is not None:
                 self._live.update(summary)
                 self._live.stop()
@@ -121,7 +122,7 @@ class StepContext:
         else:
             self.tracker.logger.step_failed(self.name, str(exc_val))
             if self._live is not None:
-                self._live.update(Text.from_markup(f"[red]✗[/] {self.name} ({duration:.2f}s)"))
+                self._live.update(Text.from_markup(f"[red]✗[/] {escape(self.name)} ({duration:.2f}s)"))
                 self._live.stop()
                 self._live = None
                 self._live_console = None
