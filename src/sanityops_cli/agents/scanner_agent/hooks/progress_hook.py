@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 from rich.console import Console
 from rich.markup import escape
 from rich.text import Text

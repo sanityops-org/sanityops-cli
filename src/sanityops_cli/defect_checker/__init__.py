@@ -13,5 +13,4 @@
 # limitations under the License.
 #
 
-
 """Defect checking for extracted artifacts via the defect-check SDK."""

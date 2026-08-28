@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 """Auto-detect LLM configuration for the defect-check SDK."""
 
 from __future__ import annotations
