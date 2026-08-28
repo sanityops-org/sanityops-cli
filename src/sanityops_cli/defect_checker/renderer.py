@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 """Render defect-check results in the terminal, grouped by artifact type."""
 
 from __future__ import annotations
