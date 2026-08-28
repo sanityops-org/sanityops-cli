@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 """File-based logging for sanityops-cli operations."""
 
 from __future__ import annotations

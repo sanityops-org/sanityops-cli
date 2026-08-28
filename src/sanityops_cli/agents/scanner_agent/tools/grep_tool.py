@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 """
 GrepTool - A powerful search tool built on ripgrep.
 

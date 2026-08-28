@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 """Inspect config loader - load and validate inspect_config.yaml"""
 
 import re
