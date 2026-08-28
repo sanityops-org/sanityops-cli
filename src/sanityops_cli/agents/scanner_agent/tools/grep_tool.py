@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+
 """
 GrepTool - A powerful search tool built on ripgrep.
 

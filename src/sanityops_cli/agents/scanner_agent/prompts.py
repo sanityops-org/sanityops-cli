@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+
 SKILL_FINDER_RULES = """\
 You are a skill discovery agent. Find all **skills** in `{directory}` and report each immediately via `store_findings`.
 
