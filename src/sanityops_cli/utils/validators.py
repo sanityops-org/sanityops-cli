@@ -13,7 +13,6 @@
 # limitations under the License.
 #
 
-
 """local validators for sanityops-cli"""
 
 import json
