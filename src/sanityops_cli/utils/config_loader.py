@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+
 """Inspect config loader - load and validate inspect_config.yaml"""
 
 import re

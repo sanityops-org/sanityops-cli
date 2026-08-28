@@ -12,4 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+
 """Defect checking for extracted artifacts via the defect-check SDK."""

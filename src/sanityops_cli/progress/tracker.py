@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+
+
 """Step-based progress display with spinner, elapsed timing, and logging."""
 
 from __future__ import annotations
