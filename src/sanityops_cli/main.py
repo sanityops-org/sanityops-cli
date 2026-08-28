@@ -33,7 +33,9 @@ app = typer.Typer(
 
 def version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"sanityops-cli version {__version__}")
+        typer.echo(f"sanityops-cli v{__version__}")
+        typer.echo("Copyright (C) 2026 zipsonken / Sanity AI Labs")
+        typer.echo("License: Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0)")
         raise typer.Exit()
 
 
