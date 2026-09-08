@@ -28,6 +28,30 @@ DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
 
+def read_file_with_encoding_fallback(path: Path) -> str | None:
+    """Read a file with UTF-8 encoding, falling back to GBK for Windows compatibility.
+
+    Args:
+        path: Path to the file to read
+
+    Returns:
+        File content as string, or None if file cannot be read with either encoding.
+    """
+    # Try UTF-8 first (most common)
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        pass
+
+    # Fall back to GBK (Windows Chinese locale)
+    try:
+        return path.read_text(encoding="gbk")
+    except (UnicodeDecodeError, OSError):
+        pass
+
+    return None
+
+
 class InspectConfigLoader:
     """Load and validate inspect_config.yaml, resolve all artifact paths to absolute."""
 
