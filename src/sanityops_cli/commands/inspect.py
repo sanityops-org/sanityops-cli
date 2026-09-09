@@ -15,8 +15,13 @@
 
 """inspect command — Sanityops CLI Tool"""
 
+from __future__ import annotations
+
 import platform
 import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 import anyio
 import typer
@@ -26,6 +31,7 @@ from rich.table import Table
 
 from sanityops_cli import __version__
 from sanityops_cli.agents.scanner_agent.agent import ScannerAgent
+from sanityops_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
 from sanityops_cli.constants.exit_codes import EXIT_FAILURE
 from sanityops_cli.defect_checker.checker import DefectChecker
 from sanityops_cli.defect_checker.llm_config import resolve_llm_config
@@ -34,12 +40,119 @@ from sanityops_cli.exceptions.base_exceptions import ValidationError
 from sanityops_cli.logging.logger import Logger
 from sanityops_cli.progress.tracker import ProgressTracker
 from sanityops_cli.utils.config_loader import InspectConfigLoader
+from sanityops_cli.utils.config_resolver import ConfigResolver
 
 console = Console()
 inspect_app = typer.Typer()
 
 #: URL users attach log files to when reporting issues.
 ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
+
+
+def _auto_upload(
+    project_id: str | None,
+    scan_result: Any,
+    config_path: Path,
+) -> None:
+    """Auto upload scanned artifacts to the server.
+
+    Flow:
+    - If no API key configured: skip (no-op).
+    - If API key configured but no project bound: create a project first,
+      then push the artifacts.
+    - If API key configured and project bound: push directly.
+
+    Args:
+        project_id: Resolved project ID (None if not bound / placeholder).
+        scan_result: ScannerAgent result containing skills, tools, prompts.
+        config_path: Path to the inspect_config.yaml for persisting project binding.
+    """
+    from sanityops_cli.api.client import SanityopsClient
+    from sanityops_cli.utils.artifact_packer import pack_from_findings
+
+    # No API key configured -> cannot upload, skip silently
+    api_key = ConfigResolver("server.api_key", "SANITYOPS_API_KEY").resolve()
+    if not api_key:
+        console.print("[dim]API key not configured, skip auto upload.[/dim]")
+        return
+
+    base_url = (
+        ConfigResolver("server.base_url", "SANITYOPS_BASE_URL", DEFAULT_SERVER_BASE_URL).resolve()
+        or DEFAULT_SERVER_BASE_URL
+    )
+    client = SanityopsClient(base_url, api_key)
+
+    # Pack artifacts from scan results
+    console.print("\n[bold]Packing artifacts...[/]")
+    try:
+        packed = pack_from_findings(
+            skills=scan_result.skills,
+            tools=scan_result.tools,
+            prompts=scan_result.prompts,
+        )
+    except Exception as e:
+        console.print(f"[red]✗ Failed to pack artifacts: {escape(str(e))}[/]")
+        raise
+
+    if (
+        not packed.get("prompt_content")
+        and not packed.get("tools_schema")
+        and not packed.get("skill_file")
+    ):
+        console.print("[yellow]No artifacts to upload.[/yellow]")
+        return
+
+    # Create a project first if not bound yet
+    if not project_id:
+        default_name = Path.cwd().name or "my-project"
+        console.print(f"\n[bold]Creating new project [cyan]{default_name}[/]...[/]")
+        try:
+            result = client.create_project(default_name, None)
+        except Exception as e:
+            console.print(f"[red]✗ Could not create project: {escape(str(e))}[/]")
+            console.print("[dim]  Check your SANITYOPS_API_KEY and network connectivity.[/dim]")
+            raise
+
+        new_project_id = result.get("project_id")
+        if not new_project_id:
+            console.print("[red]✗ Server returned no project ID[/]")
+            return
+
+        # Persist the new project binding for subsequent pushes
+        ConfigResolver.set_project("project.id", new_project_id)
+        ConfigResolver.set_project("project.name", default_name)
+
+        project_id = new_project_id
+        console.print(f"[green]✓[/] Created project (id: {project_id})")
+    else:
+        console.print(f"\n[bold]Using existing project: [cyan]{project_id}[/][/")
+
+    # Push artifacts
+    message = f"Auto-push at {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    console.print("[bold]Uploading artifacts to server...[/]")
+    try:
+        result = client.upload_artifacts(
+            project_id=project_id,
+            prompt_content=packed.get("prompt_content"),
+            tools_schema=packed.get("tools_schema"),
+            skill_file=packed.get("skill_file"),
+            message=message,
+        )
+    except Exception as e:
+        console.print(f"[red]✗ Could not upload artifacts: {escape(str(e))}[/]")
+        raise
+
+    version_id = result.get("version_id") or result.get("id")
+    if version_id:
+        console.print(f"[green]✓[/] Created version [cyan]{version_id}[/]")
+
+    if scan_result.prompts:
+        console.print(f"  Prompts: {len(scan_result.prompts)}")
+    if scan_result.tools:
+        console.print(f"  Tools:   {len(scan_result.tools)}")
+    if scan_result.skills:
+        console.print(f"  Skills:  {len(scan_result.skills)}")
+    console.print()
 
 
 def _banner_line() -> str:
@@ -166,7 +279,17 @@ def inspect(
         tracker.summary()
         raise typer.Exit()
 
-    # Step 3: Run defect check and render (unless skipped)
+    # Step 3: Auto upload artifacts after scan completes
+    # - If api-key configured and project not bound: create project then push
+    # - If api-key configured and project bound: push directly
+    try:
+        _auto_upload(project_id, result, loader._config_path)
+    except Exception:
+        # _auto_upload prints user-friendly error, just continue
+        # Upload failure does not block defect check
+        pass
+
+    # Step 4: Run defect check and render (unless skipped)
     if skip_defect_check:
         console.print("[dim]Defect check skipped (--skip-defect-check).[/dim]")
         tracker.summary()
