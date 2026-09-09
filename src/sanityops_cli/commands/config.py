@@ -127,9 +127,6 @@ def config_callback(
         sanityops-cli config --list                         # List all values
         sanityops-cli config --unset server.base_url        # Remove key
     """
-    # Hide the unused --global flag from linters while keeping it documented.
-    del global_config
-
     if list_all:
         _list_config()
         return
