@@ -196,6 +196,32 @@ class TestConfigCommandList:
         # The Project column shows empty string, not "(not set)"
         assert "(not set)" not in result.output
 
+    def test_sensitive_key_unset_in_one_column_shows_empty(self, monkeypatch, tmp_path: Path):
+        """Sensitive key set in global but unset in project shows empty, not '(not set)'."""
+        from typer.testing import CliRunner
+
+        from sanityops_cli.commands.config import config_app
+
+        runner = CliRunner()
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.chdir(tmp_path)
+
+        # Create global config with api_key set (sensitive), but no project config
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        global_config = global_config_dir / "config"
+        global_config.write_text("server:\n  api_key: my-secret-api-key-12345\n")
+
+        result = runner.invoke(config_app, ["--list"])
+
+        assert result.exit_code == 0
+        # Server.api_key row exists; Project column is unset and should be empty,
+        # not "(not set)" — _display_value returns "" for any key when value is None
+        assert "server.api_key" in result.output
+        assert "(not set)" not in result.output
+
     def test_list_shows_env_vars(self, monkeypatch, tmp_path: Path):
         """Should display environment variables set for config keys."""
         from typer.testing import CliRunner
