@@ -68,9 +68,13 @@ def _mask_sensitive_value(value: str | None) -> str:
     """Mask a sensitive value for display: first 3 + '***' + last 4 chars.
 
     Short values (< 8 chars) are fully masked. None -> '(not set)'.
+    Non-string values are converted to string first.
     """
     if value is None:
         return "(not set)"
+    # Defensive: handle non-string values from manually-edited YAML
+    if not isinstance(value, str):
+        value = str(value)
     if len(value) <= 7:
         return "***"
     return f"{value[:3]}***{value[-4:]}"
@@ -139,7 +143,10 @@ def config_callback(
         console.print(ctx.get_help())
         return
 
-    use_local = local_config  # --local overrides; default is global
+    # --global and --local are mutually exclusive scope selectors.
+    # --global is the default (and is explicit); --local targets project config.
+    # If both are passed, --global wins.
+    use_local = local_config and not global_config
 
     if value is None:
         _read_config(key)
