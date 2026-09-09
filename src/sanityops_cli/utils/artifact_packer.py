@@ -380,8 +380,10 @@ def _pack_skills_from_findings(skills: list[Finding]) -> tuple[str, bytes] | Non
                 try:
                     text_content = skill_path.read_text(encoding="utf-8")
                     zf.writestr(f"{skill_name}/SKILL.md", text_content)
-                except OSError:
-                    pass
+                except OSError as e:
+                    warnings.warn(
+                        f"Could not read skill file for ZIP archive: {skill_path}: {e}", stacklevel=2
+                    )
 
             elif skill_path.is_dir():
                 # Skill directory - add all files recursively
