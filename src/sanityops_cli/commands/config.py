@@ -76,7 +76,7 @@ def _mask_sensitive_value(value: str | None) -> str:
     return f"{value[:3]}***{value[-4:]}"
 
 
-def _display_value(key: str, value: str | None) -> str:
+def _display_value(key: str, value: Any) -> str:
     """Return the value as it should be shown, masking sensitive keys."""
     if value is None:
         return ""
