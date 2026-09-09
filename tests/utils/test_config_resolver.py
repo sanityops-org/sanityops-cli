@@ -409,6 +409,25 @@ class TestConfigResolverSetUnset:
         result = ConfigResolver.unset_global("nonexistent.key")
         assert result is False
 
+    def test_unset_global_deletes_empty_file(self, monkeypatch, tmp_path: Path):
+        """Should delete config file when last key is removed."""
+        from sanityops_cli.utils.config_resolver import ConfigResolver
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        # Create config with single key
+        ConfigResolver.set_global("server.base_url", "https://example.com")
+        global_config = home_dir / ".sanityops" / "config"
+        assert global_config.exists()
+
+        # Remove the only key
+        result = ConfigResolver.unset_global("server.base_url")
+
+        assert result is True
+        # File should be deleted (not left as empty {})
+        assert not global_config.exists()
+
     def test_list_global_returns_dict(self, monkeypatch, tmp_path: Path):
         """Should return all global config values."""
         from sanityops_cli.utils.config_resolver import ConfigResolver

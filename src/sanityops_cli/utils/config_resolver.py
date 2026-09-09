@@ -178,15 +178,19 @@ def _unset_nested_value(data: dict[str, Any], key: str) -> bool:
     """Remove a nested key from a dict using dot-separated key.
 
     Returns True if key was present and removed, False otherwise.
-    Does not remove empty intermediate dicts.
+    Cleans up empty intermediate dicts after removal.
     """
     parts = key.split(".")
     current = data
+
+    # Track path for cleanup of empty parents
+    path_stack: list[tuple[dict[str, Any], str]] = []
 
     # Navigate to parent
     for part in parts[:-1]:
         if not isinstance(current, dict) or part not in current:
             return False
+        path_stack.append((current, part))
         current = current[part]
 
     if not isinstance(current, dict):
@@ -195,8 +199,16 @@ def _unset_nested_value(data: dict[str, Any], key: str) -> bool:
     final_key = parts[-1]
     if final_key in current:
         del current[final_key]
-        return True
-    return False
+    else:
+        return False
+
+    # Clean up empty intermediate dicts (from deepest to shallowest)
+    for parent_dict, child_key in reversed(path_stack):
+        child = parent_dict[child_key]
+        if isinstance(child, dict) and not child:
+            del parent_dict[child_key]
+
+    return True
 
 
 class ConfigResolver:
@@ -300,6 +312,7 @@ class ConfigResolver:
         """Remove a key from the global config file.
 
         Returns True if key was present and removed, False otherwise.
+        If the file becomes empty after removal, it is deleted.
         """
         path = get_global_config_path()
         data = _read_yaml_file(path)
@@ -307,7 +320,11 @@ class ConfigResolver:
             return False
         removed = _unset_nested_value(data, key)
         if removed:
-            _write_yaml_file(path, data)
+            if data:
+                _write_yaml_file(path, data)
+            else:
+                # File is now empty; remove it entirely
+                path.unlink(missing_ok=True)
         return removed
 
     @staticmethod
@@ -315,6 +332,7 @@ class ConfigResolver:
         """Remove a key from the project-level config file.
 
         Returns True if key was present and removed, False otherwise.
+        If the file becomes empty after removal, it is deleted.
         """
         path = get_project_config_path()
         data = _read_yaml_file(path)
@@ -322,7 +340,11 @@ class ConfigResolver:
             return False
         removed = _unset_nested_value(data, key)
         if removed:
-            _write_yaml_file(path, data)
+            if data:
+                _write_yaml_file(path, data)
+            else:
+                # File is now empty; remove it entirely
+                path.unlink(missing_ok=True)
         return removed
 
     @staticmethod
