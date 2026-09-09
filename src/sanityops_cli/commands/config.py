@@ -131,22 +131,22 @@ def config_callback(
         sanityops-cli config --list                         # List all values
         sanityops-cli config --unset server.base_url        # Remove key
     """
+    # --global and --local are mutually exclusive scope selectors.
+    # --global is the default (and is explicit); --local targets project config.
+    # If both are passed, --global wins.
+    use_local = local_config and not global_config
+
     if list_all:
         _list_config()
         return
 
     if unset:
-        _unset_config(unset, local=local_config)
+        _unset_config(unset, local=use_local)
         return
 
     if not key:
         console.print(ctx.get_help())
         return
-
-    # --global and --local are mutually exclusive scope selectors.
-    # --global is the default (and is explicit); --local targets project config.
-    # If both are passed, --global wins.
-    use_local = local_config and not global_config
 
     if value is None:
         _read_config(key)
