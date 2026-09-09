@@ -428,6 +428,24 @@ class TestConfigResolverSetUnset:
         # File should be deleted (not left as empty {})
         assert not global_config.exists()
 
+    def test_unset_project_deletes_empty_file(self, tmp_path: Path, monkeypatch):
+        """Should delete project config file when last key is removed."""
+        from sanityops_cli.utils.config_resolver import ConfigResolver
+
+        monkeypatch.chdir(tmp_path)
+
+        # Create project config with single key
+        ConfigResolver.set_project("server.base_url", "https://example.com")
+        project_config = tmp_path / ".sanityops" / "inspect_config.yaml"
+        assert project_config.exists()
+
+        # Remove the only key
+        result = ConfigResolver.unset_project("server.base_url")
+
+        assert result is True
+        # File should be deleted (not left as empty {})
+        assert not project_config.exists()
+
     def test_list_global_returns_dict(self, monkeypatch, tmp_path: Path):
         """Should return all global config values."""
         from sanityops_cli.utils.config_resolver import ConfigResolver

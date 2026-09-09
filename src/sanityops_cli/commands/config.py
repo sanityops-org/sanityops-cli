@@ -67,11 +67,10 @@ def _is_sensitive_key(key: str) -> bool:
 def _mask_sensitive_value(value: Any) -> str:
     """Mask a sensitive value for display: first 3 + '***' + last 4 chars.
 
-    Short values (< 8 chars) are fully masked. None -> '(not set)'.
+    Short values (< 8 chars) are fully masked.
     Non-string values are converted to string first.
+    This function is called from _display_value which handles None before calling.
     """
-    if value is None:
-        return "(not set)"
     # Defensive: handle non-string values from manually-edited YAML
     if not isinstance(value, str):
         value = str(value)
