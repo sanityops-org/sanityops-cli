@@ -52,7 +52,6 @@ ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
 def _auto_upload(
     project_id: str | None,
     scan_result: Any,
-    config_path: Path,
 ) -> None:
     """Auto upload scanned artifacts to the server.
 
@@ -65,7 +64,6 @@ def _auto_upload(
     Args:
         project_id: Resolved project ID (None if not bound / placeholder).
         scan_result: ScannerAgent result containing skills, tools, prompts.
-        config_path: Path to the inspect_config.yaml for persisting project binding.
     """
     from sanityops_cli.api.client import SanityopsClient
     from sanityops_cli.utils.artifact_packer import pack_from_findings
@@ -283,7 +281,7 @@ def inspect(
     # - If api-key configured and project not bound: create project then push
     # - If api-key configured and project bound: push directly
     try:
-        _auto_upload(project_id, result, loader._config_path)
+        _auto_upload(project_id, result)
     except Exception:
         # _auto_upload prints user-friendly error, just continue
         # Upload failure does not block defect check
