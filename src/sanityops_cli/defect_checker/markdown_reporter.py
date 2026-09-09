@@ -174,7 +174,7 @@ def save_markdown_report(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     generated_at = datetime.now()
-    filename = f"inspect-{generated_at.strftime('%Y%m%d-%H%M%S')}.md"
+    filename = f"inspect-{generated_at.strftime('%Y%m%d-%H%M%S-%f')}.md"
     path = output_dir / filename
 
     body = _build_report(response, project_id=project_id, check_level=check_level, generated_at=generated_at)
