@@ -64,6 +64,11 @@ class InspectConfigLoader:
     # Public API
     # ------------------------------------------------------------------
 
+    @property
+    def config_path(self) -> Path:
+        """Return the resolved config file path."""
+        return self._config_path
+
     def load(self) -> dict[str, Any]:
         """Load config, validate, and return resolved absolute paths.
 
