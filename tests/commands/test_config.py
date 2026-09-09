@@ -331,3 +331,27 @@ class TestSensitiveValueMasking:
 
         # Config file should be unchanged
         assert global_config.read_text() == original_content
+
+    def test_non_string_api_key_is_masked(self, monkeypatch, tmp_path: Path):
+        """Non-string API key values from manually-edited YAML should be masked."""
+        from typer.testing import CliRunner
+
+        from sanityops_cli.commands.config import config_app
+
+        runner = CliRunner()
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.chdir(tmp_path)
+
+        # Create config with numeric API key (manually edited YAML)
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        global_config = global_config_dir / "config"
+        global_config.write_text("server:\n  api_key: 12345678\n")  # Integer in YAML
+
+        result = runner.invoke(config_app, ["--list"])
+
+        assert result.exit_code == 0
+        # Should contain masked version of the stringified integer
+        assert "123***5678" in result.output
