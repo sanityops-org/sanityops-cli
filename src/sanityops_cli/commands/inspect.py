@@ -282,10 +282,10 @@ def inspect(
     # - If api-key configured and project bound: push directly
     try:
         _auto_upload(project_id, result)
-    except Exception:
+    except Exception as e:
         # _auto_upload prints user-friendly error, just continue
         # Upload failure does not block defect check
-        pass
+        logger.debug(f"Auto-upload failed: {e}")
 
     # Step 4: Run defect check and render (unless skipped)
     if skip_defect_check:
