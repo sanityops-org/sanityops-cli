@@ -38,6 +38,19 @@ from sanityops_cli.agents.scanner_agent.models.finding import (
     ToolContent,
 )
 
+# Module-level exclusion set for files/dirs skipped when packing skill directories.
+EXCLUDED_DIRS = {"__pycache__", "node_modules", ".git"}
+
+
+def _is_excluded_path(file_path: Path) -> bool:
+    """Return True if any path component is an excluded directory.
+
+    Compares directory names (not just the final filename), so paths like
+    ``project/__pycache__/module.pyc`` are correctly skipped even though
+    ``file_path.name`` is ``module.pyc``.
+    """
+    return any(part in EXCLUDED_DIRS for part in file_path.parts)
+
 
 class ArtifactPacker:
     """Prepare artifacts for upload to the sanityops server.
@@ -195,10 +208,10 @@ class ArtifactPacker:
                     # Skill directory - add all files recursively
                     for file_path in skill_path.rglob("*"):
                         if file_path.is_file():
-                            # Skip hidden files and common exclusions
+                            # Skip hidden files and excluded directories
                             if any(part.startswith(".") for part in file_path.parts):
                                 continue
-                            if file_path.name in ("__pycache__", "node_modules", ".git"):
+                            if _is_excluded_path(file_path):
                                 continue
 
                             # Preserve relative path from skill directory
@@ -374,10 +387,10 @@ def _pack_skills_from_findings(skills: list[Finding]) -> tuple[str, bytes] | Non
                 # Skill directory - add all files recursively
                 for file_path in skill_path.rglob("*"):
                     if file_path.is_file():
-                        # Skip hidden files and common exclusions
+                        # Skip hidden files and excluded directories
                         if any(part.startswith(".") for part in file_path.parts):
                             continue
-                        if file_path.name in ("__pycache__", "node_modules", ".git"):
+                        if _is_excluded_path(file_path):
                             continue
 
                         rel_path = file_path.relative_to(skill_path)
