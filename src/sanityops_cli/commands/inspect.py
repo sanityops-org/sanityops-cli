@@ -196,7 +196,7 @@ def inspect(
             project_id=project_id,
             check_level=check_level,
         )
-    except Exception as e:
+    except OSError as e:
         console.print(f"[yellow]⚠ Could not save markdown report: {escape(str(e))}[/yellow]")
         logger.debug(f"Markdown report save failed: {e}")
 
