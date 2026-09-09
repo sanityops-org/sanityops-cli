@@ -15,6 +15,8 @@
 
 """Unit tests for markdown_reporter."""
 
+import pytest
+
 from sanityops_cli.defect_checker.markdown_reporter import (
     _esc_md_cell,
     save_markdown_report,
@@ -145,8 +147,6 @@ class TestExceptionHandling:
     def test_save_raises_on_permission_error(self, tmp_path):
         """Verify that save_markdown_report propagates IO errors."""
         from unittest.mock import patch
-
-        import pytest
 
         response = _response()
         # Simulate an unwritable directory regardless of platform by mocking the
