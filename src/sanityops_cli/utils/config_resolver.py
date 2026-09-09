@@ -68,11 +68,32 @@ def _read_yaml_file(path: Path) -> dict[str, Any]:
         return {}
 
 
+def _restrict_global_config_permissions(path: Path) -> None:
+    """Restrict permissions on a global config path.
+
+    The global config stores sensitive values (API keys), so it must not be
+    readable by other users on the system. Restricts the config directory to
+    owner-only (0o700) and the config file to owner-only read/write (0o600).
+
+    No-op for non-global paths (e.g., project config), which should follow the
+    repo's own permissions. Best-effort: never raises on filesystems that do not
+    support POSIX permissions (e.g., Windows).
+    """
+    if path != get_global_config_path():
+        return
+    try:
+        path.chmod(0o600)
+        path.parent.chmod(0o700)
+    except OSError:
+        pass
+
+
 def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
     """Write data to a YAML file with atomic replacement.
 
     Creates parent directories if needed.
     Uses temp file + rename to prevent corruption on interruption.
+    Applies restricted permissions for the global config path.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -86,6 +107,7 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
         if tmp_path.exists():
             tmp_path.unlink()
         raise
+    _restrict_global_config_permissions(path)
 
 
 def _get_nested_value(data: dict[str, Any], key: str) -> Any:
