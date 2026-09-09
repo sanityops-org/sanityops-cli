@@ -25,6 +25,7 @@ This module handles:
 from __future__ import annotations
 
 import json
+import warnings
 import zipfile
 from io import BytesIO
 from pathlib import Path
@@ -219,9 +220,8 @@ class ArtifactPacker:
         try:
             content = file_path.read_bytes()
             zf.writestr(archive_name, content)
-        except OSError:
-            # Skip files that can't be read
-            pass
+        except OSError as e:
+            warnings.warn(f"Could not read file for ZIP archive: {file_path}: {e}", stacklevel=2)
 
 
 def pack_from_findings(
@@ -384,7 +384,9 @@ def _pack_skills_from_findings(skills: list[Finding]) -> tuple[str, bytes] | Non
                         try:
                             binary_content = file_path.read_bytes()
                             zf.writestr(f"{skill_name}/{rel_path}", binary_content)
-                        except OSError:
-                            pass
+                        except OSError as e:
+                            warnings.warn(
+                                f"Could not read file for ZIP archive: {file_path}: {e}", stacklevel=2
+                            )
 
     return ("skills.zip", buffer.getvalue())
