@@ -14,8 +14,6 @@
 #
 
 """Unit tests for markdown_reporter."""
-from datetime import datetime
-from pathlib import Path
 
 from sanityops_cli.defect_checker.markdown_reporter import (
     _esc_md_cell,
@@ -55,9 +53,9 @@ class TestSave:
         assert path.exists()
         assert path.is_file()
         assert path.suffix == ".md"
-        # Filename matches inspect-YYYYMMDD-HHMMSS.md
-        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        assert path.name == f"inspect-{ts}.md"
+        # Filename matches inspect-YYYYMMDD-HHMMSS.md pattern
+        import re
+        assert re.match(r"inspect-\d{8}-\d{6}\.md", path.name)
 
     def test_save_creates_parent_dirs(self, tmp_path):
         nested = tmp_path / "a" / "b" / "c"
