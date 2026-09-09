@@ -22,12 +22,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-#: Map defect-check module names to display group labels (mirrors renderer).
-_MODULE_LABELS: dict[str, str] = {
-    "QDS": "Skills",
-    "QDT": "Tools",
-    "QDP": "Prompts",
-}
+from sanityops_cli.defect_checker.renderer import _MODULE_LABELS
 
 
 def _esc_md_cell(text: str | None) -> str:
