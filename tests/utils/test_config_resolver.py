@@ -142,6 +142,35 @@ class TestYamlFileOperations:
         # Only owner can read/write (0o600)
         assert mode & 0o777 == 0o600
 
+    def test_write_global_config_fixes_existing_permissions(self, monkeypatch, tmp_path: Path):
+        """Global config file permissions should be corrected when replacing existing file."""
+        import os
+
+        from sanityops_cli.utils.config_resolver import ConfigResolver
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        # Pre-create global config with loose permissions (simulating attacker scenario)
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        global_config = global_config_dir / "config"
+        global_config.write_text("server:\n  base_url: https://old.example.com\n")
+        # Set loose permissions (world-readable)
+        global_config.chmod(0o644)
+
+        # Verify loose permissions before write
+        if os.name != "posix":
+            return
+        assert global_config.stat().st_mode & 0o777 == 0o644
+
+        # Write new config (this should fix permissions)
+        ConfigResolver.set_global("server.api_key", "my-secret-key")
+
+        # Verify permissions are now restricted
+        mode = global_config.stat().st_mode
+        assert mode & 0o777 == 0o600
+
 
 class TestNestedKeyOperations:
     """Test nested key get/set/unset operations."""
