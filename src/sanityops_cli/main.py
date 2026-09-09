@@ -20,6 +20,7 @@ import sys
 import typer
 
 from sanityops_cli import __version__
+from sanityops_cli.commands.config import config_app
 from sanityops_cli.commands.init import init_config
 from sanityops_cli.commands.inspect import inspect_app
 from sanityops_cli.exceptions.base_exceptions import ValidationError
@@ -53,6 +54,11 @@ def callback(
     """Sanityops CLI callback."""
 
 app.add_typer(inspect_app, name="inspect", help="Static defect inspection of logical artifacts (System Prompts, Skills, Tool Schemas), suitable for local development or CI/CD integration")
+app.add_typer(
+    config_app,
+    name="config",
+    help="Get and set sanityops configuration (server base URL, API key, etc.)",
+)
 app.command("init")(init_config)
 
 
