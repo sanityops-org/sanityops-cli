@@ -68,24 +68,26 @@ def _read_yaml_file(path: Path) -> dict[str, Any]:
         return {}
 
 
-def _restrict_global_config_permissions(path: Path) -> None:
-    """Restrict permissions on a global config path.
+def _is_global_config_path(path: Path) -> bool:
+    """Check if the path is the global config file path."""
+    return path == get_global_config_path()
 
-    The global config stores sensitive values (API keys), so it must not be
-    readable by other users on the system. Restricts the config directory to
-    owner-only (0o700) and the config file to owner-only read/write (0o600).
 
-    No-op for non-global paths (e.g., project config), which should follow the
-    repo's own permissions. Best-effort: never raises on filesystems that do not
-    support POSIX permissions (e.g., Windows).
+def _ensure_restricted_permissions(path: Path, is_file: bool = True) -> None:
+    """Ensure restricted permissions for global config paths.
+
+    For directories: 0o700 (owner-only access)
+    For files: 0o600 (owner-only read/write)
+
+    No-op for non-global paths. Best-effort on non-POSIX filesystems.
     """
-    if path != get_global_config_path():
-        return
     try:
-        path.chmod(0o600)
-        path.parent.chmod(0o700)
+        if is_file:
+            path.chmod(0o600)
+        else:
+            path.chmod(0o700)
     except OSError:
-        pass
+        pass  # Non-POSIX filesystem (e.g., Windows)
 
 
 def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
@@ -93,12 +95,25 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
 
     Creates parent directories if needed.
     Uses temp file + rename to prevent corruption on interruption.
-    Applies restricted permissions for the global config path.
+    For global config, sets restricted permissions BEFORE writing sensitive data.
     """
+    is_global = _is_global_config_path(path)
+
+    # Create parent directory
     path.parent.mkdir(parents=True, exist_ok=True)
+
+    # For global config, restrict directory permissions first
+    if is_global:
+        _ensure_restricted_permissions(path.parent, is_file=False)
 
     tmp_path = path.with_suffix(".tmp")
     try:
+        # Create temp file and restrict permissions BEFORE writing sensitive data
+        tmp_path.touch()
+        if is_global:
+            _ensure_restricted_permissions(tmp_path, is_file=True)
+
+        # Now write the sensitive content
         with open(tmp_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
         tmp_path.replace(path)  # Atomic on POSIX, near-atomic on Windows
@@ -107,7 +122,6 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
         if tmp_path.exists():
             tmp_path.unlink()
         raise
-    _restrict_global_config_permissions(path)
 
 
 def _get_nested_value(data: dict[str, Any], key: str) -> Any:
