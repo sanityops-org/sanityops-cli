@@ -251,8 +251,8 @@ class TestConfigCommandUnset:
         assert "base_url" not in data["server"]
         assert data["server"]["api_key"] == "my-key"
 
-    def test_unset_with_both_flags_global_wins(self, monkeypatch, tmp_path: Path):
-        """When both --global and --local are passed, --global should win."""
+    def test_unset_with_both_flags_errors(self, monkeypatch, tmp_path: Path):
+        """Passing both --global and --local should error (mutually exclusive)."""
         from typer.testing import CliRunner
 
         from sanityops_cli.commands.config import config_app
@@ -269,25 +269,15 @@ class TestConfigCommandUnset:
         global_config = global_config_dir / "config"
         global_config.write_text("server:\n  base_url: https://global.example.com\n")
 
-        # Create project config with same key
-        project_config_dir = tmp_path / ".sanityops"
-        project_config_dir.mkdir(parents=True)
-        project_config = project_config_dir / "inspect_config.yaml"
-        project_config.write_text("server:\n  base_url: https://project.example.com\n")
-
-        # Unset with both flags --global should win
+        # Both flags passed should error
         result = runner.invoke(config_app, ["--unset", "server.base_url", "--global", "--local"])
 
-        assert result.exit_code == 0
-        assert "global config" in result.output.lower()
+        assert result.exit_code != 0
+        assert "mutually exclusive" in result.output.lower()
 
-        # Global config should have key removed
+        # Global config should be unchanged
         data = yaml.safe_load(global_config.read_text())
-        assert "base_url" not in data.get("server", {})
-
-        # Project config should be unchanged
-        data = yaml.safe_load(project_config.read_text())
-        assert data["server"]["base_url"] == "https://project.example.com"
+        assert data["server"]["base_url"] == "https://global.example.com"
 
 
 class TestSensitiveValueMasking:
