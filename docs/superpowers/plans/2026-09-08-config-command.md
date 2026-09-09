@@ -1196,7 +1196,8 @@ def config_callback(
         sanityops-cli config server.base_url               # Read value
         sanityops-cli config server.base_url http://...    # Set (global, default)
         sanityops-cli config server.base_url http://... --local   # Set project-level
-        sanityops-cli config server.api_key                # Prompt (masked input)
+        sanityops-cli config server.api_key                # Read value (masked display)
+        sanityops-cli config server.api_key <key>          # Set API key
         sanityops-cli config --list                         # List all values
         sanityops-cli config --unset server.base_url        # Remove key
     """
@@ -1218,12 +1219,7 @@ def config_callback(
     use_local = local_config  # --local overrides; default is global
 
     if value is None:
-        # Interactive masked input for sensitive keys on a TTY.
-        if _is_sensitive_key(key) and sys.stdin.isatty():
-            entered = getpass.getpass(f"Enter {key}: ")
-            _write_config(key, entered, local=use_local)
-        else:
-            _read_config(key)
+        _read_config(key)
     else:
         _write_config(key, value, local=use_local)
 
