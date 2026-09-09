@@ -30,11 +30,6 @@ _MODULE_LABELS: dict[str, str] = {
 }
 
 
-def _ts() -> str:
-    """Return a compact timestamp for the report filename."""
-    return datetime.now().strftime("%Y%m%d-%H%M%S")
-
-
 def _esc_md_cell(text: str | None) -> str:
     """Escape markdown table cell content: pipes and newlines."""
     if text is None:
@@ -68,6 +63,7 @@ def _build_report(
     *,
     project_id: str | None,
     check_level: str,
+    generated_at: datetime,
 ) -> str:
     """Render the full markdown report body."""
     summary = response.get("summary", {})
@@ -81,7 +77,7 @@ def _build_report(
     lines.append("")
 
     # Meta
-    lines.append(f"- **Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"- **Generated**: {generated_at.strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"- **Check level**: {check_level}")
     lines.append(f"- **Status**: {status}")
     if project_id:
@@ -177,10 +173,11 @@ def save_markdown_report(
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = f"inspect-{_ts()}.md"
+    generated_at = datetime.now()
+    filename = f"inspect-{generated_at.strftime('%Y%m%d-%H%M%S')}.md"
     path = output_dir / filename
 
-    body = _build_report(response, project_id=project_id, check_level=check_level)
+    body = _build_report(response, project_id=project_id, check_level=check_level, generated_at=generated_at)
     path.write_text(body, encoding="utf-8")
 
     return path
