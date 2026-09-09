@@ -221,8 +221,8 @@ def _list_config() -> None:
         global_val, project_val = items[key]
         table.add_row(
             key,
-            _display_value(key, str(global_val) if global_val is not None else None),
-            _display_value(key, str(project_val) if project_val is not None else None),
+            _display_value(key, global_val),
+            _display_value(key, project_val),
         )
 
     console.print(table)
