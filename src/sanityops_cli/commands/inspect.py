@@ -35,6 +35,7 @@ from sanityops_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
 from sanityops_cli.constants.exit_codes import EXIT_FAILURE
 from sanityops_cli.defect_checker.checker import DefectChecker
 from sanityops_cli.defect_checker.llm_config import resolve_llm_config
+from sanityops_cli.defect_checker.markdown_reporter import save_markdown_report
 from sanityops_cli.defect_checker.renderer import DefectRenderer
 from sanityops_cli.exceptions.base_exceptions import ValidationError
 from sanityops_cli.logging.logger import Logger
@@ -305,4 +306,18 @@ def inspect(
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     tracker.summary()
-    DefectRenderer(console).render(response)
+
+    # Save markdown report (best-effort)
+    report_path: Path | None = None
+    try:
+        report_dir = loader.config_path.parent / "results"
+        report_path = save_markdown_report(
+            response, report_dir,
+            project_id=project_id,
+            check_level=check_level,
+        )
+    except OSError as e:
+        console.print(f"[yellow]⚠ Could not save markdown report: {escape(str(e))}[/yellow]")
+        logger.debug(f"Markdown report save failed: {e}")
+
+    DefectRenderer(console).render(response, report_path=str(report_path) if report_path else None)
