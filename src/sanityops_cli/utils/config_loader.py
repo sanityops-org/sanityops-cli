@@ -40,7 +40,7 @@ def read_file_with_encoding_fallback(path: Path) -> str | None:
     # Try UTF-8 first (most common)
     try:
         return path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
+    except (UnicodeDecodeError, OSError):
         pass
 
     # Fall back to GBK (Windows Chinese locale)
