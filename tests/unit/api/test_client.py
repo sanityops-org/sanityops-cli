@@ -23,10 +23,10 @@ import pytest
 from sanityops_cli.api.client import SanityopsClient
 from sanityops_cli.exceptions.api_exceptions import (
     APIError,
+    APIValidationError,
     AuthenticationError,
     NetworkError,
     ProjectNotFoundError,
-    ValidationError,
 )
 
 
@@ -100,7 +100,7 @@ class TestSanityopsClientCreateProject:
 
         client = SanityopsClient("https://api.sanityops.org", "test-key")
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(APIValidationError):
             client.create_project("")
 
 
