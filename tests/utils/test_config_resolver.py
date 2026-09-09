@@ -229,6 +229,37 @@ class TestConfigResolverPrecedence:
         result = resolver.resolve()
         assert result == "https://project.example.com"
 
+    def test_resolve_all_sources_returns_all_values(self, monkeypatch, tmp_path: Path):
+        """Should return values from project, global, env, and default sources."""
+        from sanityops_cli.utils.config_resolver import ConfigResolver
+
+        monkeypatch.chdir(tmp_path)
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.setenv("SANITYOPS_BASE_URL", "https://env.example.com")
+
+        # Create global config
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        global_config = global_config_dir / "config"
+        global_config.write_text("server:\n  base_url: https://global.example.com\n")
+
+        # Create project config
+        project_config_dir = tmp_path / ".sanityops"
+        project_config_dir.mkdir(parents=True)
+        project_config = project_config_dir / "inspect_config.yaml"
+        project_config.write_text("server:\n  base_url: https://project.example.com\n")
+
+        resolver = ConfigResolver("server.base_url", env_var="SANITYOPS_BASE_URL", default="https://default.com")
+        result = resolver.resolve_all_sources()
+
+        assert result == {
+            "project": "https://project.example.com",
+            "global": "https://global.example.com",
+            "env": "https://env.example.com",
+            "default": "https://default.com",
+        }
+
 
 class TestConfigResolverSetUnset:
     """Test set/unset/list operations."""
