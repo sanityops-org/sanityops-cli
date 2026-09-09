@@ -15,8 +15,8 @@
 
 """Tests for config_resolver module."""
 
-import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 
