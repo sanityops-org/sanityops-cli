@@ -144,20 +144,17 @@ class TestEscMdCell:
 class TestExceptionHandling:
     def test_save_raises_on_permission_error(self, tmp_path):
         """Verify that save_markdown_report propagates IO errors."""
-        import os
-        import stat
+        from unittest.mock import patch
 
-        # Create a read-only directory
-        readonly_dir = tmp_path / "readonly"
-        readonly_dir.mkdir()
-        os.chmod(readonly_dir, stat.S_IRUSR | stat.S_IXUSR)  # read + execute, no write
+        import pytest
 
         response = _response()
-        try:
-            save_markdown_report(response, readonly_dir)
-            raise AssertionError("Expected PermissionError")
-        except PermissionError:
-            pass  # Expected
-        finally:
-            # Restore permissions for cleanup
-            os.chmod(readonly_dir, stat.S_IRWXU)
+        # Simulate an unwritable directory regardless of platform by mocking the
+        # module's Path.write_text to raise PermissionError.
+        with patch.object(
+            save_markdown_report.__globals__["Path"],
+            "write_text",
+            side_effect=PermissionError,
+        ):
+            with pytest.raises(PermissionError):
+                save_markdown_report(response, tmp_path)
