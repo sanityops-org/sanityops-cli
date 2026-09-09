@@ -34,6 +34,13 @@ class TestRender:
         assert FULL_EXPERIENCE_URL in out
         assert "For the full experience" in out
 
+    def test_footer_can_show_report_path(self):
+        console = Console(record=True, width=80)
+        DefectRenderer(console).render(_result([]), report_path="/tmp/reports/inspect-20260909-103045.md")
+        out = console.export_text()
+        assert "Report saved to" in out
+        assert "/tmp/reports/inspect-20260909-103045.md" in out
+
     def test_shows_summary_counts(self):
         console = Console(record=True, width=80)
         result = _result(
