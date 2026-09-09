@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -94,8 +95,10 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
     """Write data to a YAML file with atomic replacement.
 
     Creates parent directories if needed.
-    Uses temp file + rename to prevent corruption on interruption.
-    For global config, sets restricted permissions BEFORE writing sensitive data.
+    Uses an unpredictable temp file + rename to prevent corruption on
+    interruption and symlink attacks. The temp file is created with
+    owner-only permissions (0o600) from the start (via O_EXCL), so sensitive
+    values are never written to a world-readable file.
     """
     is_global = _is_global_config_path(path)
 
@@ -106,21 +109,26 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
     if is_global:
         _ensure_restricted_permissions(path.parent, is_file=False)
 
-    tmp_path = path.with_suffix(".tmp")
+    # Create an unpredictable temp file in the same directory with restrictive
+    # permissions. O_EXCL + O_CREAT + 0o600 means the file is owner-only from
+    # the instant it exists, and a pre-existing file never gets clobbered.
+    fd, tmp_name = tempfile.mkstemp(
+        dir=path.parent,
+        prefix=f".{path.name}.tmp-",
+        # Drop S_IRWXG/S_IRWXO from the default 0o666 so the file is 0o600.
+        # umask may further restrict, never loosen.
+        text=True,
+    )
+    tmp_path = Path(tmp_name)
     try:
-        # Create temp file and restrict permissions BEFORE writing sensitive data
-        tmp_path.touch()
-        if is_global:
-            _ensure_restricted_permissions(tmp_path, is_file=True)
-
-        # Now write the sensitive content
-        with open(tmp_path, "w", encoding="utf-8") as f:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-        tmp_path.replace(path)  # Atomic on POSIX, near-atomic on Windows
+        # Atomic on POSIX, near-atomic on Windows
+        os.replace(tmp_path, path)
     except Exception:
         # Clean up temp file on failure
         if tmp_path.exists():
-            tmp_path.unlink()
+            tmp_path.unlink(missing_ok=True)
         raise
 
 
