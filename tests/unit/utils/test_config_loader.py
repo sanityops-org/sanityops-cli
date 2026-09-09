@@ -351,3 +351,68 @@ class TestSkillsSectionFilesOnly:
         with pytest.raises(ValidationError) as excinfo:
             loader.load()
         assert "not found" in str(excinfo.value).lower()
+
+
+class TestConfigPathProperty:
+    """Tests for the config_path property."""
+
+    def test_config_path_returns_resolved_path(self, tmp_path: Path, monkeypatch):
+        """config_path should return the resolved absolute path of the config file."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-0000000000bb"},
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+
+        loader = InspectConfigLoader(str(config_file))
+        assert loader.config_path == config_file.resolve()
+
+    def test_config_path_with_explicit_path(self, tmp_path: Path, monkeypatch):
+        """config_path should work when explicit path is provided."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / "custom_config"
+        config_dir.mkdir()
+        config_file = config_dir / "my_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-0000000000cc"},
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+
+        loader = InspectConfigLoader(str(config_file))
+        assert loader.config_path == config_file.resolve()
+
+    def test_config_path_with_default_location(self, tmp_path: Path, monkeypatch):
+        """config_path should work when using default .sanityops location."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-0000000000dd"},
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+
+        # No explicit path - should find default location
+        loader = InspectConfigLoader(None)
+        assert loader.config_path == config_file.resolve()
