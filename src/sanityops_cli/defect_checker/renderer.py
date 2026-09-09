@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import Any
 
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -43,11 +44,11 @@ class DefectRenderer:
     def __init__(self, console: Console):
         self.console = console
 
-    def render(self, result: dict) -> None:
+    def render(self, result: dict, *, report_path: str | None = None) -> None:
         """Render summary, per-group defects, and the footer."""
         self._render_summary(result.get("summary", {}))
         self._render_artifact_groups(result.get("results", []))
-        self._render_footer()
+        self._render_footer(report_path)
 
     # ------------------------------------------------------------------
     # Summary
@@ -116,10 +117,17 @@ class DefectRenderer:
     # Footer
     # ------------------------------------------------------------------
 
-    def _render_footer(self) -> None:
+    def _render_footer(self, report_path: str | None = None) -> None:
+        lines: list[str] = []
+        if report_path:
+            lines.append(f"Report saved to [magenta]{escape(report_path)}[/magenta]")
+        lines.extend([
+            "For the full experience, visit",
+            FULL_EXPERIENCE_URL,
+        ])
         self.console.print(
             Panel(
-                f"For the full experience, visit\n{FULL_EXPERIENCE_URL}",
+                "\n".join(lines),
                 border_style="green",
             )
         )
