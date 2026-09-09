@@ -235,19 +235,15 @@ def _list_config() -> None:
     console.print(table)
 
     # Report which known env vars are set.
-    env_set = [
-        (env_name, _display_value(key, os_val))
-        for key, env_name, os_val in (
-            (
-                k,
-                v["env"],
-                os.environ.get(v["env"]),
-            )
-            for k, v in CONFIG_SCHEMA.items()
-            if v.get("env")
-        )
-        if os_val
-    ]
+    env_set: list[tuple[str, str]] = []
+    for config_key, schema in CONFIG_SCHEMA.items():
+        env_name = schema.get("env")
+        if not env_name:
+            continue
+        os_val = os.environ.get(env_name)
+        if os_val:
+            env_set.append((env_name, _display_value(config_key, os_val)))
+
     if env_set:
         console.print("\n[dim]Environment variables set:[/dim]")
         for env_name, val in env_set:

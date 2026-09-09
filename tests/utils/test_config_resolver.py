@@ -98,6 +98,50 @@ class TestYamlFileOperations:
         assert config_file.exists()
         assert config_file.parent.is_dir()
 
+    def test_write_yaml_file_cleans_temp_on_failure(self, tmp_path: Path):
+        """Should clean up temp file if write fails."""
+        from sanityops_cli.utils.config_resolver import _write_yaml_file
+
+        config_file = tmp_path / "config.yaml"
+
+        # Create a situation that will cause write to fail
+        # by making yaml.safe_dump raise an exception
+        import unittest.mock
+
+        with unittest.mock.patch("yaml.safe_dump", side_effect=RuntimeError("fail")):
+            try:
+                _write_yaml_file(config_file, {"key": "value"})
+            except RuntimeError:
+                pass
+
+        # Config file should not exist, and no temp files should remain
+        assert not config_file.exists()
+        # Check no temp files remain in parent directory
+        temp_files = list(tmp_path.glob(".*.tmp-*"))
+        assert temp_files == []
+
+    def test_write_global_config_restricts_permissions(self, monkeypatch, tmp_path: Path):
+        """Global config file should be created with 0o600 permissions."""
+        import os
+
+        from sanityops_cli.utils.config_resolver import ConfigResolver
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+
+        ConfigResolver.set_global("server.api_key", "my-secret-key")
+
+        global_config = home_dir / ".sanityops" / "config"
+        assert global_config.exists()
+
+        # Skip permission check on filesystems that don't support POSIX perms
+        if os.name != "posix":
+            return
+
+        mode = global_config.stat().st_mode
+        # Only owner can read/write (0o600)
+        assert mode & 0o777 == 0o600
+
 
 class TestNestedKeyOperations:
     """Test nested key get/set/unset operations."""
