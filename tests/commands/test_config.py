@@ -147,6 +147,32 @@ class TestConfigCommandList:
         assert "server.base_url" in result.output
         assert "https://example.com" in result.output
 
+    def test_list_shows_empty_for_unset_in_one_column(self, monkeypatch, tmp_path: Path):
+        """Keys set in global but not project show empty cell in Project column."""
+        from typer.testing import CliRunner
+
+        from sanityops_cli.commands.config import config_app
+
+        runner = CliRunner()
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.chdir(tmp_path)
+
+        # Create global config with base_url
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        global_config = global_config_dir / "config"
+        global_config.write_text("server:\n  base_url: https://example.com\n")
+
+        result = runner.invoke(config_app, ["--list"])
+
+        assert result.exit_code == 0
+        assert "server.base_url" in result.output
+        assert "https://example.com" in result.output
+        # The Project column shows empty string, not "(not set)"
+        assert "(not set)" not in result.output
+
 
 class TestConfigCommandUnset:
     """Test unsetting config values."""
