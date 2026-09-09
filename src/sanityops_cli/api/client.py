@@ -24,12 +24,10 @@ import httpx
 
 from sanityops_cli.exceptions.api_exceptions import (
     APIError,
+    APIValidationError,
     AuthenticationError,
     NetworkError,
     ProjectNotFoundError,
-)
-from sanityops_cli.exceptions.api_exceptions import (
-    ValidationError as APIValidationError,
 )
 
 

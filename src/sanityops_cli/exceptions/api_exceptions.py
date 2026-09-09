@@ -51,7 +51,7 @@ class NetworkError(APIError):
     exit_code: int = 7
 
 
-class ValidationError(APIError):
+class APIValidationError(APIError):
     """Validation error (422).
 
     Request parameters failed validation.
