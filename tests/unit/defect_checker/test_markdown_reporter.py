@@ -53,9 +53,9 @@ class TestSave:
         assert path.exists()
         assert path.is_file()
         assert path.suffix == ".md"
-        # Filename matches inspect-YYYYMMDD-HHMMSS.md pattern
+        # Filename matches inspect-YYYYMMDD-HHMMSS-microseconds.md pattern
         import re
-        assert re.match(r"inspect-\d{8}-\d{6}\.md", path.name)
+        assert re.match(r"inspect-\d{8}-\d{6}-\d{6}\.md", path.name)
 
     def test_save_creates_parent_dirs(self, tmp_path):
         nested = tmp_path / "a" / "b" / "c"
@@ -139,3 +139,25 @@ class TestEscMdCell:
 
     def test_html_escaped(self):
         assert _esc_md_cell("<x>&y") == "&lt;x&gt;&amp;y"
+
+
+class TestExceptionHandling:
+    def test_save_raises_on_permission_error(self, tmp_path):
+        """Verify that save_markdown_report propagates IO errors."""
+        import os
+        import stat
+
+        # Create a read-only directory
+        readonly_dir = tmp_path / "readonly"
+        readonly_dir.mkdir()
+        os.chmod(readonly_dir, stat.S_IRUSR | stat.S_IXUSR)  # read + execute, no write
+
+        response = _response()
+        try:
+            save_markdown_report(response, readonly_dir)
+            raise AssertionError("Expected PermissionError")
+        except PermissionError:
+            pass  # Expected
+        finally:
+            # Restore permissions for cleanup
+            os.chmod(readonly_dir, stat.S_IRWXU)
