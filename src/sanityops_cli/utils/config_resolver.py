@@ -125,7 +125,14 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
         # Atomic on POSIX, near-atomic on Windows
         os.replace(tmp_path, path)
-    except Exception:
+    except BaseException:
+        # Close fd if os.fdopen() failed before wrapping it (the fd would
+        # otherwise leak). If fdopen succeeded, the file is already closed and
+        # os.close() raises OSError (EBADF), which we swallow.
+        try:
+            os.close(fd)
+        except OSError:
+            pass
         # Clean up temp file on failure
         if tmp_path.exists():
             tmp_path.unlink(missing_ok=True)
