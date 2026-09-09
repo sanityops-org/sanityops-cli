@@ -204,7 +204,7 @@ class TestSensitiveValueMasking:
 
         assert result.exit_code == 0
         # Should contain masked version, not full key
-        assert "my-s***2345" in result.output or "***" in result.output
+        assert "my-***2345" in result.output
         assert "my-secret-api-key-12345" not in result.output
 
     def test_short_api_key_fully_masked(self, monkeypatch, tmp_path: Path):
