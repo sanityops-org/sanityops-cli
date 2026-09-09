@@ -228,3 +228,33 @@ class TestSensitiveValueMasking:
 
         assert result.exit_code == 0
         assert "short" not in result.output
+
+    def test_read_sensitive_key_does_not_prompt_or_write(self, monkeypatch, tmp_path: Path):
+        """Should READ (not prompt/write) when reading sensitive key without value."""
+        from typer.testing import CliRunner
+
+        from sanityops_cli.commands.config import config_app
+
+        runner = CliRunner()
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.chdir(tmp_path)
+
+        # Create config with API key
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        global_config = global_config_dir / "config"
+        original_content = "server:\n  api_key: my-secret-api-key-12345\n"
+        global_config.write_text(original_content)
+
+        # Read the API key (no value argument)
+        result = runner.invoke(config_app, ["server.api_key"])
+
+        assert result.exit_code == 0
+        # Should contain masked version, not full key
+        assert "my-***2345" in result.output
+        assert "my-secret-api-key-12345" not in result.output
+
+        # Config file should be unchanged
+        assert global_config.read_text() == original_content
