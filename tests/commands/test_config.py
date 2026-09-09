@@ -196,6 +196,30 @@ class TestConfigCommandList:
         # The Project column shows empty string, not "(not set)"
         assert "(not set)" not in result.output
 
+    def test_list_shows_env_vars(self, monkeypatch, tmp_path: Path):
+        """Should display environment variables set for config keys."""
+        from typer.testing import CliRunner
+
+        from sanityops_cli.commands.config import config_app
+
+        runner = CliRunner()
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("SANITYOPS_BASE_URL", "https://env.example.com")
+
+        # Need at least one config to avoid early "No configuration found" return
+        global_config_dir = home_dir / ".sanityops"
+        global_config_dir.mkdir(parents=True)
+        (global_config_dir / "config").write_text("server:\n  api_key: test-key\n")
+
+        result = runner.invoke(config_app, ["--list"])
+
+        assert result.exit_code == 0
+        assert "SANITYOPS_BASE_URL" in result.output
+        assert "https://env.example.com" in result.output
+
 
 class TestConfigCommandUnset:
     """Test unsetting config values."""
