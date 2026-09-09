@@ -133,8 +133,11 @@ def config_callback(
     """
     # --global and --local are mutually exclusive scope selectors.
     # --global is the default (and is explicit); --local targets project config.
-    # If both are passed, --global wins.
-    use_local = local_config and not global_config
+    if global_config and local_config:
+        console.print("[red]Error: --global and --local are mutually exclusive[/red]")
+        raise typer.Exit(code=EXIT_FAILURE)
+
+    use_local = local_config
 
     if list_all:
         _list_config()
