@@ -123,6 +123,11 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
         # Atomic on POSIX, near-atomic on Windows
         os.replace(tmp_path, path)
+        # Ensure restrictive permissions on the destination file after atomic
+        # replace. os.replace() may preserve existing destination permissions
+        # if the file already existed with looser permissions.
+        if is_global:
+            _ensure_restricted_permissions(path, is_file=True)
     except BaseException:
         # Close fd if os.fdopen() failed before wrapping it (the fd would
         # otherwise leak). If fdopen succeeded, the file is already closed and
