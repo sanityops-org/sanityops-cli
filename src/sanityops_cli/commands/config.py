@@ -64,7 +64,7 @@ def _is_sensitive_key(key: str) -> bool:
     return bool(CONFIG_SCHEMA.get(key, {}).get("sensitive"))
 
 
-def _mask_sensitive_value(value: str | None) -> str:
+def _mask_sensitive_value(value: Any) -> str:
     """Mask a sensitive value for display: first 3 + '***' + last 4 chars.
 
     Short values (< 8 chars) are fully masked. None -> '(not set)'.
