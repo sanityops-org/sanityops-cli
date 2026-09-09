@@ -115,7 +115,8 @@ class ConfigResolver:
 sanityops-cli config server.base_url                    # Read value
 sanityops-cli config server.base_url https://...        # Set (global, default)
 sanityops-cli config server.base_url https://... --local  # Set project-level
-sanityops-cli config server.api_key                     # Prompt (masked input)
+sanityops-cli config server.api_key                     # Read value (masked display)
+sanityops-cli config server.api_key <key>               # Set API key
 sanityops-cli config --list                             # List all values
 sanityops-cli config --unset server.base_url            # Remove from global
 sanityops-cli config --unset server.base_url --local    # Remove from project
@@ -137,7 +138,8 @@ sanityops-cli config --unset server.base_url --local    # Remove from project
 - `server.api_key` is marked as sensitive in `CONFIG_SCHEMA`
 - Display: masked as `abc***wxyz` (first 3 + `***` + last 4)
 - Values shorter than 8 characters are fully masked as `***`
-- When setting via CLI: uses `getpass` for masked terminal input
+- Reading a sensitive key displays the masked value (same as `--list`)
+- Setting a sensitive key requires passing the value as an argument
 
 ### List Output
 
