@@ -22,6 +22,7 @@ the sanityops SaaS backend (NOT the LLM model config, which lives under
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import typer
@@ -236,7 +237,7 @@ def _list_config() -> None:
             (
                 k,
                 v["env"],
-                __import__("os").environ.get(v["env"]),
+                os.environ.get(v["env"]),
             )
             for k, v in CONFIG_SCHEMA.items()
             if v.get("env")
