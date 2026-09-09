@@ -156,7 +156,7 @@ class SanityopsClient:
         except httpx.TimeoutException as e:
             raise NetworkError(f"Request timed out: {e}") from e
 
-        if response.status_code != 200:
+        if response.status_code not in (200, 201):
             self._handle_error(response, "project creation")
 
         return self._unwrap_response(response.json())
@@ -268,7 +268,7 @@ class SanityopsClient:
         except httpx.TimeoutException as e:
             raise NetworkError(f"Request timed out: {e}") from e
 
-        if response.status_code != 200:
+        if response.status_code not in (200, 201):
             self._handle_error(response, "artifact upload")
 
         return self._unwrap_response(response.json())
