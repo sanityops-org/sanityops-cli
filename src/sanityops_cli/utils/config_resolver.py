@@ -110,13 +110,11 @@ def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
         _ensure_restricted_permissions(path.parent, is_file=False)
 
     # Create an unpredictable temp file in the same directory with restrictive
-    # permissions. mkstemp() uses O_EXCL internally with mode 0o600, meaning
+    # permissions. mkstemp() creates the file with mode 0o600 by default, meaning
     # the file is owner-only from creation and symlink attacks are prevented.
     fd, tmp_name = tempfile.mkstemp(
         dir=path.parent,
         prefix=f".{path.name}.tmp-",
-        # Drop S_IRWXG/S_IRWXO from the default 0o666 so the file is 0o600.
-        # umask may further restrict, never loosen.
         text=True,
     )
     tmp_path = Path(tmp_name)
