@@ -86,6 +86,29 @@ class TestConfigCommandSet:
         data = yaml.safe_load(global_config.read_text())
         assert data["server"]["base_url"] == "https://new.example.com"
 
+    def test_set_api_key_global(self, monkeypatch, tmp_path: Path):
+        """Should set server.api_key in global config."""
+        from typer.testing import CliRunner
+
+        from sanityops_cli.commands.config import config_app
+
+        runner = CliRunner()
+
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(config_app, ["server.api_key", "my-secret-api-key"])
+
+        assert result.exit_code == 0
+        assert "Set server.api_key in global config" in result.output
+
+        # Verify file was created with API key
+        global_config = home_dir / ".sanityops" / "config"
+        assert global_config.exists()
+        data = yaml.safe_load(global_config.read_text())
+        assert data["server"]["api_key"] == "my-secret-api-key"
+
     def test_set_local_creates_project_config(self, monkeypatch, tmp_path: Path):
         """Should set value in project config with --local flag."""
         from typer.testing import CliRunner
