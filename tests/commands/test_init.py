@@ -1,16 +1,58 @@
 """Tests for inspect init command."""
 
-import uuid
 from pathlib import Path
 
 import yaml
+from typer.testing import CliRunner
+
+from sanityops_cli.main import app
+from sanityops_cli.utils.config_loader import PROJECT_ID_PLACEHOLDER
+
+
+def test_init_prints_file_created_message(tmp_path: Path, monkeypatch):
+    """Should confirm the config file was created."""
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["init"])
+
+    assert result.exit_code == 0
+    assert "Created .sanityops/inspect_config.yaml" in result.output
+
+
+def test_init_prints_artifact_and_model_guidance(tmp_path: Path, monkeypatch):
+    """Should guide users to edit artifacts and model configuration."""
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["init"])
+
+    assert result.exit_code == 0
+    assert "Before running inspect, you need:" in result.output
+    assert "- Edit this file to add your prompts, tools, and skills." in result.output
+    assert "- Edit this file to add your provider, api_key, model_id and base_url" in result.output
+    assert "optional." in result.output
+    assert "If omitted, the CLI uses LLM_* environment variables)." in result.output
+
+
+def test_init_prints_server_config_guidance(tmp_path: Path, monkeypatch):
+    """Should guide users to configure the server URL and API key."""
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["init"])
+
+    assert result.exit_code == 0
+    assert (
+        "- To connect to the Sanityops service, configure the server URL and API key:"
+        in result.output
+    )
+    assert 'sanityops-cli config server.base_url "<your-server-url>"' in result.output
+    assert 'sanityops-cli config server.api_key "<your-api-key>"' in result.output
 
 
 class TestInitConfig:
     """Test cases for init_config function."""
 
     def test_creates_config_file_when_none_exists(self, tmp_path: Path, monkeypatch):
-        """Should create .sanityops/inspect_config.yaml with valid UUID."""
+        """Should create .sanityops/inspect_config.yaml with placeholder UUID."""
         # Arrange
         monkeypatch.chdir(tmp_path)
 
@@ -28,10 +70,12 @@ class TestInitConfig:
         content = yaml.safe_load(config_file.read_text())
         assert "project" in content
         assert "id" in content["project"]
+        assert "name" in content["project"]
 
-        # Verify UUID is valid format
+        # Verify placeholder UUID is kept (project not yet bound)
         project_id = content["project"]["id"]
-        uuid.UUID(project_id)  # raises ValueError if invalid
+        assert project_id == PROJECT_ID_PLACEHOLDER
+        assert content["project"]["name"] == ""
 
     def test_preserves_existing_when_user_declines(self, tmp_path: Path, monkeypatch):
         """Should preserve existing config when user declines overwrite."""
@@ -81,10 +125,9 @@ class TestInitConfig:
         # Act
         init_config()
 
-        # Assert - new file created with new UUID
+        # Assert - new file created with placeholder UUID (not the old one)
         new_content = yaml.safe_load(config_file.read_text())
-        assert new_content["project"]["id"] != "original-uuid-12345"
-        uuid.UUID(new_content["project"]["id"])  # verify valid UUID
+        assert new_content["project"]["id"] == PROJECT_ID_PLACEHOLDER
 
         # Backup file exists with original content
         backup_files = list(config_dir.glob("inspect_config.yaml.bak.*"))
@@ -121,6 +164,21 @@ class TestInitConfig:
 
         # Assert
         assert (config_dir / "inspect_config.yaml").exists()
+
+    def test_creates_gitignore_to_keep_secrets_out_of_git(self, tmp_path: Path, monkeypatch):
+        """Should write a nested .gitignore covering the config file and results."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        from sanityops_cli.commands.init import init_config
+
+        # Act
+        init_config()
+
+        # Assert
+        gitignore = tmp_path / ".sanityops" / ".gitignore"
+        assert gitignore.is_file()
+        assert gitignore.read_text().strip() == "*"
 
     def test_init_is_registered_as_top_level_command(self):
         """Verify 'init' is registered on the top-level app, not just under 'inspect'."""
@@ -185,8 +243,8 @@ class TestInitConfigPreservesComments:
         content = config_file.read_text()
         assert "Required:" in content or "# Required" in content, "Required labels should be in comments"
 
-    def test_generated_config_has_valid_uuid_not_placeholder(self, tmp_path: Path, monkeypatch):
-        """Should replace placeholder UUID with real UUID."""
+    def test_generated_config_keeps_placeholder_uuid(self, tmp_path: Path, monkeypatch):
+        """Should keep placeholder UUID so the project can be auto-created later."""
         # Arrange
         monkeypatch.chdir(tmp_path)
 
@@ -198,8 +256,8 @@ class TestInitConfigPreservesComments:
         # Assert
         config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
         content = config_file.read_text()
-        assert "00000000-0000-0000-0000-000000000000" not in content, "Placeholder UUID should be replaced"
+        assert PROJECT_ID_PLACEHOLDER in content, "Placeholder UUID should be preserved for unbound project"
 
-        # Verify the actual UUID is valid
+        # Placeholder is a valid UUID format but signals "not yet bound"
         data = yaml.safe_load(content)
-        uuid.UUID(data["project"]["id"])  # raises if invalid
+        assert data["project"]["id"] == PROJECT_ID_PLACEHOLDER
