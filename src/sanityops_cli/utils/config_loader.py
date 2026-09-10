@@ -74,7 +74,7 @@ class InspectConfigLoader:
 
         Returns:
             {
-                "project_id": str,
+                "project_id": str | None,  # None if placeholder (not bound)
                 "prompts": List[str],   # absolute paths
                 "tools": List[str],     # absolute paths
                 "skills": List[str],    # absolute paths
@@ -91,8 +91,13 @@ class InspectConfigLoader:
                 "At least one of (prompts / tools / skills) must be provided in config"
             )
 
+        # project_id may be None/placeholder if not bound
+        project_id = self._config["project"]["id"]
+        if project_id == "00000000-0000-0000-0000-000000000000":
+            project_id = None
+
         return {
-            "project_id": self._config["project"]["id"],
+            "project_id": project_id,
             "prompts": prompts,
             "tools": tools,
             "skills": skills,

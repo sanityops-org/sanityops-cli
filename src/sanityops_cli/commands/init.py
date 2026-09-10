@@ -15,7 +15,6 @@
 
 """Init command — Initialize inspect configuration."""
 
-import uuid
 from pathlib import Path
 
 import typer
@@ -35,7 +34,9 @@ DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 def init_config() -> None:
     """Initialize .sanityops/inspect_config.yaml with a template.
 
-    Creates a new config file with a generated project UUID.
+    Creates a new config file with a placeholder project UUID. The project
+    stays unbound until the first inspect upload auto-creates it and writes
+    the real project id/name back to this file.
     If a config already exists, prompts to backup and replace.
     """
     from datetime import datetime
@@ -76,11 +77,9 @@ def init_config() -> None:
         console.print(f"[red]✗ Internal error: template not found ({e})[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
 
-    # Replace placeholder UUID with generated one
-    template_content = template_content.replace(
-        "00000000-0000-0000-0000-000000000000",
-        str(uuid.uuid4())
-    )
+    # The placeholder UUID is intentionally left as-is so that the first
+    # inspect upload auto-creates the project and writes the real id/name
+    # back to this config file.
 
     # Write config file
     try:
@@ -91,7 +90,15 @@ def init_config() -> None:
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     console.print("[green]✓[/green] Created .sanityops/inspect_config.yaml")
-    console.print("  Edit this file to add your prompts, tools, and skills.")
+    console.print("Before running inspect, you need:")
+    console.print("-Edit this file to add your prompts, tools, and skills.")
+    console.print(
+        "-Edit this file to add your provider, api_key, model_id and base_url "
+        "(optional. If omitted, the CLI uses LLM_* environment variables)."
+    )
+    console.print("-To connect to the Sanityops service, configure the server URL and API key:")
+    console.print('sanityops-cli config server.base_url "<your-server-url>"')
+    console.print("sanityops-cli config server.api_key")
 
 
 def _load_template() -> str:
