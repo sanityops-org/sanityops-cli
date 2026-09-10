@@ -6,7 +6,7 @@ import yaml
 from typer.testing import CliRunner
 
 from sanityops_cli.main import app
-from sanityops_cli.utils.config_loader import PROJECT_ID_PLACEHOLDER as PLACEHOLDER_UUID
+from sanityops_cli.utils.config_loader import PROJECT_ID_PLACEHOLDER
 
 
 def test_init_prints_file_created_message(tmp_path: Path, monkeypatch):
@@ -74,7 +74,7 @@ class TestInitConfig:
 
         # Verify placeholder UUID is kept (project not yet bound)
         project_id = content["project"]["id"]
-        assert project_id == PLACEHOLDER_UUID
+        assert project_id == PROJECT_ID_PLACEHOLDER
         assert content["project"]["name"] == ""
 
     def test_preserves_existing_when_user_declines(self, tmp_path: Path, monkeypatch):
@@ -127,7 +127,7 @@ class TestInitConfig:
 
         # Assert - new file created with placeholder UUID (not the old one)
         new_content = yaml.safe_load(config_file.read_text())
-        assert new_content["project"]["id"] == PLACEHOLDER_UUID
+        assert new_content["project"]["id"] == PROJECT_ID_PLACEHOLDER
 
         # Backup file exists with original content
         backup_files = list(config_dir.glob("inspect_config.yaml.bak.*"))
@@ -164,6 +164,21 @@ class TestInitConfig:
 
         # Assert
         assert (config_dir / "inspect_config.yaml").exists()
+
+    def test_creates_gitignore_to_keep_secrets_out_of_git(self, tmp_path: Path, monkeypatch):
+        """Should write a nested .gitignore covering the config file and results."""
+        # Arrange
+        monkeypatch.chdir(tmp_path)
+
+        from sanityops_cli.commands.init import init_config
+
+        # Act
+        init_config()
+
+        # Assert
+        gitignore = tmp_path / ".sanityops" / ".gitignore"
+        assert gitignore.is_file()
+        assert gitignore.read_text().strip() == "*"
 
     def test_init_is_registered_as_top_level_command(self):
         """Verify 'init' is registered on the top-level app, not just under 'inspect'."""
@@ -241,8 +256,8 @@ class TestInitConfigPreservesComments:
         # Assert
         config_file = tmp_path / ".sanityops" / "inspect_config.yaml"
         content = config_file.read_text()
-        assert PLACEHOLDER_UUID in content, "Placeholder UUID should be preserved for unbound project"
+        assert PROJECT_ID_PLACEHOLDER in content, "Placeholder UUID should be preserved for unbound project"
 
         # Placeholder is a valid UUID format but signals "not yet bound"
         data = yaml.safe_load(content)
-        assert data["project"]["id"] == PLACEHOLDER_UUID
+        assert data["project"]["id"] == PROJECT_ID_PLACEHOLDER

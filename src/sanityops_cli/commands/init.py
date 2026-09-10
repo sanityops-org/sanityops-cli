@@ -89,6 +89,15 @@ def init_config() -> None:
         console.print(f"[red]✗ Cannot write config file: {e}[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
 
+    # Keep secrets out of git: the config file holds the API key and the
+    # results directory holds scanned source artifacts. A nested .gitignore
+    # inside the generated directory covers both without touching the
+    # user's repository root .gitignore.
+    try:
+        (config_dir / ".gitignore").write_text("*\n", encoding="utf-8")
+    except OSError as e:
+        console.print(f"[yellow]⚠ Could not write {config_dir / '.gitignore'}: {e}[/yellow]")
+
     console.print("[green]✓[/green] Created .sanityops/inspect_config.yaml")
     console.print("Before running inspect, you need:")
     console.print("- Edit this file to add your prompts, tools, and skills.")
