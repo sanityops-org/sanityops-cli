@@ -2,24 +2,34 @@
 # Sanityops CLI - Inspect Configuration Template
 # ============================================================================
 # Usage:
-#   1. Copy this template to your project root (e.g. sanityops.yaml)
-#   2. Fill in the project id (UUID) and artifact file paths
-#   3. Run: sanityops-cli inspect --config sanityops.yaml
+#   1. Run: sanityops-cli init
+#   2. Fill in model configuration below (required)
+#   3. Connect to the Sanityops service:
+#      sanityops-cli config server.base_url "<your-server-url>"
+#      sanityops-cli config server.api_key
+#   4. Configure artifact paths below
+#   5. Run: sanityops-cli inspect
+#      (A project is created automatically on first upload and the
+#      project id/name are written back to this file.)
 # ============================================================================
 
 # Project metadata
+# id: Left as a placeholder. A real project id is assigned automatically
+#     on first inspect upload (project auto-created), or set it manually.
+# name: Project display name (optional, filled automatically on first upload)
 project:
   id: "00000000-0000-0000-0000-000000000000"
+  name: ""
 
-# Model configuration (optional).
-# If omitted, the CLI uses LLM_* environment variables.
-# Uncomment and fill in to override:
-#
-# model:
-#   provider: anthropic            # Required: anthropic, openai, azure, etc.
-#   api_key: sk-ant-...            # Required: your API key (keep this file out of git)
-#   model_id: claude-sonnet-4-20250514  # Required: model identifier
-#   base_url: ""                   # Optional: custom endpoint URL
+# Model configuration (required)
+# Configure your LLM provider and credentials here.
+# Alternatively, you can use environment variables:
+#   LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_ID, LLM_BASE_URL
+model:
+  provider: anthropic                 # Required: anthropic, openai, azure, etc.
+  api_key: ""                         # Required: your API key (keep this file out of git)
+  model_id: claude-sonnet-4-20250514  # Required: model identifier
+  base_url: ""                        # Optional: custom endpoint URL
 
 # System Prompt file list (supports any plaintext file format)
 prompts:

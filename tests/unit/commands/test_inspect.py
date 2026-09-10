@@ -222,13 +222,10 @@ def test_inspect_prints_banner_before_project_id(monkeypatch, tmp_path):
     assert result.exit_code == 0
     text = output.getvalue()
     assert f"sanityops-cli v{__version__}" in text
-    assert "Project ID: 00000000-0000-0000-0000-000000000000" in text
+    assert "Project ID: not set" in text
     # the Project ID line must immediately follow the banner line (no intervening output)
     lines = text.splitlines()
     banner_line_idx = next(
         i for i, line in enumerate(lines) if f"sanityops-cli v{__version__}" in line
     )
-    assert (
-        "Project ID: 00000000-0000-0000-0000-000000000000"
-        in lines[banner_line_idx + 1]
-    )
+    assert "Project ID: not set" in lines[banner_line_idx + 1]

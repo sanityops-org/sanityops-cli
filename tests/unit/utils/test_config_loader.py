@@ -416,3 +416,72 @@ class TestConfigPathProperty:
         # No explicit path - should find default location
         loader = InspectConfigLoader(None)
         assert loader.config_path == config_file.resolve()
+
+
+class TestProjectPlaceholder:
+    """Test handling of the placeholder project UUID and project.name."""
+
+    def test_placeholder_uuid_resolves_to_none(self, tmp_path: Path, monkeypatch):
+        """Placeholder project.id should resolve to None (project not bound)."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-000000000000"},
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["project_id"] is None
+
+    def test_real_uuid_is_returned_as_is(self, tmp_path: Path, monkeypatch):
+        """A real (non-placeholder) project.id should be returned unchanged."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        real_id = "11111111-2222-3333-4444-555555555555"
+        config_content = {
+            "project": {"id": real_id},
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["project_id"] == real_id
+
+    def test_project_name_field_is_ignored_by_loader(self, tmp_path: Path, monkeypatch):
+        """An extra project.name field should not affect loading."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-000000000000", "name": ""},
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w") as f:
+            yaml.dump(config_content, f)
+
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["project_id"] is None
+        assert str(skill_file.resolve()) in result["skills"]
