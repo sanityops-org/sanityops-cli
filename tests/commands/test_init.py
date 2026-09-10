@@ -6,8 +6,7 @@ import yaml
 from typer.testing import CliRunner
 
 from sanityops_cli.main import app
-
-PLACEHOLDER_UUID = "00000000-0000-0000-0000-000000000000"
+from sanityops_cli.utils.config_loader import PROJECT_ID_PLACEHOLDER as PLACEHOLDER_UUID
 
 
 def test_init_prints_configuration_guidance(tmp_path: Path, monkeypatch):

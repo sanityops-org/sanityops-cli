@@ -27,6 +27,11 @@ from sanityops_cli.exceptions.base_exceptions import ValidationError
 DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
+# Sentinel project.id meaning "not yet bound". Kept as-is by init so that
+# the first inspect upload auto-creates the project and writes the real
+# id/name back to the config file.
+PROJECT_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
+
 
 def read_file_with_encoding_fallback(path: Path) -> str | None:
     """Read a file with UTF-8 encoding, falling back to GBK for Windows compatibility.
@@ -79,6 +84,10 @@ class InspectConfigLoader:
                 "tools": List[str],     # absolute paths
                 "skills": List[str],    # absolute paths
             }
+
+        Note:
+            project.name in the config file is not returned here; it is
+            display metadata written back by the auto-upload flow.
         """
         self._validate_structure()
 
@@ -93,7 +102,7 @@ class InspectConfigLoader:
 
         # project_id may be None/placeholder if not bound
         project_id = self._config["project"]["id"]
-        if project_id == "00000000-0000-0000-0000-000000000000":
+        if project_id == PROJECT_ID_PLACEHOLDER:
             project_id = None
 
         return {
