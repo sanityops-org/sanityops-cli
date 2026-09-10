@@ -194,11 +194,19 @@ class InspectConfigLoader:
         for field in required_fields:
             value = model.get(field)
             if value is None:
-                raise ValidationError(f"'model.{field}' is required when model section is present")
+                raise ValidationError(
+                    f"'model.{field}' is required when model section is present. "
+                    "Fill it in .sanityops/inspect_config.yaml, or remove the "
+                    "'model' section to use LLM_* environment variables instead."
+                )
             if not isinstance(value, str):
                 raise ValidationError(f"'model.{field}' must be a string")
             if value.strip() == "":
-                raise ValidationError(f"'model.{field}' cannot be empty")
+                raise ValidationError(
+                    f"'model.{field}' cannot be empty. "
+                    "Fill it in .sanityops/inspect_config.yaml, or remove the "
+                    "'model' section to use LLM_* environment variables instead."
+                )
 
         # Optional field - just check it's a string if present
         base_url = model.get("base_url")
