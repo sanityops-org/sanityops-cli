@@ -9,19 +9,37 @@ from sanityops_cli.main import app
 from sanityops_cli.utils.config_loader import PROJECT_ID_PLACEHOLDER as PLACEHOLDER_UUID
 
 
-def test_init_prints_configuration_guidance(tmp_path: Path, monkeypatch):
-    """Should guide first-time users through local and server configuration."""
+def test_init_prints_file_created_message(tmp_path: Path, monkeypatch):
+    """Should confirm the config file was created."""
     monkeypatch.chdir(tmp_path)
 
     result = CliRunner().invoke(app, ["init"])
 
     assert result.exit_code == 0
     assert "Created .sanityops/inspect_config.yaml" in result.output
+
+
+def test_init_prints_artifact_and_model_guidance(tmp_path: Path, monkeypatch):
+    """Should guide users to edit artifacts and model configuration."""
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["init"])
+
+    assert result.exit_code == 0
     assert "Before running inspect, you need:" in result.output
     assert "- Edit this file to add your prompts, tools, and skills." in result.output
     assert "- Edit this file to add your provider, api_key, model_id and base_url" in result.output
     assert "optional." in result.output
     assert "If omitted, the CLI uses LLM_* environment variables)." in result.output
+
+
+def test_init_prints_server_config_guidance(tmp_path: Path, monkeypatch):
+    """Should guide users to configure the server URL and API key."""
+    monkeypatch.chdir(tmp_path)
+
+    result = CliRunner().invoke(app, ["init"])
+
+    assert result.exit_code == 0
     assert (
         "- To connect to the Sanityops service, configure the server URL and API key:"
         in result.output
