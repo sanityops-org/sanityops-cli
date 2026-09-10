@@ -6,7 +6,7 @@ import pytest
 import yaml
 
 from sanityops_cli.exceptions.base_exceptions import ValidationError
-from sanityops_cli.utils.config_loader import InspectConfigLoader
+from sanityops_cli.utils.config_loader import PROJECT_ID_PLACEHOLDER, InspectConfigLoader
 
 
 class TestModelSectionValidation:
@@ -432,7 +432,7 @@ class TestProjectPlaceholder:
         skill_file.write_text("---\nname: test\ndescription: test\n---\n")
 
         config_content = {
-            "project": {"id": "00000000-0000-0000-0000-000000000000"},
+            "project": {"id": PROJECT_ID_PLACEHOLDER},
             "skills": [{"file": str(skill_file)}],
         }
         with open(config_file, "w") as f:
@@ -475,7 +475,7 @@ class TestProjectPlaceholder:
         skill_file.write_text("---\nname: test\ndescription: test\n---\n")
 
         config_content = {
-            "project": {"id": "00000000-0000-0000-0000-000000000000", "name": ""},
+            "project": {"id": PROJECT_ID_PLACEHOLDER, "name": ""},
             "skills": [{"file": str(skill_file)}],
         }
         with open(config_file, "w") as f:
