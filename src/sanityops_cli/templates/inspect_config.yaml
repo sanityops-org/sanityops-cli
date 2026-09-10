@@ -21,7 +21,7 @@ project:
   id: "00000000-0000-0000-0000-000000000000"
   name: ""
 
-# Model configuration (required)
+# Model configuration (required unless provided via LLM_* environment variables)
 # Configure your LLM provider and credentials here.
 # Alternatively, you can use environment variables:
 #   LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_ID, LLM_BASE_URL

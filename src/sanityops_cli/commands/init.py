@@ -91,12 +91,12 @@ def init_config() -> None:
 
     console.print("[green]✓[/green] Created .sanityops/inspect_config.yaml")
     console.print("Before running inspect, you need:")
-    console.print("-Edit this file to add your prompts, tools, and skills.")
+    console.print("- Edit this file to add your prompts, tools, and skills.")
     console.print(
-        "-Edit this file to add your provider, api_key, model_id and base_url "
+        "- Edit this file to add your provider, api_key, model_id and base_url "
         "(optional. If omitted, the CLI uses LLM_* environment variables)."
     )
-    console.print("-To connect to the Sanityops service, configure the server URL and API key:")
+    console.print("- To connect to the Sanityops service, configure the server URL and API key:")
     console.print('sanityops-cli config server.base_url "<your-server-url>"')
     console.print("sanityops-cli config server.api_key")
 

@@ -19,12 +19,12 @@ def test_init_prints_configuration_guidance(tmp_path: Path, monkeypatch):
     assert result.exit_code == 0
     assert "Created .sanityops/inspect_config.yaml" in result.output
     assert "Before running inspect, you need:" in result.output
-    assert "-Edit this file to add your prompts, tools, and skills." in result.output
-    assert "-Edit this file to add your provider, api_key, model_id and base_url" in result.output
+    assert "- Edit this file to add your prompts, tools, and skills." in result.output
+    assert "- Edit this file to add your provider, api_key, model_id and base_url" in result.output
     assert "optional." in result.output
     assert "If omitted, the CLI uses LLM_* environment variables)." in result.output
     assert (
-        "-To connect to the Sanityops service, configure the server URL and API key:"
+        "- To connect to the Sanityops service, configure the server URL and API key:"
         in result.output
     )
     assert 'sanityops-cli config server.base_url "<your-server-url>"' in result.output
