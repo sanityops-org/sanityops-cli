@@ -236,7 +236,7 @@ def inspect(
         table.add_row("Skill", f)
     console.print(table)
     console.print(f"[dim]{_banner_line()}[/dim]")
-    console.print(f"[dim]Project ID: {project_id}[/dim]")
+    console.print(f"[dim]Project ID: {project_id or 'not set'}[/dim]")
     console.print(
         f"[dim]Total: {len(prompt_files)} prompts, "
         f"{len(tool_files)} tools, {len(skill_files)} skills[/dim]\n"

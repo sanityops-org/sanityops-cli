@@ -27,6 +27,11 @@ from sanityops_cli.exceptions.base_exceptions import ValidationError
 DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
+# Sentinel project.id meaning "not yet bound". Kept as-is by init so that
+# the first inspect upload auto-creates the project and writes the real
+# id/name back to the config file.
+PROJECT_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
+
 
 def read_file_with_encoding_fallback(path: Path) -> str | None:
     """Read a file with UTF-8 encoding, falling back to GBK for Windows compatibility.
@@ -74,11 +79,15 @@ class InspectConfigLoader:
 
         Returns:
             {
-                "project_id": str,
+                "project_id": str | None,  # None if placeholder (not bound)
                 "prompts": List[str],   # absolute paths
                 "tools": List[str],     # absolute paths
                 "skills": List[str],    # absolute paths
             }
+
+        Note:
+            project.name in the config file is not returned here; it is
+            display metadata written back by the auto-upload flow.
         """
         self._validate_structure()
 
@@ -91,8 +100,13 @@ class InspectConfigLoader:
                 "At least one of (prompts / tools / skills) must be provided in config"
             )
 
+        # project_id may be None/placeholder if not bound
+        project_id = self._config["project"]["id"]
+        if project_id == PROJECT_ID_PLACEHOLDER:
+            project_id = None
+
         return {
-            "project_id": self._config["project"]["id"],
+            "project_id": project_id,
             "prompts": prompts,
             "tools": tools,
             "skills": skills,
@@ -180,11 +194,19 @@ class InspectConfigLoader:
         for field in required_fields:
             value = model.get(field)
             if value is None:
-                raise ValidationError(f"'model.{field}' is required when model section is present")
+                raise ValidationError(
+                    f"'model.{field}' is required when model section is present. "
+                    "Fill it in .sanityops/inspect_config.yaml, or remove the "
+                    "'model' section to use LLM_* environment variables instead."
+                )
             if not isinstance(value, str):
                 raise ValidationError(f"'model.{field}' must be a string")
             if value.strip() == "":
-                raise ValidationError(f"'model.{field}' cannot be empty")
+                raise ValidationError(
+                    f"'model.{field}' cannot be empty. "
+                    "Fill it in .sanityops/inspect_config.yaml, or remove the "
+                    "'model' section to use LLM_* environment variables instead."
+                )
 
         # Optional field - just check it's a string if present
         base_url = model.get("base_url")

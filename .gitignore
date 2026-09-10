@@ -68,3 +68,6 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+
+# uv lockfile (regenerated locally, not tracked)
+uv.lock
