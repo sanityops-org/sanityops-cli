@@ -27,7 +27,7 @@ def test_init_prints_configuration_guidance(tmp_path: Path, monkeypatch):
         in result.output
     )
     assert 'sanityops-cli config server.base_url "<your-server-url>"' in result.output
-    assert "sanityops-cli config server.api_key" in result.output
+    assert 'sanityops-cli config server.api_key "<your-api-key>"' in result.output
 
 
 class TestInitConfig:
