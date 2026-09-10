@@ -98,7 +98,7 @@ def init_config() -> None:
     )
     console.print("- To connect to the Sanityops service, configure the server URL and API key:")
     console.print('sanityops-cli config server.base_url "<your-server-url>"')
-    console.print("sanityops-cli config server.api_key")
+    console.print('sanityops-cli config server.api_key "<your-api-key>"')
 
 
 def _load_template() -> str:
