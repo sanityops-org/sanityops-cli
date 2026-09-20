@@ -254,7 +254,7 @@ def _write_repairs_markdown(
 @inspect_app.command("repair")
 def inspect_repair(
     ctx: typer.Context,
-    report: Path | None = typer.Option(
+    report: Path | None = typer.Option(  # noqa: B008
         None,
         "--report", "-r",
         help=(
