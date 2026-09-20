@@ -40,6 +40,7 @@ class TestFindLatestReport:
     def test_returns_newest_report(self, tmp_path: Path):
         """Returns the most recently modified report."""
         import time
+
         from sanityops_cli.commands.inspect import _find_latest_report
 
         results_dir = tmp_path / "results"
@@ -64,8 +65,8 @@ class TestWriteRepairsMarkdown:
 
     def test_creates_output_file(self, tmp_path: Path):
         """Creates output file with correct structure."""
+
         from sanityops_cli.commands.inspect import _write_repairs_markdown
-        from datetime import datetime
 
         repairs = [
             {
