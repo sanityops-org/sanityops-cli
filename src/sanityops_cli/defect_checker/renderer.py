@@ -34,6 +34,45 @@ _MODULE_LABELS: dict[str, str] = {
     "QDP": "Prompts",
 }
 
+#: Map module names to singular type labels for panel titles.
+_MODULE_TYPE_LABELS: dict[str, str] = {
+    "QDS": "Skill",
+    "QDT": "Tool",
+    "QDP": "Prompt",
+}
+
+def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
+    """Resolve artifact names from defect's artifact_refs.
+
+    1. Collects artifact_refs from all defects
+    2. Maps refs to artifact names via artifacts[].id -> artifacts[].name
+    3. Returns comma-separated names or None
+    """
+    artifacts = [a for a in result.get("artifacts") or [] if isinstance(a, dict)]
+    by_id = {a.get("id"): a for a in artifacts if isinstance(a.get("id"), str)}
+
+    names: list[str] = []
+    refs: list[str] = []
+    for defect in result.get("defects") or []:
+        for ref in defect.get("artifact_refs") or []:
+            if isinstance(ref, str) and ref not in refs:
+                refs.append(ref)
+
+    seen: set[str] = set()
+    for ref in refs:
+        artifact = by_id.get(ref)
+        name = artifact.get("name") if artifact else None
+        if isinstance(name, str) and name and name not in seen:
+            names.append(name)
+            seen.add(name)
+
+    if names:
+        return ", ".join(names)
+    if len(artifacts) == 1:
+        return artifacts[0].get("name")
+    return None
+
+
 #: Maximum number of defects rendered per group.
 MAX_DEFECTS_PER_GROUP = 2
 
