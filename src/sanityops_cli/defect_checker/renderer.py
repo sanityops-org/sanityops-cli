@@ -96,7 +96,9 @@ def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
     if names:
         return ", ".join(names)
     if len(artifacts) == 1:
-        return artifacts[0].get("name")
+        name = artifacts[0].get("name")
+        if isinstance(name, str) and name:
+            return name
     return None
 
 

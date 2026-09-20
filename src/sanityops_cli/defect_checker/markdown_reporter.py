@@ -18,11 +18,14 @@
 from __future__ import annotations
 
 import html
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from sanityops_cli.defect_checker.renderer import _MODULE_LABELS
+
+_log = logging.getLogger(__name__)
 
 
 def _esc_md_cell(text: str | None) -> str:
@@ -89,7 +92,8 @@ def _calculate_cross_score(
     try:
         from defect_check.cross.scoring import CrossScoringCalculator
         scoring = CrossScoringCalculator().calculate_score(defects, check_level, mode=None)
-    except Exception:
+    except Exception as e:
+        _log.warning("Cross scoring calculation failed: %s", e)
         return None
     return {
         "total_score": scoring.get("total_score"),
