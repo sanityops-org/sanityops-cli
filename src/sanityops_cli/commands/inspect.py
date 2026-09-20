@@ -254,6 +254,8 @@ def _write_repairs_markdown(
 @inspect_app.command("repair")
 def inspect_repair(
     ctx: typer.Context,
+    # B008: Typer requires function calls in argument defaults for its CLI option
+    # annotation pattern. This is intentional and standard for Typer commands.
     report: Path | None = typer.Option(  # noqa: B008
         None,
         "--report", "-r",
