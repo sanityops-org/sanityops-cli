@@ -197,6 +197,33 @@ class TestResolveArtifactNames:
         }
         assert _resolve_artifact_names(result) == "morning-report"
 
+    def test_skips_non_dict_defects(self):
+        """Skips defects that are not dicts instead of raising AttributeError."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+
+        result = {
+            "artifacts": [{"id": "skill-1", "name": "morning-report"}],
+            "defects": [
+                None,
+                "not-a-dict",
+                {"artifact_refs": ["skill-1"]},
+            ],
+        }
+        assert _resolve_artifact_names(result) == "morning-report"
+
+    def test_non_dict_defects_only_returns_none(self):
+        """Returns None when every defect is a non-dict."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+
+        result = {
+            "artifacts": [
+                {"id": "skill-1", "name": "morning-report"},
+                {"id": "skill-2", "name": "daily-summary"},
+            ],
+            "defects": [None, 42],
+        }
+        assert _resolve_artifact_names(result) is None
+
 
 class TestResolveArtifactTitle:
     def test_qds_with_resolvable_names(self):
