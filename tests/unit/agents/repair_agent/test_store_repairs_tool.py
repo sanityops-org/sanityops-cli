@@ -118,7 +118,7 @@ class TestStoreRepairsTool:
         StoreRepairsTool.clear()
         assert len(StoreRepairsTool.get_repairs()) == 0
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_add_operation(self):
         """Execute with add operation works."""
         tool = StoreRepairsTool()
