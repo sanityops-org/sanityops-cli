@@ -32,6 +32,7 @@ _MODULE_LABELS: dict[str, str] = {
     "QDS": "Skills",
     "QDT": "Tools",
     "QDP": "Prompts",
+    "CROSS": "Cross",
 }
 
 #: Map module names to singular type labels for panel titles.
@@ -40,6 +41,32 @@ _MODULE_TYPE_LABELS: dict[str, str] = {
     "QDT": "Tool",
     "QDP": "Prompt",
 }
+
+
+def resolve_artifact_title(result: dict[str, Any]) -> str | None:
+    """Generate panel title for QDS/QDT/QDP/CROSS results.
+
+    Returns:
+        - "Skill morning-report" (type + name) if artifacts resolvable
+        - "Skills" (plural label) if not resolvable
+        - "Cross" for CROSS module
+        - None for unknown modules
+    """
+    module = result.get("module")
+
+    if module == "CROSS":
+        return "Cross"
+
+    fallback_label = _MODULE_LABELS.get(module)
+    if fallback_label is None:
+        return None
+
+    artifact_names = _resolve_artifact_names(result)
+    type_label = _MODULE_TYPE_LABELS.get(module)
+    if type_label and artifact_names:
+        return f"{type_label} {artifact_names}"
+    return fallback_label
+
 
 def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
     """Resolve artifact names from defect's artifact_refs.
@@ -116,15 +143,13 @@ class DefectRenderer:
 
     def _render_artifact_groups(self, results: list[dict[str, Any]]) -> None:
         for result in results:
-            module = result.get("module")
-            label = _MODULE_LABELS.get(module)
-            if label is None:
-                # CROSS and any unknown modules are not rendered.
+            title = resolve_artifact_title(result)
+            if title is None:
                 continue
             defects = result.get("defects", [])
             if not defects:
                 continue
-            self._render_group(label, defects)
+            self._render_group(title, defects)
             self.console.print()
 
     def _render_group(self, label: str, defects: list[dict[str, Any]]) -> None:
@@ -160,10 +185,12 @@ class DefectRenderer:
         lines: list[str] = []
         if report_path:
             lines.append(f"Report saved to [magenta]{escape(report_path)}[/magenta]")
-        lines.extend([
-            "For the full experience, visit",
-            FULL_EXPERIENCE_URL,
-        ])
+        lines.extend(
+            [
+                "For the full experience, visit",
+                FULL_EXPERIENCE_URL,
+            ]
+        )
         self.console.print(
             Panel(
                 "\n".join(lines),
