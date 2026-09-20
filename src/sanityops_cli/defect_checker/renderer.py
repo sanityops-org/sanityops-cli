@@ -81,6 +81,8 @@ def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
     names: list[str] = []
     refs: list[str] = []
     for defect in result.get("defects") or []:
+        if not isinstance(defect, dict):
+            continue
         for ref in defect.get("artifact_refs") or []:
             if isinstance(ref, str) and ref not in refs:
                 refs.append(ref)
