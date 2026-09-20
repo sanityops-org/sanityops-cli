@@ -13,6 +13,8 @@
 # limitations under the License.
 #
 
-from sanityops_cli.main import app
+from sanityops_cli.main import main
 
-app()
+# Use main() (not app()) so the packaged binary matches the pip-installed
+# entry point, including the Getting Started panel on --help / no-args.
+main()
