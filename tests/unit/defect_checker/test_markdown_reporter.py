@@ -218,3 +218,37 @@ class TestAggregateCrossDefects:
         ]
         result = _aggregate_cross_defects(cross_results)
         assert len(result) == 1
+
+
+class TestCalculateCrossScore:
+    def test_empty_input(self):
+        """Returns None for empty input."""
+        from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+        assert _calculate_cross_score([], "L2") is None
+
+    def test_valid_defects(self):
+        """Returns score dict for valid defects."""
+        from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+        defects = [
+            {"defect_id": "QD-PT-1", "defect_level": "P1", "relation": "QD-PT"},
+        ]
+        result = _calculate_cross_score(defects, "L2")
+        # Should return a dict with total_score and gate_result
+        assert isinstance(result, dict)
+        assert "total_score" in result
+        assert "gate_result" in result
+
+    def test_sdk_exception_returns_none(self):
+        """Returns None gracefully when SDK raises exception."""
+        from unittest.mock import patch
+        from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+
+        defects = [{"defect_id": "x", "defect_level": "P0", "relation": "QD-PT"}]
+
+        # Patch CrossScoringCalculator to raise an exception
+        with patch(
+            "defect_check.cross.scoring.CrossScoringCalculator.calculate_score",
+            side_effect=RuntimeError("SDK error"),
+        ):
+            result = _calculate_cross_score(defects, "L2")
+            assert result is None
