@@ -105,7 +105,6 @@ class TestResolveArtifactNames:
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
-cd /Users/a1234/Documents/project/sanityops-cli/.claude/worktrees/model-config-comments-in-init-template-e55c19
 python -m pytest tests/unit/defect_checker/test_renderer.py::TestResolveArtifactNames -v
 ```
 Expected: FAIL with "ImportError: cannot import name '_resolve_artifact_names'"
