@@ -1,5 +1,6 @@
 """Tests for the Getting Started and Advanced Usage help panels."""
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,27 @@ from sanityops_cli.help_panel import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _run_entry_point(*args: str) -> tuple[int, str]:
+    """Run entry.py and return its exit code plus ANSI-stripped combined output.
+
+    Click colorizes error messages differently depending on whether it detects
+    a TTY, and it may colorize mid-phrase (e.g. the option name in
+    "No such option: -h"). Stripping escapes keeps the text assertions stable
+    across local runs and CI.
+    """
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), *args],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    output = _ANSI_ESCAPE.sub("", result.stdout + result.stderr)
+    return result.returncode, output
 
 
 def test_getting_started_text_content():
@@ -67,97 +89,55 @@ def test_entry_point_shows_getting_started_on_help():
     Getting Started panel logic in main(), so the packaged binary's --help
     output was missing the panel while pip-installed runs showed it.
     """
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--help"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" in result.stdout
+    returncode, output = _run_entry_point("--help")
+    assert returncode == 0
+    assert "Getting Started" in output
 
 
 def test_entry_point_shows_advanced_usage_on_help():
     """Verify the entry point shows the Advanced Usage panel."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--help"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Advanced Usage" in result.stdout
+    returncode, output = _run_entry_point("--help")
+    assert returncode == 0
+    assert "Advanced Usage" in output
 
 
 def test_entry_point_shows_getting_started_with_no_args():
     """Verify the PyInstaller entry point shows the panel with no arguments."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py")],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" in result.stdout
-    assert "Advanced Usage" in result.stdout
+    returncode, output = _run_entry_point()
+    assert returncode == 0
+    assert "Getting Started" in output
+    assert "Advanced Usage" in output
 
 
 def test_entry_point_does_not_show_panels_for_unsupported_h_flag():
     """Verify -h (unsupported by Typer at root) shows an error without panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "-h"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 2
-    assert "No such option: -h" in result.stderr + result.stdout
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("-h")
+    assert returncode == 2
+    assert "No such option: -h" in output
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 
 
 def test_entry_point_does_not_show_panels_for_invalid_flag_with_help():
     """Verify --help mixed with an invalid flag shows an error without panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--help", "--bogus"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 2
-    assert "No such option: --bogus" in result.stderr + result.stdout
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("--help", "--bogus")
+    assert returncode == 2
+    assert "No such option: --bogus" in output
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 
 
 def test_entry_point_does_not_show_panels_for_subcommand_help():
     """Verify subcommand help does not show the top-level panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "inspect", "--help"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("inspect", "--help")
+    assert returncode == 0
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 
 
 def test_entry_point_does_not_show_panels_for_version():
     """Verify --version does not show the top-level panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--version"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("--version")
+    assert returncode == 0
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
