@@ -141,8 +141,25 @@ def _build_report(
     lines.append(f"| Gate | {gate} |")
     lines.append("")
 
+    # Separate CROSS from other modules and merge
+    module_results = [r for r in results if r.get("module") != "CROSS"]
+    cross_results = [r for r in results if r.get("module") == "CROSS"]
+
+    if cross_results:
+        # Merge all CROSS sub-results into single section
+        cross_defects = [d for r in cross_results for d in (r.get("defects") or [])]
+        mapped_defects = _aggregate_cross_defects(cross_results)
+        cross_score = _calculate_cross_score(mapped_defects, check_level)
+
+        module_results.append({
+            "module": "CROSS",
+            "status": "completed",
+            "defects": cross_defects,
+            "score": cross_score,
+        })
+
     # Per-module results
-    for result in results:
+    for result in module_results:
         module = result.get("module", "")
         label = _MODULE_LABELS.get(module, module)
         result_status = result.get("status", "unknown")
