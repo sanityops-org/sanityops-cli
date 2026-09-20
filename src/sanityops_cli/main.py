@@ -91,9 +91,9 @@ def main():
         try:
             app()
         except SystemExit as e:
-            # Intercept successful exits and help exits. no_args_is_help exits
-            # with code 2 (click's UsageError code), so accept 0 and 2 here;
-            # re-raise anything else (real usage errors keep failing).
+            # Swallow the help exit so the panels can be printed after it.
+            # --help exits 0; no_args_is_help exits 2 (click's UsageError
+            # code). Both are expected here. Anything else propagates.
             if e.code not in (0, 2):
                 raise
         # Print the Getting Started and Advanced Usage panels
