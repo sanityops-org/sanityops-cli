@@ -14,7 +14,7 @@
 - UTF-8 stream reconfiguration added for Windows GBK/cp936 compatibility
 - Entry point in `pyproject.toml` must change from `:app` to `:main`
 - Remove CJK assertion tests (to be re-added when text is localized)
-- All 7 final tests must pass
+- All 13 final tests must pass
 - Existing tests must continue to pass
 
 ---
@@ -292,18 +292,24 @@ Replace lines 65-78 (the entire `main()` function) with:
 def main():
     """Entrance function for the Sanityops CLI application."""
     # Check if --help is requested for the main app only (no subcommand)
-    is_help = "--help" in sys.argv or "-h" in sys.argv
-    is_version = "--version" in sys.argv or "-V" in sys.argv
-    has_subcommand = any(arg and not arg.startswith("-") for arg in sys.argv[1:])
+    # Only show panels when --help is the sole flag or there are no args.
+    # This avoids showing panels when there are usage errors (e.g., -h, --bogus).
+    is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
+    is_version = "--version" in sys.argv or "-V" in sys.argv
 
-    if (is_help or is_no_args_help) and not is_version and not has_subcommand:
+    if (is_only_help or is_no_args_help) and not is_version:
+        # Use a custom console to capture and extend help output
         console = Console()
         try:
             app()
         except SystemExit as e:
+            # Intercept successful exits and help exits. no_args_is_help exits
+            # with code 2 (click's UsageError code), so accept 0 and 2 here;
+            # re-raise anything else (real usage errors keep failing).
             if e.code not in (0, 2):
                 raise
+        # Print the Getting Started and Advanced Usage panels
         console.print()
         console.print(get_getting_started_panel())
         console.print()
@@ -327,7 +333,7 @@ Run:
 pytest tests/test_help_panel.py -v
 ```
 
-Expected: 7 PASS
+Expected: 13 PASS
 
 - [ ] **Step 5: Verify existing tests still pass**
 
