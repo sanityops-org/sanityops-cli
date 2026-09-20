@@ -158,3 +158,63 @@ class TestExceptionHandling:
         ):
             with pytest.raises(PermissionError):
                 save_markdown_report(response, tmp_path)
+
+
+class TestAggregateCrossDefects:
+    def test_empty_input(self):
+        """Returns empty list for empty input."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        assert _aggregate_cross_defects([]) == []
+
+    def test_single_cross_result(self):
+        """Aggregates defects from a single CROSS result."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        cross_results = [
+            {
+                "defects": [
+                    {"id": "QD-PT-1", "severity": "P0", "category": "QD-PT"},
+                ]
+            }
+        ]
+        result = _aggregate_cross_defects(cross_results)
+        assert len(result) == 1
+        assert result[0] == {
+            "defect_id": "QD-PT-1",
+            "defect_level": "P0",
+            "relation": "QD-PT",
+        }
+
+    def test_multiple_cross_results(self):
+        """Aggregates defects from multiple CROSS results (PS/PT/ST)."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        cross_results = [
+            {
+                "defects": [
+                    {"id": "QD-PS-1", "severity": "P1", "category": "QD-PS"},
+                ]
+            },
+            {
+                "defects": [
+                    {"id": "QD-PT-2", "severity": "P0", "category": "QD-PT"},
+                ]
+            },
+        ]
+        result = _aggregate_cross_defects(cross_results)
+        assert len(result) == 2
+        assert result[0]["defect_id"] == "QD-PS-1"
+        assert result[1]["defect_id"] == "QD-PT-2"
+
+    def test_skips_non_dict_defects(self):
+        """Skips defects that are not dicts."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        cross_results = [
+            {
+                "defects": [
+                    {"id": "QD-PT-1", "severity": "P0", "category": "QD-PT"},
+                    "invalid",
+                    None,
+                ]
+            }
+        ]
+        result = _aggregate_cross_defects(cross_results)
+        assert len(result) == 1
