@@ -224,6 +224,46 @@ class TestResolveArtifactNames:
         }
         assert _resolve_artifact_names(result) is None
 
+    def test_missing_defects_key(self):
+        """Handles a result with no defects key at all."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+
+        result = {"artifacts": [{"id": "skill-1", "name": "morning-report"}]}
+        assert _resolve_artifact_names(result) == "morning-report"
+
+    def test_none_defects_key(self):
+        """Handles an explicit None defects value."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+
+        result = {
+            "artifacts": [
+                {"id": "skill-1", "name": "morning-report"},
+                {"id": "skill-2", "name": "daily-summary"},
+            ],
+            "defects": None,
+        }
+        assert _resolve_artifact_names(result) is None
+
+    def test_artifact_without_name_key(self):
+        """Skips artifacts that have no name; falls back to plural label."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+
+        result = {
+            "artifacts": [{"id": "skill-1"}],
+            "defects": [{"artifact_refs": ["skill-1"]}],
+        }
+        assert _resolve_artifact_names(result) is None
+
+    def test_artifact_with_none_name(self):
+        """Skips artifacts whose name is None."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+
+        result = {
+            "artifacts": [{"id": "skill-1", "name": None}],
+            "defects": [{"artifact_refs": ["skill-1"]}],
+        }
+        assert _resolve_artifact_names(result) is None
+
 
 class TestResolveArtifactTitle:
     def test_qds_with_resolvable_names(self):
