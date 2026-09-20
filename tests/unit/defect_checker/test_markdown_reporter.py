@@ -227,7 +227,11 @@ class TestCalculateCrossScore:
         assert _calculate_cross_score([], "L2") is None
 
     def test_valid_defects(self):
-        """Returns score dict for valid defects."""
+        """Returns score dict for valid defects.
+
+        This test exercises the real defect-check SDK (a required dependency)
+        rather than mocking, to verify the integration works end-to-end.
+        """
         from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
         defects = [
             {"defect_id": "QD-PT-1", "defect_level": "P1", "relation": "QD-PT"},
@@ -238,8 +242,8 @@ class TestCalculateCrossScore:
         assert "total_score" in result
         assert "gate_result" in result
 
-    def test_sdk_exception_returns_none(self):
-        """Returns None gracefully when SDK raises exception."""
+    def test_sdk_exception_returns_none(self, caplog):
+        """Returns None gracefully when SDK raises exception, logs warning."""
         from unittest.mock import patch
 
         from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
@@ -253,6 +257,9 @@ class TestCalculateCrossScore:
         ):
             result = _calculate_cross_score(defects, "L2")
             assert result is None
+            # Verify the warning was logged
+            assert "Cross scoring calculation failed" in caplog.text
+            assert "SDK error" in caplog.text
 
 
 class TestCrossArtifactReport:
