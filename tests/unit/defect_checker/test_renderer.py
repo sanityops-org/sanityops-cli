@@ -301,3 +301,10 @@ class TestResolveArtifactTitle:
 
         result = {"module": "UNKNOWN"}
         assert resolve_artifact_title(result) is None
+
+    def test_missing_module_key(self):
+        """Returns None when module key is missing entirely."""
+        from sanityops_cli.defect_checker.renderer import resolve_artifact_title
+
+        result = {"artifacts": [{"id": "skill-1", "name": "morning-report"}]}
+        assert resolve_artifact_title(result) is None

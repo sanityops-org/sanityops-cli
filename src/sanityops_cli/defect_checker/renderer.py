@@ -43,31 +43,6 @@ _MODULE_TYPE_LABELS: dict[str, str] = {
 }
 
 
-def resolve_artifact_title(result: dict[str, Any]) -> str | None:
-    """Generate panel title for QDS/QDT/QDP/CROSS results.
-
-    Returns:
-        - "Skill morning-report" (type + name) if artifacts resolvable
-        - "Skills" (plural label) if not resolvable
-        - "Cross" for CROSS module
-        - None for unknown modules
-    """
-    module = result.get("module")
-
-    if module == "CROSS":
-        return "Cross"
-
-    fallback_label = _MODULE_LABELS.get(module)
-    if fallback_label is None:
-        return None
-
-    artifact_names = _resolve_artifact_names(result)
-    type_label = _MODULE_TYPE_LABELS.get(module)
-    if type_label and artifact_names:
-        return f"{type_label} {artifact_names}"
-    return fallback_label
-
-
 def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
     """Resolve artifact names from defect's artifact_refs.
 
@@ -102,6 +77,31 @@ def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
         if isinstance(name, str) and name:
             return name
     return None
+
+
+def resolve_artifact_title(result: dict[str, Any]) -> str | None:
+    """Generate panel title for QDS/QDT/QDP/CROSS results.
+
+    Returns:
+        - "Skill morning-report" (type + name) if artifacts resolvable
+        - "Skills" (plural label) if not resolvable
+        - "Cross" for CROSS module
+        - None for unknown modules
+    """
+    module = result.get("module")
+
+    if module == "CROSS":
+        return "Cross"
+
+    fallback_label = _MODULE_LABELS.get(module)
+    if fallback_label is None:
+        return None
+
+    artifact_names = _resolve_artifact_names(result)
+    type_label = _MODULE_TYPE_LABELS.get(module)
+    if type_label and artifact_names:
+        return f"{type_label} {artifact_names}"
+    return fallback_label
 
 
 #: Maximum number of defects rendered per group.
