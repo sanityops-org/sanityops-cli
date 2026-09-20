@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-
 from sanityops_cli.agents.repair_agent.agent import RepairAgent, _is_rate_limit_error
 
 
