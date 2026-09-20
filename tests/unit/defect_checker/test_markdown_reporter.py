@@ -241,6 +241,7 @@ class TestCalculateCrossScore:
     def test_sdk_exception_returns_none(self):
         """Returns None gracefully when SDK raises exception."""
         from unittest.mock import patch
+
         from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
 
         defects = [{"defect_id": "x", "defect_level": "P0", "relation": "QD-PT"}]
