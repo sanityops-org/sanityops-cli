@@ -86,6 +86,10 @@ def _calculate_cross_score(
     The SDK uses weighted deductions per PS/PT/ST group:
         P0:P1:P2 = 5:3:1 deduction weights
         Gate FAIL when any group has P0 defect
+
+    Returns None on any failure so the report degrades gracefully instead of
+    crashing. This is intentional: the SDK import or calculation may fail in
+    unexpected ways, and we prefer an unscored CROSS section over no report.
     """
     if not defects:
         return None
@@ -93,6 +97,8 @@ def _calculate_cross_score(
         from defect_check.cross.scoring import CrossScoringCalculator
         scoring = CrossScoringCalculator().calculate_score(defects, check_level, mode=None)
     except Exception as e:
+        # Intentional broad catch: SDK import, configuration, or calculation
+        # failures should not prevent report generation.
         _log.warning("Cross scoring calculation failed: %s", e)
         return None
     return {
