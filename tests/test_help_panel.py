@@ -103,3 +103,59 @@ def test_entry_point_shows_getting_started_with_no_args():
     assert result.returncode == 0
     assert "Getting Started" in result.stdout
     assert "Advanced Usage" in result.stdout
+
+
+def test_entry_point_does_not_show_panels_for_unsupported_h_flag():
+    """Verify -h (unsupported by Typer at root) shows an error without panels."""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), "-h"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "Getting Started" not in result.stdout
+    assert "Advanced Usage" not in result.stdout
+
+
+def test_entry_point_does_not_show_panels_for_invalid_flag_with_help():
+    """Verify --help mixed with an invalid flag shows an error without panels."""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), "--help", "--bogus"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    assert result.returncode != 0
+    assert "Getting Started" not in result.stdout
+    assert "Advanced Usage" not in result.stdout
+
+
+def test_entry_point_does_not_show_panels_for_subcommand_help():
+    """Verify subcommand help does not show the top-level panels."""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), "inspect", "--help"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    assert result.returncode == 0
+    assert "Getting Started" not in result.stdout
+    assert "Advanced Usage" not in result.stdout
+
+
+def test_entry_point_does_not_show_panels_for_version():
+    """Verify --version does not show the top-level panels."""
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), "--version"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    assert result.returncode == 0
+    assert "Getting Started" not in result.stdout
+    assert "Advanced Usage" not in result.stdout
