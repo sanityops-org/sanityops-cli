@@ -291,6 +291,9 @@ def inspect_repair(
     content to `.sanityops/repairs/repair-<timestamp>.md`. Nothing is
     uploaded and no source file is modified.
     """
+    if ctx.resilient_parsing:
+        return
+
     logger = Logger()
     tracker = ProgressTracker(console, logger, verbose=verbose)
 

@@ -82,7 +82,7 @@ class RepairAgent:
 
 ```python
 class StoreRepairsTool(Tool):
-    name = "store_repairs"
+    name = "store_repair"
     description = "Store repaired artifact content with defect references"
     parameters = {
         "type": "object",
