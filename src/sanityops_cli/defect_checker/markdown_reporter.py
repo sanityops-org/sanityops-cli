@@ -74,6 +74,29 @@ def _aggregate_cross_defects(cross_results: list[dict]) -> list[dict]:
     return defects
 
 
+def _calculate_cross_score(
+    defects: list[dict],
+    check_level: str,
+) -> dict | None:
+    """Compute merged CROSS score using SDK's CrossScoringCalculator.
+
+    The SDK uses weighted deductions per PS/PT/ST group:
+        P0:P1:P2 = 5:3:1 deduction weights
+        Gate FAIL when any group has P0 defect
+    """
+    if not defects:
+        return None
+    try:
+        from defect_check.cross.scoring import CrossScoringCalculator
+        scoring = CrossScoringCalculator().calculate_score(defects, check_level, mode=None)
+    except Exception:
+        return None
+    return {
+        "total_score": scoring.get("total_score"),
+        "gate_result": scoring.get("gate_result", "PASS"),
+    }
+
+
 def _build_report(
     response: dict[str, Any],
     *,
