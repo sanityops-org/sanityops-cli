@@ -179,6 +179,265 @@ def _report_program_error(
     console.print(ISSUE_URL)
 
 
+# ============================================================================
+# Helper functions for repair command
+# ============================================================================
+
+
+def _find_latest_report(report_dir: Path) -> Path | None:
+    """Return the newest inspect-*.md report in report_dir, or None."""
+    if not report_dir.is_dir():
+        return None
+    candidates = sorted(report_dir.glob("inspect-*.md"), key=lambda p: p.stat().st_mtime)
+    return candidates[-1] if candidates else None
+
+
+def _write_repairs_markdown(
+    repairs: list[dict],
+    output_dir: Path,
+    *,
+    report_path: Path,
+    project_id: str | None,
+) -> Path:
+    """Persist repaired artifact content into a single markdown file."""
+    from datetime import datetime
+
+    output_dir = output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    path = output_dir / f"repair-{timestamp}.md"
+
+    type_labels = {"skill": "Skill", "tool": "Tool", "prompt": "Prompt"}
+    lines: list[str] = [
+        "# Repair Report",
+        "",
+        "> **Disclaimer**: This tool lacks business context. The repair content is for reference only. Please verify and apply fixes carefully based on your business logic.",
+        "",
+        f"- **Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"- **Source report**: {report_path}",
+        f"- **Project ID**: {project_id or 'not set'}",
+        f"- **Artifacts repaired**: {len(repairs)}",
+        "",
+    ]
+
+    for index, repair in enumerate(repairs, start=1):
+        label = type_labels.get(repair.get("artifact_type", ""), "Artifact")
+        artifact_path = repair.get("artifact_path", "")
+        lines.extend(
+            [
+                "---",
+                "",
+                f"## {index}. {label} — {Path(artifact_path).name}",
+                "",
+                f"- **Source**: `{artifact_path}`",
+                f"- **Summary**: {repair.get('summary', '')}",
+                "",
+                "### Repaired content",
+                "",
+                "````markdown",
+                repair.get("repaired_content", ""),
+                "````",
+                "",
+            ]
+        )
+
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
+
+
+# ============================================================================
+# inspect repair — generate repaired artifacts from a local inspection report
+# ============================================================================
+
+
+@inspect_app.command("repair")
+def inspect_repair(
+    ctx: typer.Context,
+    report: Path | None = typer.Option(
+        None,
+        "--report", "-r",
+        help=(
+            "Path to the inspection report (.md) to repair from. "
+            "If omitted, uses the newest .sanityops/results/inspect-*.md."
+        ),
+    ),
+    config: str | None = typer.Option(
+        None,
+        "--config", "-c",
+        help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    timeout: int = typer.Option(
+        1800,
+        "--timeout",
+        help="Agent execution timeout in seconds (default: 1800, 30min).",
+    ),
+    token_budget: int = typer.Option(
+        0,
+        "--token-budget",
+        help=(
+            "Token budget for repair agent (default: auto-scaled by artifact count). "
+            "Set explicitly for large projects."
+        ),
+    ),
+    model: str | None = typer.Option(None, "--model", "-m", help="LLM model ID override"),
+    provider: str | None = typer.Option(None, "--provider", "-p", help="LLM provider override"),
+) -> None:
+    """Generate repaired artifacts locally from an inspection report.
+
+    Reads the latest inspection report (or --report), asks a local repair
+    agent to rewrite every defective artifact, and writes the repaired
+    content to `.sanityops/repairs/repair-<timestamp>.md`. Nothing is
+    uploaded and no source file is modified.
+    """
+    logger = Logger()
+    tracker = ProgressTracker(console, logger, verbose=verbose)
+
+    # Step 1: Load and validate config
+    try:
+        with tracker.step("Loading configuration..."):
+            loader = InspectConfigLoader(config)
+            artifacts = loader.load()
+    except ValidationError as e:
+        console.print(f"[red]✗ Config error: {escape(str(e))}[/red]")
+        raise typer.Exit(code=EXIT_FAILURE) from None
+    except Exception as e:
+        _report_program_error(logger, "Loading configuration...", e, step_summary_shown=verbose)
+        raise typer.Exit(code=EXIT_FAILURE) from None
+
+    project_id = artifacts.get("project_id")
+    artifact_paths = {
+        "prompts": artifacts.get("prompts") or [],
+        "tools": artifacts.get("tools") or [],
+        "skills": artifacts.get("skills") or [],
+    }
+    total = sum(len(v) for v in artifact_paths.values())
+    if not total:
+        console.print("[red]✗ No artifacts configured in inspect_config.yaml[/red]")
+        raise typer.Exit(code=EXIT_FAILURE)
+
+    # Step 2: Resolve report path
+    results_dir = loader.config_path.parent / "results"
+    report_path: Path | None = None
+    if report:
+        report_path = report.expanduser().resolve()
+        if not report_path.is_file():
+            console.print(f"[red]✗ Report not found: {report}[/red]")
+            raise typer.Exit(code=EXIT_FAILURE)
+    else:
+        report_path = _find_latest_report(results_dir)
+        if report_path is None:
+            console.print(f"[red]✗ No inspection report found in {results_dir}[/red]")
+            console.print("  Run `sanityops-cli inspect` first, or pass --report <path>.")
+            raise typer.Exit(code=EXIT_FAILURE)
+
+    console.print()
+    console.print("[bold]Repairing artifacts from inspection report[/]")
+    console.print(f"  Report:    {report_path}")
+    console.print(
+        f"  Artifacts: {total} ({len(artifact_paths['prompts'])}p, "
+        f"{len(artifact_paths['tools'])}t, {len(artifact_paths['skills'])}s)"
+    )
+
+    # Step 3: Resolve LLM config
+    try:
+        with tracker.step("Resolving LLM configuration..."):
+            llm_config = resolve_llm_config(config)
+            # Apply CLI overrides
+            if provider:
+                llm_config["llm_provider"] = provider
+            if model:
+                llm_config["llm_model_id"] = model
+    except Exception as e:
+        console.print(f"[red]✗ Failed to resolve LLM configuration: {escape(str(e))}[/red]")
+        raise typer.Exit(code=EXIT_FAILURE) from None
+
+    if not llm_config.get("llm_api_key", "").strip():
+        console.print("[red]✗ LLM configuration is incomplete (missing API key).[/red]")
+        console.print(
+            "  Configure model.provider/api_key/model_id in .sanityops/inspect_config.yaml."
+        )
+        raise typer.Exit(code=EXIT_FAILURE)
+
+    from sanityops_agent.config import ProviderConfig
+    from sanityops_agent.llm.factory import ProviderFactory
+
+    provider_config = ProviderConfig(
+        LLM_PROVIDER=llm_config["llm_provider"],
+        API_KEY=llm_config["llm_api_key"],
+        MODEL_ID=llm_config["llm_model_id"],
+        BASE_URL=llm_config["llm_base_url"] or None,
+    )
+    llm_provider = ProviderFactory.create(provider_config)
+
+    # Step 4: Run the repair agent
+    from sanityops_cli.agents.repair_agent.agent import RepairAgent, _is_rate_limit_error
+
+    # Token budget auto-scaling
+    if token_budget > 0:
+        effective_budget = token_budget
+    else:
+        effective_budget = 300_000 + 150_000 * total
+
+    agent = RepairAgent(
+        provider=llm_provider,
+        max_loops=60,
+        timeout=timeout,
+        token_budget=effective_budget,
+        verbose=verbose,
+        console=console,
+        logger=logger,
+    )
+
+    console.print(f"  Provider:  {llm_config['llm_provider']}")
+    console.print(f"  Model:     {llm_config['llm_model_id']}")
+    console.print(f"  Budget:    {effective_budget} tokens / {timeout}s")
+    console.print()
+
+    try:
+        with tracker.step("Running repair agent..."):
+            repairs = agent.repair_sync(
+                report_path=str(report_path),
+                artifacts=artifact_paths,
+                project_root=str(loader.config_path.parent.parent),
+            )
+    except ValidationError as e:
+        if _is_rate_limit_error(e):
+            console.print("[red]✗ Repair failed: the LLM service is rate limited.[/red]")
+            console.print(
+                "  The server-side model quota is exhausted."
+            )
+            console.print("  Wait a minute and re-run, or raise the backend quota.")
+        else:
+            console.print(f"[red]✗ Repair failed: {escape(str(e))}[/red]")
+        raise typer.Exit(code=EXIT_FAILURE) from None
+    except Exception as e:
+        _report_program_error(logger, "Running repair agent...", e, step_summary_shown=verbose)
+        raise typer.Exit(code=EXIT_FAILURE) from None
+
+    tracker.summary()
+
+    if not repairs:
+        console.print("[yellow]⚠[/] No repairs generated (report may contain no defects).")
+        raise typer.Exit()
+
+    # Step 5: Persist repairs
+    repairs_dir = loader.config_path.parent / "repairs"
+    try:
+        out_path = _write_repairs_markdown(
+            repairs,
+            repairs_dir,
+            report_path=report_path,
+            project_id=project_id,
+        )
+        console.print(f"[green]✓[/] Repaired {len(repairs)} artifact(s)")
+        console.print(f"  Saved to: {out_path}")
+    except Exception as e:
+        console.print(f"[red]✗ Could not save repair report: {escape(str(e))}[/red]")
+        raise typer.Exit(code=EXIT_FAILURE) from None
+
+
 @inspect_app.callback(invoke_without_command=True)
 def inspect(
     ctx: typer.Context,
@@ -200,6 +459,10 @@ def inspect(
     ),
 ):
     """Inspect and defect-check the configured artifacts."""
+    # Skip callback execution when a subcommand is invoked
+    if ctx.invoked_subcommand is not None:
+        return
+
     if check_level not in {"L1", "L2", "L3"}:
         console.print(f"[red]✗ Invalid check level: {escape(check_level)} (must be L1/L2/L3)[/red]")
         raise typer.Exit(code=EXIT_FAILURE)
