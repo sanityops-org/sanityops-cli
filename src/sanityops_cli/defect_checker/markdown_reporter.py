@@ -53,6 +53,27 @@ def _format_score(score: dict[str, Any] | None) -> str:
     return ", ".join(parts)
 
 
+def _aggregate_cross_defects(cross_results: list[dict]) -> list[dict]:
+    """Aggregate defects from all CROSS sub-results (PS/PT/ST) into one list.
+
+    Maps SDK DefectItem format to CrossScoringCalculator format:
+        id -> defect_id
+        severity -> defect_level
+        category -> relation (QD-PS, QD-PT, QD-ST)
+    """
+    defects = []
+    for result in cross_results:
+        for d in result.get("defects") or []:
+            if not isinstance(d, dict):
+                continue
+            defects.append({
+                "defect_id": d.get("id"),
+                "defect_level": d.get("severity"),
+                "relation": d.get("category"),
+            })
+    return defects
+
+
 def _build_report(
     response: dict[str, Any],
     *,
