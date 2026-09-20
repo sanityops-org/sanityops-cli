@@ -84,9 +84,8 @@ def main():
     # This avoids showing panels when there are usage errors (e.g., -h, --bogus).
     is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
-    is_version = "--version" in sys.argv or "-V" in sys.argv
 
-    if (is_only_help or is_no_args_help) and not is_version:
+    if is_only_help or is_no_args_help:
         # Use a custom console to capture and extend help output
         console = Console()
         try:
