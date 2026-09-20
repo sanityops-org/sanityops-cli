@@ -114,7 +114,8 @@ def test_entry_point_does_not_show_panels_for_unsupported_h_flag():
         cwd=REPO_ROOT,
         timeout=60,
     )
-    assert result.returncode != 0
+    assert result.returncode == 2
+    assert "No such option: -h" in result.stderr + result.stdout
     assert "Getting Started" not in result.stdout
     assert "Advanced Usage" not in result.stdout
 
@@ -128,7 +129,8 @@ def test_entry_point_does_not_show_panels_for_invalid_flag_with_help():
         cwd=REPO_ROOT,
         timeout=60,
     )
-    assert result.returncode != 0
+    assert result.returncode == 2
+    assert "No such option: --bogus" in result.stderr + result.stdout
     assert "Getting Started" not in result.stdout
     assert "Advanced Usage" not in result.stdout
 
