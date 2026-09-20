@@ -103,3 +103,61 @@ class TestRender:
         DefectRenderer(console).render(result)
         out = console.export_text()
         assert "c1" not in out
+
+
+class TestResolveArtifactNames:
+    def test_single_artifact_with_ref(self):
+        """Returns artifact name when artifact_refs matches one artifact."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+        result = {
+            "artifacts": [{"id": "skill-1", "name": "morning-report"}],
+            "defects": [{"artifact_refs": ["skill-1"]}],
+        }
+        assert _resolve_artifact_names(result) == "morning-report"
+
+    def test_multiple_artifacts_with_refs(self):
+        """Returns comma-separated names when multiple artifact_refs."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+        result = {
+            "artifacts": [
+                {"id": "skill-1", "name": "morning-report"},
+                {"id": "skill-2", "name": "daily-summary"},
+            ],
+            "defects": [
+                {"artifact_refs": ["skill-1", "skill-2"]},
+            ],
+        }
+        assert _resolve_artifact_names(result) == "morning-report, daily-summary"
+
+    def test_fallback_single_artifact_no_refs(self):
+        """Returns single artifact name when no artifact_refs but only one artifact."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+        result = {
+            "artifacts": [{"id": "skill-1", "name": "morning-report"}],
+            "defects": [{"artifact_refs": []}],
+        }
+        assert _resolve_artifact_names(result) == "morning-report"
+
+    def test_returns_none_no_refs_multiple_artifacts(self):
+        """Returns None when no artifact_refs and multiple artifacts."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+        result = {
+            "artifacts": [
+                {"id": "skill-1", "name": "morning-report"},
+                {"id": "skill-2", "name": "daily-summary"},
+            ],
+            "defects": [{"artifact_refs": []}],
+        }
+        assert _resolve_artifact_names(result) is None
+
+    def test_deduplicates_refs(self):
+        """Deduplicates artifact_refs pointing to same artifact."""
+        from sanityops_cli.defect_checker.renderer import _resolve_artifact_names
+        result = {
+            "artifacts": [{"id": "skill-1", "name": "morning-report"}],
+            "defects": [
+                {"artifact_refs": ["skill-1"]},
+                {"artifact_refs": ["skill-1"]},
+            ],
+        }
+        assert _resolve_artifact_names(result) == "morning-report"
