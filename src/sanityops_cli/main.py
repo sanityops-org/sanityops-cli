@@ -80,15 +80,13 @@ app.command("init")(init_config)
 def main():
     """Entrance function for the Sanityops CLI application."""
     # Check if --help is requested for the main app only (no subcommand)
-    # This means: --help present, no subcommand (first arg after flags would be a command)
-    is_help = "--help" in sys.argv or "-h" in sys.argv
-    is_version = "--version" in sys.argv or "-V" in sys.argv
-    # No subcommand if: only flags, or only the app name
-    has_subcommand = any(arg and not arg.startswith("-") for arg in sys.argv[1:])
-    # Also show panel when no args (no_args_is_help=True will show help)
+    # Only show panels when --help is the sole flag or there are no args.
+    # This avoids showing panels when there are usage errors (e.g., -h, --bogus).
+    is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
+    is_version = "--version" in sys.argv or "-V" in sys.argv
 
-    if (is_help or is_no_args_help) and not is_version and not has_subcommand:
+    if (is_only_help or is_no_args_help) and not is_version:
         # Use a custom console to capture and extend help output
         console = Console()
         try:
