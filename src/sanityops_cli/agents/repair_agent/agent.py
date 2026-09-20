@@ -29,8 +29,6 @@ if TYPE_CHECKING:
 # RepairAgent Class
 # ============================================================================
 
-console = Console()
-
 
 class RepairAgent:
     """Runs an LLM agent that rewrites defective artifacts using the report.
