@@ -252,3 +252,62 @@ class TestCalculateCrossScore:
         ):
             result = _calculate_cross_score(defects, "L2")
             assert result is None
+
+
+class TestCrossArtifactReport:
+    def test_cross_module_merged_in_report(self, tmp_path):
+        """CROSS sub-results are merged into single section."""
+        response = _response(
+            results=[
+                {
+                    "module": "QDS",
+                    "status": "completed",
+                    "defects": [_defect(defect_id="QDS-1", severity="P1")],
+                },
+                {
+                    "module": "CROSS",
+                    "status": "completed",
+                    "defects": [
+                        {"id": "QD-PT-1", "name": "cross1", "severity": "P0",
+                         "description": "d", "location": "l", "impact": "i",
+                         "fix_suggestion": "f", "category": "QD-PT"},
+                    ],
+                },
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        # Should contain CROSS section with merged results
+        assert "## Cross (CROSS)" in content
+        assert "QD-PT-1" in content
+
+    def test_multiple_cross_subresults_merged(self, tmp_path):
+        """Multiple CROSS sub-results (PS/PT/ST) are merged."""
+        response = _response(
+            results=[
+                {
+                    "module": "CROSS",
+                    "status": "completed",
+                    "defects": [
+                        {"id": "QD-PS-1", "name": "ps1", "severity": "P1",
+                         "description": "d", "location": "l", "impact": "i",
+                         "fix_suggestion": "f", "category": "QD-PS"},
+                    ],
+                },
+                {
+                    "module": "CROSS",
+                    "status": "completed",
+                    "defects": [
+                        {"id": "QD-PT-1", "name": "pt1", "severity": "P0",
+                         "description": "d", "location": "l", "impact": "i",
+                         "fix_suggestion": "f", "category": "QD-PT"},
+                    ],
+                },
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        # Should contain only one CROSS section
+        assert content.count("## Cross (CROSS)") == 1
+        assert "QD-PS-1" in content
+        assert "QD-PT-1" in content
