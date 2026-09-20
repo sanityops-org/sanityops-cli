@@ -120,8 +120,11 @@ class RepairAgent:
             raise ValidationError("No artifacts configured to repair")
 
         for p in all_paths:
-            if not Path(p).is_absolute() or not Path(p).exists():
-                raise ValidationError(f"Artifact path invalid: {p}")
+            path = Path(p)
+            if not path.is_absolute():
+                raise ValidationError(f"Artifact path must be absolute: {p}")
+            if not path.exists():
+                raise ValidationError(f"Artifact path does not exist: {p}")
 
         # Deliberately NO TaskTool: repair must follow the artifact list
         # exactly, not spawn sub-agents to explore the project. Registering it

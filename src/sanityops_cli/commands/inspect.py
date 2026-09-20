@@ -200,12 +200,11 @@ def _write_repairs_markdown(
     project_id: str | None,
 ) -> Path:
     """Persist repaired artifact content into a single markdown file."""
-    from datetime import datetime
-
     output_dir = output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    now = datetime.now()
+    timestamp = now.strftime("%Y%m%d-%H%M%S")
     path = output_dir / f"repair-{timestamp}.md"
 
     type_labels = {"skill": "Skill", "tool": "Tool", "prompt": "Prompt"}
@@ -214,7 +213,7 @@ def _write_repairs_markdown(
         "",
         "> **Disclaimer**: This tool lacks business context. The repair content is for reference only. Please verify and apply fixes carefully based on your business logic.",
         "",
-        f"- **Generated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+        f"- **Generated**: {now.strftime('%Y-%m-%d %H:%M:%S')}",
         f"- **Source report**: {report_path}",
         f"- **Project ID**: {project_id or 'not set'}",
         f"- **Artifacts repaired**: {len(repairs)}",
