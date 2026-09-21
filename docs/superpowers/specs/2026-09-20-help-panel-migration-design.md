@@ -62,17 +62,23 @@ Replace `main()` function with interception logic:
 ```python
 def main():
     """Entrance function for the Sanityops CLI application."""
-    # Check if --help is requested for the main app only (no subcommand)
-    is_help = "--help" in sys.argv or "-h" in sys.argv
-    is_version = "--version" in sys.argv or "-V" in sys.argv
-    has_subcommand = any(arg and not arg.startswith("-") for arg in sys.argv[1:])
+    # Show panels only when --help is the sole flag or there are no args.
+    # This narrow trigger avoids showing panels on usage errors (-h, --bogus).
+    #
+    # Note: --version/-V doesn't need explicit handling here because:
+    # - `--version` won't match the exact `["--help"]` check
+    # - Single-arg `--version` has len > 1, so is_no_args_help is False
+    # - It falls through to the normal app() path, which prints version and exits.
+    is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
 
-    if (is_help or is_no_args_help) and not is_version and not has_subcommand:
+    if is_only_help or is_no_args_help:
         console = Console()
         try:
             app()
         except SystemExit as e:
+            # --help exits 0; no_args_is_help exits 2 (click's UsageError code).
+            # Both are expected here. Anything else propagates.
             if e.code not in (0, 2):
                 raise
         console.print()
@@ -171,5 +177,5 @@ sanityops-cli inspect --help
 3. `sanityops-cli inspect --help` does NOT show panels (subcommand help only)
 4. `sanityops-cli --version` does NOT show panels
 5. `python entry.py --help` shows both panels (PyInstaller binary behavior)
-6. All 7 tests in `test_help_panel.py` pass
+6. All 13 tests in `test_help_panel.py` pass (6 panel + 7 entry point behavior)
 7. Existing tests continue to pass
