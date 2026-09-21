@@ -1,4 +1,4 @@
-"""Getting Started panel for CLI help output."""
+"""Getting Started and Advanced Usage panels for CLI help output."""
 
 from rich.panel import Panel
 from rich.text import Text
