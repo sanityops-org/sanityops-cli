@@ -47,6 +47,7 @@ class ScannerAgent:
         provider,
         max_loops: int = 30,
         timeout: int = 120,
+        token_budget: int = 200000,
         verbose: bool = False,
         console: Console | None = None,
         logger: Logger | None = None,
@@ -54,6 +55,7 @@ class ScannerAgent:
         self.provider = provider
         self.max_loops = max_loops
         self.timeout = timeout
+        self.token_budget = token_budget
         self.verbose = verbose
         self.console = console or Console()
         self.logger: Logger | None = logger
@@ -95,6 +97,7 @@ class ScannerAgent:
         config = AgentConfig(
             max_loops=self.max_loops,
             total_timeout=self.timeout,
+            token_budget=self.token_budget,
             system_prompt=system_prompt,
         )
 
@@ -197,6 +200,7 @@ class ScannerAgent:
         config = AgentConfig(
             max_loops=self.max_loops,
             total_timeout=self.timeout,
+            token_budget=self.token_budget,
             system_prompt=system_prompt,
         )
 

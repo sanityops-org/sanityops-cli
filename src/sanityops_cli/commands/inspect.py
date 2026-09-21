@@ -40,7 +40,7 @@ from sanityops_cli.defect_checker.renderer import DefectRenderer
 from sanityops_cli.exceptions.base_exceptions import ValidationError
 from sanityops_cli.logging.logger import Logger
 from sanityops_cli.progress.tracker import ProgressTracker
-from sanityops_cli.utils.config_loader import InspectConfigLoader
+from sanityops_cli.utils.config_loader import InspectConfigLoader, read_file_with_encoding_fallback
 from sanityops_cli.utils.config_resolver import ConfigResolver
 
 console = Console()
@@ -48,6 +48,32 @@ inspect_app = typer.Typer()
 
 #: URL users attach log files to when reporting issues.
 ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
+
+
+def _load_agent_config(config_path: Path) -> dict:
+    """Read the optional `agent:` section from inspect_config.yaml.
+
+    Returns {} when the section is absent or malformed — callers then fall
+    back to their own defaults. Known keys: max_loops, token_budget, timeout.
+    """
+    import yaml
+
+    try:
+        content = read_file_with_encoding_fallback(config_path)
+        if not content:
+            return {}
+        data = yaml.safe_load(content)
+        section = (data or {}).get("agent")
+        if not isinstance(section, dict):
+            return {}
+        out: dict = {}
+        for key in ("max_loops", "token_budget", "timeout"):
+            value = section.get(key)
+            if isinstance(value, int) and value > 0:
+                out[key] = value
+        return out
+    except Exception:
+        return {}
 
 
 def _auto_upload(
@@ -461,6 +487,19 @@ def inspect(
         "--skip-defect-check",
         help="Skip the defect check step and only run artifact analysis.",
     ),
+    timeout: int = typer.Option(
+        1800,
+        "--timeout",
+        help=(
+            "Agent execution timeout in seconds (default: 1800, 30min). "
+            "Increase for large projects; decrease for fast-fail in CI."
+        ),
+    ),
+    token_budget: int = typer.Option(
+        200000,
+        "--token-budget",
+        help="Token budget for agent execution (default: 200000). Increase for large projects.",
+    ),
 ):
     """Inspect and defect-check the configured artifacts."""
     # Skip callback execution when a subcommand is invoked
@@ -525,11 +564,28 @@ def inspect(
                 BASE_URL=llm_config["llm_base_url"] or None,
             )
             provider = ProviderFactory.create(provider_config)
+
+            # Load optional agent config section for timeout/token_budget overrides
+            agent_cfg = _load_agent_config(loader.config_path)
+
+            # Resolve effective timeout and token budget
+            # CLI flag wins when it differs from default; otherwise config file wins
+            effective_timeout = timeout if timeout != 1800 else agent_cfg.get("timeout", timeout)
+            effective_budget = (
+                token_budget if token_budget != 200000 else max(agent_cfg.get("token_budget", 0), 200000)
+            )
+
+            if verbose:
+                console.print(f"  Timeout:      {effective_timeout}s")
+                console.print(f"  Token budget: {effective_budget}")
+
             agent = ScannerAgent(
                 provider=provider,
                 verbose=verbose,
                 console=step.console,
                 logger=logger,
+                timeout=effective_timeout,
+                token_budget=effective_budget,
             )
             result = agent.analyze_files_sync(
                 prompts=prompt_files,
