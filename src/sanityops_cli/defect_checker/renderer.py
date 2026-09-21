@@ -32,7 +32,77 @@ _MODULE_LABELS: dict[str, str] = {
     "QDS": "Skills",
     "QDT": "Tools",
     "QDP": "Prompts",
+    "CROSS": "Cross",
 }
+
+#: Map module names to singular type labels for panel titles.
+_MODULE_TYPE_LABELS: dict[str, str] = {
+    "QDS": "Skill",
+    "QDT": "Tool",
+    "QDP": "Prompt",
+}
+
+
+def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
+    """Resolve artifact names from defect's artifact_refs.
+
+    1. Collects artifact_refs from all defects
+    2. Maps refs to artifact names via artifacts[].id -> artifacts[].name
+    3. Returns comma-separated names or None
+    """
+    artifacts = [a for a in result.get("artifacts") or [] if isinstance(a, dict)]
+    by_id = {a.get("id"): a for a in artifacts if isinstance(a.get("id"), str)}
+
+    names: list[str] = []
+    refs: list[str] = []
+    for defect in result.get("defects") or []:
+        if not isinstance(defect, dict):
+            continue
+        for ref in defect.get("artifact_refs") or []:
+            if isinstance(ref, str) and ref not in refs:
+                refs.append(ref)
+
+    seen: set[str] = set()
+    for ref in refs:
+        artifact = by_id.get(ref)
+        name = artifact.get("name") if artifact else None
+        if isinstance(name, str) and name and name not in seen:
+            names.append(name)
+            seen.add(name)
+
+    if names:
+        return ", ".join(names)
+    if len(artifacts) == 1:
+        name = artifacts[0].get("name")
+        if isinstance(name, str) and name:
+            return name
+    return None
+
+
+def resolve_artifact_title(result: dict[str, Any]) -> str | None:
+    """Generate panel title for QDS/QDT/QDP/CROSS results.
+
+    Returns:
+        - "Skill morning-report" (type + name) if artifacts resolvable
+        - "Skills" (plural label) if not resolvable
+        - "Cross" for CROSS module
+        - None for unknown modules
+    """
+    module = result.get("module")
+
+    if module == "CROSS":
+        return "Cross"
+
+    fallback_label = _MODULE_LABELS.get(module)
+    if fallback_label is None:
+        return None
+
+    artifact_names = _resolve_artifact_names(result)
+    type_label = _MODULE_TYPE_LABELS.get(module)
+    if type_label and artifact_names:
+        return f"{type_label} {artifact_names}"
+    return fallback_label
+
 
 #: Maximum number of defects rendered per group.
 MAX_DEFECTS_PER_GROUP = 2
@@ -77,15 +147,13 @@ class DefectRenderer:
 
     def _render_artifact_groups(self, results: list[dict[str, Any]]) -> None:
         for result in results:
-            module = result.get("module")
-            label = _MODULE_LABELS.get(module)
-            if label is None:
-                # CROSS and any unknown modules are not rendered.
+            title = resolve_artifact_title(result)
+            if title is None:
                 continue
             defects = result.get("defects", [])
             if not defects:
                 continue
-            self._render_group(label, defects)
+            self._render_group(title, defects)
             self.console.print()
 
     def _render_group(self, label: str, defects: list[dict[str, Any]]) -> None:
@@ -121,10 +189,12 @@ class DefectRenderer:
         lines: list[str] = []
         if report_path:
             lines.append(f"Report saved to [magenta]{escape(report_path)}[/magenta]")
-        lines.extend([
-            "For the full experience, visit",
-            FULL_EXPERIENCE_URL,
-        ])
+        lines.extend(
+            [
+                "For the full experience, visit",
+                FULL_EXPERIENCE_URL,
+            ]
+        )
         self.console.print(
             Panel(
                 "\n".join(lines),

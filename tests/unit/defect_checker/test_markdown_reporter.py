@@ -158,3 +158,164 @@ class TestExceptionHandling:
         ):
             with pytest.raises(PermissionError):
                 save_markdown_report(response, tmp_path)
+
+
+class TestAggregateCrossDefects:
+    def test_empty_input(self):
+        """Returns empty list for empty input."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        assert _aggregate_cross_defects([]) == []
+
+    def test_single_cross_result(self):
+        """Aggregates defects from a single CROSS result."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        cross_results = [
+            {
+                "defects": [
+                    {"id": "QD-PT-1", "severity": "P0", "category": "QD-PT"},
+                ]
+            }
+        ]
+        result = _aggregate_cross_defects(cross_results)
+        assert len(result) == 1
+        assert result[0] == {
+            "defect_id": "QD-PT-1",
+            "defect_level": "P0",
+            "relation": "QD-PT",
+        }
+
+    def test_multiple_cross_results(self):
+        """Aggregates defects from multiple CROSS results (PS/PT/ST)."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        cross_results = [
+            {
+                "defects": [
+                    {"id": "QD-PS-1", "severity": "P1", "category": "QD-PS"},
+                ]
+            },
+            {
+                "defects": [
+                    {"id": "QD-PT-2", "severity": "P0", "category": "QD-PT"},
+                ]
+            },
+        ]
+        result = _aggregate_cross_defects(cross_results)
+        assert len(result) == 2
+        assert result[0]["defect_id"] == "QD-PS-1"
+        assert result[1]["defect_id"] == "QD-PT-2"
+
+    def test_skips_non_dict_defects(self):
+        """Skips defects that are not dicts."""
+        from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+        cross_results = [
+            {
+                "defects": [
+                    {"id": "QD-PT-1", "severity": "P0", "category": "QD-PT"},
+                    "invalid",
+                    None,
+                ]
+            }
+        ]
+        result = _aggregate_cross_defects(cross_results)
+        assert len(result) == 1
+
+
+class TestCalculateCrossScore:
+    def test_empty_input(self):
+        """Returns None for empty input."""
+        from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+        assert _calculate_cross_score([], "L2") is None
+
+    def test_valid_defects(self):
+        """Returns score dict for valid defects.
+
+        This test exercises the real defect-check SDK (a required dependency)
+        rather than mocking, to verify the integration works end-to-end.
+        """
+        from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+        defects = [
+            {"defect_id": "QD-PT-1", "defect_level": "P1", "relation": "QD-PT"},
+        ]
+        result = _calculate_cross_score(defects, "L2")
+        # Should return a dict with total_score and gate_result
+        assert isinstance(result, dict)
+        assert "total_score" in result
+        assert "gate_result" in result
+
+    def test_sdk_exception_returns_none(self, caplog):
+        """Returns None gracefully when SDK raises exception, logs warning."""
+        from unittest.mock import patch
+
+        from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+
+        defects = [{"defect_id": "x", "defect_level": "P0", "relation": "QD-PT"}]
+
+        # Patch CrossScoringCalculator to raise an exception
+        with patch(
+            "defect_check.cross.scoring.CrossScoringCalculator.calculate_score",
+            side_effect=RuntimeError("SDK error"),
+        ):
+            result = _calculate_cross_score(defects, "L2")
+            assert result is None
+            # Verify the warning was logged
+            assert "Cross scoring calculation failed" in caplog.text
+            assert "SDK error" in caplog.text
+
+
+class TestCrossArtifactReport:
+    def test_cross_module_merged_in_report(self, tmp_path):
+        """CROSS sub-results are merged into single section."""
+        response = _response(
+            results=[
+                {
+                    "module": "QDS",
+                    "status": "completed",
+                    "defects": [_defect(defect_id="QDS-1", severity="P1")],
+                },
+                {
+                    "module": "CROSS",
+                    "status": "completed",
+                    "defects": [
+                        {"id": "QD-PT-1", "name": "cross1", "severity": "P0",
+                         "description": "d", "location": "l", "impact": "i",
+                         "fix_suggestion": "f", "category": "QD-PT"},
+                    ],
+                },
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        # Should contain CROSS section with merged results
+        assert "## Cross (CROSS)" in content
+        assert "QD-PT-1" in content
+
+    def test_multiple_cross_subresults_merged(self, tmp_path):
+        """Multiple CROSS sub-results (PS/PT/ST) are merged."""
+        response = _response(
+            results=[
+                {
+                    "module": "CROSS",
+                    "status": "completed",
+                    "defects": [
+                        {"id": "QD-PS-1", "name": "ps1", "severity": "P1",
+                         "description": "d", "location": "l", "impact": "i",
+                         "fix_suggestion": "f", "category": "QD-PS"},
+                    ],
+                },
+                {
+                    "module": "CROSS",
+                    "status": "completed",
+                    "defects": [
+                        {"id": "QD-PT-1", "name": "pt1", "severity": "P0",
+                         "description": "d", "location": "l", "impact": "i",
+                         "fix_suggestion": "f", "category": "QD-PT"},
+                    ],
+                },
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        # Should contain only one CROSS section
+        assert content.count("## Cross (CROSS)") == 1
+        assert "QD-PS-1" in content
+        assert "QD-PT-1" in content
