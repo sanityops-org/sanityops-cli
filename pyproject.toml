@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sanityops-cli"
-version = "0.0.7"
+version = "0.0.8"
 description = "CLI tool for static defect inspection of AI logical artifacts"
 readme = "README.md"
 requires-python = ">=3.11"
