@@ -31,6 +31,12 @@ model:
   model_id: claude-sonnet-4-20250514  # Required: model identifier
   base_url: ""                        # Optional: custom endpoint URL
 
+# Agent configuration (optional)
+# Override CLI defaults for timeout and token budget.
+# agent:
+#   timeout: 1800      # seconds (default: 1800, 30min)
+#   token_budget: 200000
+
 # System Prompt file list (supports any plaintext file format)
 prompts:
   - file: prompts/system_prompt.md
