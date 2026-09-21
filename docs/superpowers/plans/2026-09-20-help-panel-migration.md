@@ -349,25 +349,25 @@ Replace lines 65-78 (the entire `main()` function) with:
 ```python
 def main():
     """Entrance function for the Sanityops CLI application."""
-    # Check if --help is requested for the main app only (no subcommand)
-    # Only show panels when --help is the sole flag or there are no args.
-    # This avoids showing panels when there are usage errors (e.g., -h, --bogus).
+    # Show panels only when --help is the sole flag or there are no args.
+    # This narrow trigger avoids showing panels on usage errors (-h, --bogus).
+    #
+    # Note: --version/-V doesn't need explicit handling here because:
+    # - `--version` won't match the exact `["--help"]` check
+    # - Single-arg `--version` has len > 1, so is_no_args_help is False
+    # - It falls through to the normal app() path, which prints version and exits.
     is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
-    is_version = "--version" in sys.argv or "-V" in sys.argv
 
-    if (is_only_help or is_no_args_help) and not is_version:
-        # Use a custom console to capture and extend help output
+    if is_only_help or is_no_args_help:
         console = Console()
         try:
             app()
         except SystemExit as e:
-            # Intercept successful exits and help exits. no_args_is_help exits
-            # with code 2 (click's UsageError code), so accept 0 and 2 here;
-            # re-raise anything else (real usage errors keep failing).
+            # --help exits 0; no_args_is_help exits 2 (click's UsageError code).
+            # Both are expected here. Anything else propagates.
             if e.code not in (0, 2):
                 raise
-        # Print the Getting Started and Advanced Usage panels
         console.print()
         console.print(get_getting_started_panel())
         console.print()
