@@ -96,8 +96,9 @@ def main():
             app()
         except SystemExit as e:
             # Swallow the help exit so the panels can be printed after it.
-            # --help exits 0; no_args_is_help exits 2 (click's UsageError
-            # code). Both are expected here. Anything else propagates.
+            # --help exits 0; no_args_is_help triggers Typer's help which
+            # exits 2 (Click's UsageError code). We catch both and continue
+            # to print panels, resulting in exit 0 for both cases.
             if e.code not in (0, 2):
                 raise
         # Print the Getting Started and Advanced Usage panels
