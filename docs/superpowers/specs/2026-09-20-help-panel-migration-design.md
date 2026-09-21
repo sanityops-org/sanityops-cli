@@ -6,13 +6,15 @@
 
 ## Summary
 
-Migrate the Getting Started and Advanced Usage help panels from sanityops-cli to sanityops-cli. The panels appear when users run `sanityops-cli --help` or `sanityops-cli` with no arguments, providing a 5-step quick start workflow and CI/CD integration guidance.
+Migrate the Getting Started and Advanced Usage help panels from sanityops-cli to sanityops-cli. The panels appear when users run `sanityops-cli --help` or `sanityops-cli` with no arguments, providing a 4-step quick start workflow and CI/CD integration guidance.
+
+**Note:** The original 5-step workflow was reduced to 4 steps because sanityops-cli has no `inspect cover` subcommand.
 
 ## Files Changed
 
 | File | Action |
 |------|--------|
-| `src/sanityops_cli/help_panel.py` | Create (copy from sanityops-cli) |
+| `src/sanityops_cli/help_panel.py` | Create (localized from sanityops-cli) |
 | `src/sanityops_cli/main.py` | Modify (add help interception logic) |
 | `entry.py` | Modify (call `main()` instead of `app()`) |
 | `pyproject.toml` | Modify (entry point `:app` → `:main`) |
@@ -22,14 +24,14 @@ Migrate the Getting Started and Advanced Usage help panels from sanityops-cli to
 
 ### 1. `help_panel.py` (new)
 
-Copy verbatim from sanityops-cli. Contains:
+Create with localized text. Contains:
 
-- `GETTING_STARTED_TEXT` — 5-step workflow string
+- `GETTING_STARTED_TEXT` — 4-step workflow string (sanityops-cli commands, .sanityops/ directory)
 - `ADVANCED_USAGE_TEXT` — CI/CD integration guidance string
 - `get_getting_started_panel()` — Returns Rich `Panel` with blue border
 - `get_advanced_usage_panel()` — Returns Rich `Panel` with cyan border
 
-Text references `sanityops-cli` (to be localized later per user decision).
+Text is localized to `sanityops-cli` and `.sanityops/` directory.
 
 ### 2. `main.py` (modify)
 
@@ -166,7 +168,6 @@ sanityops-cli inspect --help
 
 ## Out of Scope
 
-- Localizing text from `sanityops-cli` to `sanityops-cli` (deferred)
 - Adding `project` command (does not exist in sanityops-cli)
 - Migrating other sanityops-cli features
 
