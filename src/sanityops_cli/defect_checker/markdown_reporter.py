@@ -18,11 +18,14 @@
 from __future__ import annotations
 
 import html
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from sanityops_cli.defect_checker.renderer import _MODULE_LABELS
+
+_log = logging.getLogger(__name__)
 
 
 def _esc_md_cell(text: str | None) -> str:
@@ -51,6 +54,57 @@ def _format_score(score: dict[str, Any] | None) -> str:
     if score.get("gate_result"):
         parts.append(f"gate {score['gate_result']}")
     return ", ".join(parts)
+
+
+def _aggregate_cross_defects(cross_results: list[dict]) -> list[dict]:
+    """Aggregate defects from all CROSS sub-results (PS/PT/ST) into one list.
+
+    Maps SDK DefectItem format to CrossScoringCalculator format:
+        id -> defect_id
+        severity -> defect_level
+        category -> relation (QD-PS, QD-PT, QD-ST)
+    """
+    defects = []
+    for result in cross_results:
+        for d in result.get("defects") or []:
+            if not isinstance(d, dict):
+                continue
+            defects.append({
+                "defect_id": d.get("id"),
+                "defect_level": d.get("severity"),
+                "relation": d.get("category"),
+            })
+    return defects
+
+
+def _calculate_cross_score(
+    defects: list[dict],
+    check_level: str,
+) -> dict | None:
+    """Compute merged CROSS score using SDK's CrossScoringCalculator.
+
+    The SDK uses weighted deductions per PS/PT/ST group:
+        P0:P1:P2 = 5:3:1 deduction weights
+        Gate FAIL when any group has P0 defect
+
+    Returns None on any failure so the report degrades gracefully instead of
+    crashing. This is intentional: the SDK import or calculation may fail in
+    unexpected ways, and we prefer an unscored CROSS section over no report.
+    """
+    if not defects:
+        return None
+    try:
+        from defect_check.cross.scoring import CrossScoringCalculator
+        scoring = CrossScoringCalculator().calculate_score(defects, check_level, mode=None)
+    except Exception as e:
+        # Intentional broad catch: SDK import, configuration, or calculation
+        # failures should not prevent report generation.
+        _log.warning("Cross scoring calculation failed: %s", e)
+        return None
+    return {
+        "total_score": scoring.get("total_score"),
+        "gate_result": scoring.get("gate_result", "PASS"),
+    }
 
 
 def _build_report(
@@ -97,8 +151,25 @@ def _build_report(
     lines.append(f"| Gate | {gate} |")
     lines.append("")
 
+    # Separate CROSS from other modules and merge
+    module_results = [r for r in results if r.get("module") != "CROSS"]
+    cross_results = [r for r in results if r.get("module") == "CROSS"]
+
+    if cross_results:
+        # Merge all CROSS sub-results into single section
+        cross_defects = [d for r in cross_results for d in (r.get("defects") or [])]
+        mapped_defects = _aggregate_cross_defects(cross_results)
+        cross_score = _calculate_cross_score(mapped_defects, check_level)
+
+        module_results.append({
+            "module": "CROSS",
+            "status": "completed",
+            "defects": cross_defects,
+            "score": cross_score,
+        })
+
     # Per-module results
-    for result in results:
+    for result in module_results:
         module = result.get("module", "")
         label = _MODULE_LABELS.get(module, module)
         result_status = result.get("status", "unknown")
