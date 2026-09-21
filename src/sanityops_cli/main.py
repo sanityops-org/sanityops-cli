@@ -44,6 +44,7 @@ app = typer.Typer(
     name="Sanityops-cli",
     help="Sanityops CLI Tool — A cli tool for sanityops",
     no_args_is_help=True,
+    add_completion=False,
 )
 
 
