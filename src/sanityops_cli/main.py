@@ -79,9 +79,13 @@ app.command("init")(init_config)
 
 def main():
     """Entrance function for the Sanityops CLI application."""
-    # Check if --help is requested for the main app only (no subcommand)
-    # Only show panels when --help is the sole flag or there are no args.
-    # This avoids showing panels when there are usage errors (e.g., -h, --bogus).
+    # Show panels only when --help is the sole flag or there are no args.
+    # This narrow trigger avoids showing panels on usage errors (-h, --bogus).
+    #
+    # Note: --version/-V doesn't need explicit handling here because:
+    # - `--version` won't match the exact `["--help"]` check
+    # - Single-arg `--version` has len > 1, so is_no_args_help is False
+    # - It falls through to the normal app() path, which prints version and exits.
     is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
 
