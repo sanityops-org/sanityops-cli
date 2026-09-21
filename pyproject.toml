@@ -38,7 +38,7 @@ dependencies = [
 ]
 
 [project.scripts]
-sanityops-cli = "sanityops_cli.main:app"
+sanityops-cli = "sanityops_cli.main:main"
 
 [project.urls]
 Homepage = "https://sanityops.org"

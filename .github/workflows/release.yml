@@ -107,6 +107,7 @@ jobs:
             --hidden-import tools.builtins.skill \
             --hidden-import tools.builtins.task \
             --hidden-import tools.builtins.todo \
+            --hidden-import sanityops_cli.help_panel \
             entry.py
 
       - uses: actions/upload-artifact@v4
@@ -186,6 +187,7 @@ jobs:
             --hidden-import tools.builtins.skill \
             --hidden-import tools.builtins.task \
             --hidden-import tools.builtins.todo \
+            --hidden-import sanityops_cli.help_panel \
             entry.py
 
       - uses: actions/upload-artifact@v4
@@ -261,6 +263,7 @@ jobs:
             --hidden-import tools.builtins.skill `
             --hidden-import tools.builtins.task `
             --hidden-import tools.builtins.todo `
+            --hidden-import sanityops_cli.help_panel `
             entry.py
 
       - uses: actions/upload-artifact@v4
