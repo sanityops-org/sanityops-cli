@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import defect_check
+from defect_check.models import DefectCheckOptions
 
 from sanityops_cli.agents.scanner_agent.models.finding import (
     Finding,
@@ -47,6 +48,9 @@ class DefectChecker:
         tools = self._convert_tools(findings.tools)
         prompts = self._convert_prompts(findings.prompts)
         skills = self._convert_skills(findings.skills)
+        options = DefectCheckOptions(
+            enable_cross_check=True,
+        )
 
         return await defect_check.check(
             tools=tools,
@@ -57,6 +61,7 @@ class DefectChecker:
             llm_api_key=self.llm_config.get("llm_api_key"),
             llm_model_id=self.llm_config.get("llm_model_id"),
             llm_base_url=self.llm_config.get("llm_base_url"),
+            options=options
         )
 
     def _convert_tools(self, tools: list[Finding]) -> list[dict]:
