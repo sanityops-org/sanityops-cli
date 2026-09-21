@@ -39,12 +39,11 @@ def _run_entry_point(*args: str) -> tuple[int, str]:
 
 
 def test_getting_started_text_content():
-    """Verify the Getting Started text contains all 5 steps."""
-    assert "deeplogic-cli init" in GETTING_STARTED_TEXT
+    """Verify the Getting Started text contains all 4 steps."""
+    assert "sanityops-cli init" in GETTING_STARTED_TEXT
     assert "inspect_config.yaml" in GETTING_STARTED_TEXT
-    assert "deeplogic-cli inspect" in GETTING_STARTED_TEXT
-    assert "deeplogic-cli inspect repair" in GETTING_STARTED_TEXT
-    assert "deeplogic-cli inspect cover" in GETTING_STARTED_TEXT
+    assert "sanityops-cli inspect" in GETTING_STARTED_TEXT
+    assert "sanityops-cli inspect repair" in GETTING_STARTED_TEXT
     assert "(optional)" in GETTING_STARTED_TEXT
 
 
@@ -66,7 +65,7 @@ def test_advanced_usage_text_content():
     assert "CI/CD" in ADVANCED_USAGE_TEXT
     assert "inspect_config.yaml" in ADVANCED_USAGE_TEXT
     assert "environment variables" in ADVANCED_USAGE_TEXT
-    assert "deeplogic-cli config --help" in ADVANCED_USAGE_TEXT
+    assert "sanityops-cli config --help" in ADVANCED_USAGE_TEXT
 
 
 def test_advanced_usage_panel_returns_panel():
