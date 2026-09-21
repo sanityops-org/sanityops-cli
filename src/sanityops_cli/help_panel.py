@@ -7,8 +7,7 @@ GETTING_STARTED_TEXT = """\
   1. Run 'sanityops-cli init' to create the default configuration
   2. Edit .sanityops/inspect_config.yaml to configure your project
   3. Run 'sanityops-cli inspect' to start the inspection
-  4. Run 'sanityops-cli inspect repair' to generate fixes (optional)
-  5. Run 'sanityops-cli inspect cover' to apply fixes (optional)\
+  4. Run 'sanityops-cli inspect repair' to generate fixes (optional)\
 """
 
 ADVANCED_USAGE_TEXT = """\
