@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Copy `help_panel.py` verbatim — text still references `deeplogic-cli` (localization deferred)
+- Create `help_panel.py` with localized text (sanityops-cli, .sanityops/)
+- Remove step 5 (`inspect cover`) — sanityops-cli has no cover subcommand
 - UTF-8 stream reconfiguration added for Windows GBK/cp936 compatibility
 - Entry point in `pyproject.toml` must change from `:app` to `:main`
 - Remove CJK assertion tests (to be re-added when text is localized)
@@ -27,30 +28,29 @@
 **Interfaces:**
 - Produces: `GETTING_STARTED_TEXT` (str), `ADVANCED_USAGE_TEXT` (str), `get_getting_started_panel()` → `Panel`, `get_advanced_usage_panel()` → `Panel`
 
-- [ ] **Step 1: Create `help_panel.py` with verbatim copy from deeplogic-cli**
+- [ ] **Step 1: Create `help_panel.py` with localized text**
 
 ```python
-"""Getting Started panel for CLI help output."""
+"""Getting Started and Advanced Usage panels for CLI help output."""
 
 from rich.panel import Panel
 from rich.text import Text
 
 GETTING_STARTED_TEXT = """\
-  1. Run 'deeplogic-cli init' to create the default configuration
-  2. Edit .deeplogic/inspect_config.yaml to configure your project
-  3. Run 'deeplogic-cli inspect' to start the inspection
-  4. Run 'deeplogic-cli inspect repair' to generate fixes (optional)
-  5. Run 'deeplogic-cli inspect cover' to apply fixes (optional)\
+  1. Run 'sanityops-cli init' to create the default configuration
+  2. Edit .sanityops/inspect_config.yaml to configure your project
+  3. Run 'sanityops-cli inspect' to start the inspection
+  4. Run 'sanityops-cli inspect repair' to generate fixes (optional)
 """
 
 ADVANCED_USAGE_TEXT = """\
   CI/CD Integration:
-    1. Commit .deeplogic/inspect_config.yaml to the repository
+    1. Commit .sanityops/inspect_config.yaml to the repository
     2. Set LLM API keys via environment variables (never commit sensitive keys)
-    3. Run 'deeplogic-cli inspect' in the pipeline
+    3. Run 'sanityops-cli inspect' in the pipeline
 
-  Config Command (deeplogic-cli config --help):
-    View detailed configuration options and usage examples\
+  Config Command (sanityops-cli config --help):
+    View detailed configuration options and usage examples
 """
 
 
@@ -58,7 +58,7 @@ def get_getting_started_panel() -> Panel:
     """Create the Getting Started panel for help output.
 
     Returns:
-        A Rich Panel containing the 5-step Getting Started workflow.
+        A Rich Panel containing the 4-step Getting Started workflow.
     """
     return Panel(
         Text(GETTING_STARTED_TEXT, justify="left"),
@@ -82,6 +82,8 @@ def get_advanced_usage_panel() -> Panel:
     )
 ```
 
+**Note:** Step 5 (`inspect cover`) from deeplogic-cli was removed because sanityops-cli has no `cover` subcommand.
+
 - [ ] **Step 2: Verify file is importable**
 
 Run:
@@ -95,7 +97,7 @@ Expected: `OK`
 
 ```bash
 git add src/sanityops_cli/help_panel.py
-git commit -m "feat(help): add Getting Started and Advanced Usage panels from deeplogic-cli"
+git commit -m "feat(help): add Getting Started and Advanced Usage panels localized for sanityops-cli"
 ```
 
 ---
@@ -114,6 +116,7 @@ git commit -m "feat(help): add Getting Started and Advanced Usage panels from de
 ```python
 """Tests for the Getting Started and Advanced Usage help panels."""
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -129,14 +132,34 @@ from sanityops_cli.help_panel import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _run_entry_point(*args: str) -> tuple[int, str]:
+    """Run entry.py and return its exit code plus ANSI-stripped combined output.
+
+    Click colorizes error messages differently depending on whether it detects
+    a TTY, and it may colorize mid-phrase (e.g. the option name in
+    "No such option: -h"). Stripping escapes keeps the text assertions stable
+    across local runs and CI.
+    """
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), *args],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    output = _ANSI_ESCAPE.sub("", result.stdout + result.stderr)
+    return result.returncode, output
+
 
 def test_getting_started_text_content():
-    """Verify the Getting Started text contains all 5 steps."""
-    assert "deeplogic-cli init" in GETTING_STARTED_TEXT
+    """Verify the Getting Started text contains all 4 steps."""
+    assert "sanityops-cli init" in GETTING_STARTED_TEXT
     assert "inspect_config.yaml" in GETTING_STARTED_TEXT
-    assert "deeplogic-cli inspect" in GETTING_STARTED_TEXT
-    assert "deeplogic-cli inspect repair" in GETTING_STARTED_TEXT
-    assert "deeplogic-cli inspect cover" in GETTING_STARTED_TEXT
+    assert "sanityops-cli inspect" in GETTING_STARTED_TEXT
+    assert "sanityops-cli inspect repair" in GETTING_STARTED_TEXT
     assert "(optional)" in GETTING_STARTED_TEXT
 
 
@@ -158,7 +181,7 @@ def test_advanced_usage_text_content():
     assert "CI/CD" in ADVANCED_USAGE_TEXT
     assert "inspect_config.yaml" in ADVANCED_USAGE_TEXT
     assert "environment variables" in ADVANCED_USAGE_TEXT
-    assert "deeplogic-cli config --help" in ADVANCED_USAGE_TEXT
+    assert "sanityops-cli config --help" in ADVANCED_USAGE_TEXT
 
 
 def test_advanced_usage_panel_returns_panel():
@@ -181,100 +204,58 @@ def test_entry_point_shows_getting_started_on_help():
     Getting Started panel logic in main(), so the packaged binary's --help
     output was missing the panel while pip-installed runs showed it.
     """
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--help"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" in result.stdout
+    returncode, output = _run_entry_point("--help")
+    assert returncode == 0
+    assert "Getting Started" in output
 
 
 def test_entry_point_shows_advanced_usage_on_help():
     """Verify the entry point shows the Advanced Usage panel."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--help"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Advanced Usage" in result.stdout
+    returncode, output = _run_entry_point("--help")
+    assert returncode == 0
+    assert "Advanced Usage" in output
 
 
 def test_entry_point_shows_getting_started_with_no_args():
     """Verify the PyInstaller entry point shows the panel with no arguments."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py")],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" in result.stdout
-    assert "Advanced Usage" in result.stdout
+    returncode, output = _run_entry_point()
+    assert returncode == 0
+    assert "Getting Started" in output
+    assert "Advanced Usage" in output
 
 
 def test_entry_point_does_not_show_panels_for_unsupported_h_flag():
     """Verify -h (unsupported by Typer at root) shows an error without panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "-h"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 2
-    assert "No such option: -h" in result.stderr + result.stdout
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("-h")
+    assert returncode == 2
+    assert "No such option: -h" in output
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 
 
 def test_entry_point_does_not_show_panels_for_invalid_flag_with_help():
     """Verify --help mixed with an invalid flag shows an error without panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--help", "--bogus"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 2
-    assert "No such option: --bogus" in result.stderr + result.stdout
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("--help", "--bogus")
+    assert returncode == 2
+    assert "No such option: --bogus" in output
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 
 
 def test_entry_point_does_not_show_panels_for_subcommand_help():
     """Verify subcommand help does not show the top-level panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "inspect", "--help"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("inspect", "--help")
+    assert returncode == 0
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 
 
 def test_entry_point_does_not_show_panels_for_version():
     """Verify --version does not show the top-level panels."""
-    result = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "entry.py"), "--version"],
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        timeout=60,
-    )
-    assert result.returncode == 0
-    assert "Getting Started" not in result.stdout
-    assert "Advanced Usage" not in result.stdout
+    returncode, output = _run_entry_point("--version")
+    assert returncode == 0
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
 ```
 
 - [ ] **Step 2: Run unit tests (panel functions) — should pass**
