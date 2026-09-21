@@ -1,0 +1,142 @@
+"""Tests for the Getting Started and Advanced Usage help panels."""
+
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+from rich.panel import Panel
+
+from sanityops_cli.help_panel import (
+    ADVANCED_USAGE_TEXT,
+    GETTING_STARTED_TEXT,
+    get_advanced_usage_panel,
+    get_getting_started_panel,
+)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _run_entry_point(*args: str) -> tuple[int, str]:
+    """Run entry.py and return its exit code plus ANSI-stripped combined output.
+
+    Click colorizes error messages differently depending on whether it detects
+    a TTY, and it may colorize mid-phrase (e.g. the option name in
+    "No such option: -h"). Stripping escapes keeps the text assertions stable
+    across local runs and CI.
+    """
+    result = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "entry.py"), *args],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+        timeout=60,
+    )
+    output = _ANSI_ESCAPE.sub("", result.stdout + result.stderr)
+    return result.returncode, output
+
+
+def test_getting_started_text_content():
+    """Verify the Getting Started text contains all 4 steps."""
+    assert "sanityops-cli init" in GETTING_STARTED_TEXT
+    assert "inspect_config.yaml" in GETTING_STARTED_TEXT
+    assert "sanityops-cli inspect" in GETTING_STARTED_TEXT
+    assert "sanityops-cli inspect repair" in GETTING_STARTED_TEXT
+    assert "(optional)" in GETTING_STARTED_TEXT
+
+
+def test_getting_started_panel_returns_panel():
+    """Verify the function returns a Rich Panel."""
+    panel = get_getting_started_panel()
+    assert isinstance(panel, Panel)
+
+
+def test_getting_started_panel_has_correct_title():
+    """Verify the panel has the correct title."""
+    panel = get_getting_started_panel()
+    assert panel.title is not None
+    assert "Getting Started" in str(panel.title)
+
+
+def test_advanced_usage_text_content():
+    """Verify the Advanced Usage text contains CI/CD integration."""
+    assert "CI/CD" in ADVANCED_USAGE_TEXT
+    assert "inspect_config.yaml" in ADVANCED_USAGE_TEXT
+    assert "environment variables" in ADVANCED_USAGE_TEXT
+    assert "sanityops-cli config --help" in ADVANCED_USAGE_TEXT
+
+
+def test_advanced_usage_panel_returns_panel():
+    """Verify the function returns a Rich Panel."""
+    panel = get_advanced_usage_panel()
+    assert isinstance(panel, Panel)
+
+
+def test_advanced_usage_panel_has_correct_title():
+    """Verify the panel has the correct title."""
+    panel = get_advanced_usage_panel()
+    assert panel.title is not None
+    assert "Advanced Usage" in str(panel.title)
+
+
+def test_entry_point_shows_getting_started_on_help():
+    """Verify the PyInstaller entry point (entry.py) shows the Getting Started panel.
+
+    Regression test: entry.py used to call app() directly, bypassing the
+    Getting Started panel logic in main(), so the packaged binary's --help
+    output was missing the panel while pip-installed runs showed it.
+    """
+    returncode, output = _run_entry_point("--help")
+    assert returncode == 0
+    assert "Getting Started" in output
+
+
+def test_entry_point_shows_advanced_usage_on_help():
+    """Verify the entry point shows the Advanced Usage panel."""
+    returncode, output = _run_entry_point("--help")
+    assert returncode == 0
+    assert "Advanced Usage" in output
+
+
+def test_entry_point_shows_getting_started_with_no_args():
+    """Verify the PyInstaller entry point shows the panel with no arguments."""
+    returncode, output = _run_entry_point()
+    assert returncode == 0
+    assert "Getting Started" in output
+    assert "Advanced Usage" in output
+
+
+def test_entry_point_does_not_show_panels_for_unsupported_h_flag():
+    """Verify -h (unsupported by Typer at root) shows an error without panels."""
+    returncode, output = _run_entry_point("-h")
+    assert returncode == 2
+    assert "No such option: -h" in output
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
+
+
+def test_entry_point_does_not_show_panels_for_invalid_flag_with_help():
+    """Verify --help mixed with an invalid flag shows an error without panels."""
+    returncode, output = _run_entry_point("--help", "--bogus")
+    assert returncode == 2
+    assert "No such option: --bogus" in output
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
+
+
+def test_entry_point_does_not_show_panels_for_subcommand_help():
+    """Verify subcommand help does not show the top-level panels."""
+    returncode, output = _run_entry_point("inspect", "--help")
+    assert returncode == 0
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
+
+
+def test_entry_point_does_not_show_panels_for_version():
+    """Verify --version does not show the top-level panels."""
+    returncode, output = _run_entry_point("--version")
+    assert returncode == 0
+    assert "Getting Started" not in output
+    assert "Advanced Usage" not in output
