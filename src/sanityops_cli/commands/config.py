@@ -29,7 +29,9 @@ from typing import Any
 
 import typer
 from rich.console import Console
+from rich.panel import Panel
 from rich.table import Table
+from rich.text import Text
 
 from sanityops_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
 from sanityops_cli.constants.exit_codes import EXIT_FAILURE
@@ -105,9 +107,6 @@ def _flatten_config(data: dict[str, Any], prefix: str = "") -> list[tuple[str, A
 
 def _get_config_usage_panel():
     """Build the advanced usage panel for config --help."""
-    from rich.panel import Panel
-    from rich.text import Text
-
     usage_text = f"""\
 Configuration Priority:
   Project-level (.sanityops/inspect_config.yaml) > Global (~/.sanityops/config)
