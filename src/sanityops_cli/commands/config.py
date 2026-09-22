@@ -196,7 +196,7 @@ def config_callback(
         return
 
     if unset:
-        _unset_config(unset, local=local_config)
+        _unset_config(unset, local=use_local)
         return
 
     if not key:
