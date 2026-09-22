@@ -22,7 +22,9 @@ the sanityops SaaS backend (NOT the LLM model config, which lives under
 
 from __future__ import annotations
 
+import getpass
 import os
+import sys
 from typing import Any
 
 import typer
@@ -39,7 +41,8 @@ console = Console()
 config_app = typer.Typer(
     name="config",
     help="Get and set sanityops configuration (server base URL, API key, etc.)",
-    no_args_is_help=True,
+    no_args_is_help=False,  # We handle help ourselves to add usage panel
+    add_help_option=False,  # We handle --help ourselves to add usage panel
     context_settings={"allow_interspersed_args": True},
 )
 
@@ -100,9 +103,64 @@ def _flatten_config(data: dict[str, Any], prefix: str = "") -> list[tuple[str, A
     return result
 
 
+def _get_config_usage_panel():
+    """Build the advanced usage panel for config --help."""
+    from rich.panel import Panel
+    from rich.text import Text
+
+    usage_text = f"""\
+Configuration Priority:
+  Project-level (.sanityops/inspect_config.yaml) > Global (~/.sanityops/config)
+  > Environment Variables > Default
+
+Available Keys:
+  server.base_url  Sanityops SaaS backend URL (default: {DEFAULT_SERVER_BASE_URL})
+  server.api_key   API key for authentication (sensitive, masked on display)
+
+Environment Variables:
+  SANITYOPS_BASE_URL  Override server.base_url
+  SANITYOPS_API_KEY   Override server.api_key
+
+Commands:
+  config <key>                      Read a config value
+  config <key> <value>              Set a value (global, default)
+  config <key> <value> --local      Set a project-level value
+  config --list                     List all config values
+  config --unset <key>              Remove a config key
+
+Examples:
+  sanityops-cli config server.base_url               # Read value
+  sanityops-cli config server.base_url https://...   # Set global
+  sanityops-cli config server.base_url https://... --local  # Set project-level
+  sanityops-cli config server.api_key                # Prompt (masked input)
+  sanityops-cli config --list                         # List all values
+  sanityops-cli config --unset server.base_url        # Remove key\
+"""
+    return Panel(
+        Text(usage_text, justify="left"),
+        title="Config Usage",
+        border_style="cyan",
+        padding=(0, 1),
+    )
+
+
+def _help_callback(help_requested: bool) -> None:
+    """Custom help callback placeholder - actual handling in callback body."""
+    # This is a placeholder to enable -h flag; the actual help display is in config_callback
+    pass
+
+
 @config_app.callback(invoke_without_command=True)
 def config_callback(
     ctx: typer.Context,
+    help_flag: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        is_eager=True,
+        callback=_help_callback,
+        help="Show this message and exit",
+    ),
     key: str = typer.Argument(None, help="Config key, e.g. server.base_url"),
     value: str = typer.Argument(None, help="Config value (omit to read)"),
     list_all: bool = typer.Option(False, "--list", "-l", help="List all config values"),
@@ -118,40 +176,39 @@ def config_callback(
         help="Operate on project-level config",
     ),
 ) -> None:
-    """Get, set, or list sanityops configuration values.
+    """Get, set, or list sanityops configuration values."""
+    # Hide the unused --global flag from linters while keeping it documented.
+    del global_config
 
-    Precedence: project-level > global > environment variables > default.
-
-    Examples:
-        sanityops-cli config server.base_url               # Read value
-        sanityops-cli config server.base_url http://...    # Set (global, default)
-        sanityops-cli config server.base_url http://... --local   # Set project-level
-        sanityops-cli config server.api_key                # Read (masked) value
-        sanityops-cli config --list                         # List all values
-        sanityops-cli config --unset server.base_url        # Remove key
-    """
-    # --global and --local are mutually exclusive scope selectors.
-    # --global is the default (and is explicit); --local targets project config.
-    if global_config and local_config:
-        console.print("[red]Error: --global and --local are mutually exclusive[/red]")
-        raise typer.Exit(code=EXIT_FAILURE)
-
-    use_local = local_config
+    # Handle --help/-h
+    if help_flag:
+        console.print(ctx.get_help())
+        console.print(_get_config_usage_panel())
+        raise typer.Exit()
 
     if list_all:
         _list_config()
         return
 
     if unset:
-        _unset_config(unset, local=use_local)
+        _unset_config(unset, local=local_config)
         return
 
     if not key:
+        # Show help with additional usage documentation
         console.print(ctx.get_help())
-        return
+        console.print(_get_config_usage_panel())
+        raise typer.Exit()
+
+    use_local = local_config  # --local overrides; default is global
 
     if value is None:
-        _read_config(key)
+        # Interactive masked input for sensitive keys on a TTY.
+        if _is_sensitive_key(key) and sys.stdin.isatty():
+            entered = getpass.getpass(f"Enter {key}: ")
+            _write_config(key, entered, local=use_local)
+        else:
+            _read_config(key)
     else:
         _write_config(key, value, local=use_local)
 
