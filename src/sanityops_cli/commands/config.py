@@ -183,8 +183,7 @@ def config_callback(
         console.print("[red]Error: --global and --local are mutually exclusive[/red]")
         raise typer.Exit(code=EXIT_FAILURE)
 
-    # Hide the unused --global flag from linters while keeping it documented.
-    del global_config
+    use_local = local_config  # --local overrides; default is global
 
     # Handle --help/-h
     if help_flag:
@@ -205,8 +204,6 @@ def config_callback(
         console.print(ctx.get_help())
         console.print(_get_config_usage_panel())
         raise typer.Exit()
-
-    use_local = local_config  # --local overrides; default is global
 
     if value is None:
         # Interactive masked input for sensitive keys on a TTY.
