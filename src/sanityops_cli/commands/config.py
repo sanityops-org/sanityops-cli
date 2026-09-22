@@ -177,6 +177,12 @@ def config_callback(
     ),
 ) -> None:
     """Get, set, or list sanityops configuration values."""
+    # --global and --local are mutually exclusive scope selectors.
+    # --global is the default (and is explicit); --local targets project config.
+    if global_config and local_config:
+        console.print("[red]Error: --global and --local are mutually exclusive[/red]")
+        raise typer.Exit(code=EXIT_FAILURE)
+
     # Hide the unused --global flag from linters while keeping it documented.
     del global_config
 
