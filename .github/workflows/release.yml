@@ -32,14 +32,29 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "::notice::Building version $VERSION"
 
-  build-macos:
+  # Single build job that handles all platforms sequentially (no artifacts needed)
+  build-all:
     needs: prepare
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
-          - arch: arm64
-          - arch: x64
-    runs-on: macos-latest
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - os: windows-latest
+            platform: win
+            arch: x64
     steps:
       - uses: actions/checkout@v4
 
@@ -53,248 +68,60 @@ jobs:
           pip install pyinstaller typer rich httpx tomli tomli-w
           pip install -e .
 
-      - name: Build binary
+      - name: Build binary (Unix)
+        if: runner.os != 'Windows'
         run: |
           ARCH="${{ matrix.arch }}"
-          if [ "$ARCH" = "x64" ]; then
+          if [ "${{ matrix.platform }}" = "darwin" ] && [ "$ARCH" = "x64" ]; then
             export ARCHFLAGS="-arch x86_64"
-          else
+          elif [ "${{ matrix.platform }}" = "darwin" ]; then
             export ARCHFLAGS="-arch arm64"
           fi
           pyinstaller --onefile \
-            --name sanityops-cli-darwin-$ARCH \
+            --name sanityops-cli-${{ matrix.platform }}-$ARCH \
             --collect-data defect_check \
             --collect-data sanityops_cli \
-            --hidden-import pydantic \
-            --hidden-import pydantic_settings \
-            --hidden-import config \
-            --hidden-import agents \
-            --hidden-import agents.factory \
-            --hidden-import agents.parent \
-            --hidden-import agents.sub \
-            --hidden-import core \
-            --hidden-import core.agent \
-            --hidden-import core.context \
-            --hidden-import core.message \
-            --hidden-import hooks \
-            --hidden-import hooks.base \
-            --hidden-import hooks.builtin \
-            --hidden-import llm \
-            --hidden-import llm.base \
-            --hidden-import llm.exceptions \
-            --hidden-import llm.factory \
-            --hidden-import llm.adapters \
-            --hidden-import llm.adapters.base \
-            --hidden-import llm.adapters.anthropic_adapter \
-            --hidden-import llm.adapters.openai_adapter \
-            --hidden-import llm.providers \
-            --hidden-import llm.providers.anthropic \
-            --hidden-import llm.providers.openai \
-            --hidden-import managers \
-            --hidden-import managers.history \
-            --hidden-import managers.skill \
-            --hidden-import managers.state \
-            --hidden-import managers.todo \
-            --hidden-import tools \
-            --hidden-import tools.base \
-            --hidden-import tools.context \
-            --hidden-import tools.registry \
-            --hidden-import tools.builtins \
-            --hidden-import tools.builtins.bash \
-            --hidden-import tools.builtins.file_ops \
-            --hidden-import tools.builtins.glob \
-            --hidden-import tools.builtins.history \
-            --hidden-import tools.builtins.skill \
-            --hidden-import tools.builtins.task \
-            --hidden-import tools.builtins.todo \
-            --hidden-import sanityops_cli.help_panel \
             entry.py
 
-      - name: Upload binary to release
-        uses: actions/upload-artifact@v4
-        with:
-          name: sanityops-cli-darwin-${{ matrix.arch }}
-          path: dist/sanityops-cli-darwin-${{ matrix.arch }}
-          retention-days: 1
-
-  build-linux:
-    needs: prepare
-    strategy:
-      matrix:
-        include:
-          - arch: x64
-            runs-on: ubuntu-latest
-          - arch: arm64
-            runs-on: ubuntu-24.04-arm
-    runs-on: ${{ matrix.runs-on }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install pyinstaller typer rich httpx tomli tomli-w
-          pip install -e .
-
-      - name: Build binary
-        run: |
-          pyinstaller --onefile \
-            --name sanityops-cli-linux-${{ matrix.arch }} \
-            --collect-data defect_check \
-            --collect-data sanityops_cli \
-            --hidden-import pydantic \
-            --hidden-import pydantic_settings \
-            --hidden-import config \
-            --hidden-import agents \
-            --hidden-import agents.factory \
-            --hidden-import agents.parent \
-            --hidden-import agents.sub \
-            --hidden-import core \
-            --hidden-import core.agent \
-            --hidden-import core.context \
-            --hidden-import core.message \
-            --hidden-import hooks \
-            --hidden-import hooks.base \
-            --hidden-import hooks.builtin \
-            --hidden-import llm \
-            --hidden-import llm.base \
-            --hidden-import llm.exceptions \
-            --hidden-import llm.factory \
-            --hidden-import llm.adapters \
-            --hidden-import llm.adapters.base \
-            --hidden-import llm.adapters.anthropic_adapter \
-            --hidden-import llm.adapters.openai_adapter \
-            --hidden-import llm.providers \
-            --hidden-import llm.providers.anthropic \
-            --hidden-import llm.providers.openai \
-            --hidden-import managers \
-            --hidden-import managers.history \
-            --hidden-import managers.skill \
-            --hidden-import managers.state \
-            --hidden-import managers.todo \
-            --hidden-import tools \
-            --hidden-import tools.base \
-            --hidden-import tools.context \
-            --hidden-import tools.registry \
-            --hidden-import tools.builtins \
-            --hidden-import tools.builtins.bash \
-            --hidden-import tools.builtins.file_ops \
-            --hidden-import tools.builtins.glob \
-            --hidden-import tools.builtins.history \
-            --hidden-import tools.builtins.skill \
-            --hidden-import tools.builtins.task \
-            --hidden-import tools.builtins.todo \
-            --hidden-import sanityops_cli.help_panel \
-            entry.py
-
-      - name: Upload binary to release
-        uses: actions/upload-artifact@v4
-        with:
-          name: sanityops-cli-linux-${{ matrix.arch }}
-          path: dist/sanityops-cli-linux-${{ matrix.arch }}
-          retention-days: 1
-
-  build-windows:
-    needs: prepare
-    strategy:
-      matrix:
-        include:
-          - arch: x64
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install pyinstaller typer rich httpx tomli tomli-w
-          pip install -e .
-
-      - name: Build binary
+      - name: Build binary (Windows)
+        if: runner.os == 'Windows'
         run: |
           pyinstaller --onefile --name sanityops-cli-win-x64 `
             --collect-data defect_check `
             --collect-data sanityops_cli `
-            --hidden-import pydantic `
-            --hidden-import pydantic_settings `
-            --hidden-import config `
-            --hidden-import agents `
-            --hidden-import agents.factory `
-            --hidden-import agents.parent `
-            --hidden-import agents.sub `
-            --hidden-import core `
-            --hidden-import core.agent `
-            --hidden-import core.context `
-            --hidden-import core.message `
-            --hidden-import hooks `
-            --hidden-import hooks.base `
-            --hidden-import hooks.builtin `
-            --hidden-import llm `
-            --hidden-import llm.base `
-            --hidden-import llm.exceptions `
-            --hidden-import llm.factory `
-            --hidden-import llm.adapters `
-            --hidden-import llm.adapters.base `
-            --hidden-import llm.adapters.anthropic_adapter `
-            --hidden-import llm.adapters.openai_adapter `
-            --hidden-import llm.providers `
-            --hidden-import llm.providers.anthropic `
-            --hidden-import llm.providers.openai `
-            --hidden-import managers `
-            --hidden-import managers.history `
-            --hidden-import managers.skill `
-            --hidden-import managers.state `
-            --hidden-import managers.todo `
-            --hidden-import tools `
-            --hidden-import tools.base `
-            --hidden-import tools.context `
-            --hidden-import tools.registry `
-            --hidden-import tools.builtins `
-            --hidden-import tools.builtins.bash `
-            --hidden-import tools.builtins.file_ops `
-            --hidden-import tools.builtins.glob `
-            --hidden-import tools.builtins.history `
-            --hidden-import tools.builtins.skill `
-            --hidden-import tools.builtins.task `
-            --hidden-import tools.builtins.todo `
-            --hidden-import sanityops_cli.help_panel `
             entry.py
 
-      - name: Upload binary to release
-        uses: actions/upload-artifact@v4
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: sanityops-cli-win-x64
-          path: dist/sanityops-cli-win-x64.exe
-          retention-days: 1
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: Release v${{ needs.prepare.outputs.version }}
+          files: |
+            dist/sanityops-cli-*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Combined package and release job - downloads artifacts, creates release package
-  package-and-release:
-    needs: [prepare, build-macos, build-linux, build-windows]
+  # Package job - downloads release assets and creates checksums
+  package:
+    needs: [prepare, build-all]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Download release assets
+        uses: robinraju/release-downloader@v1.8
         with:
-          path: release/binaries
-          pattern: sanityops-cli-*
-          merge-multiple: true
+          tag: v${{ needs.prepare.outputs.version }}
+          fileName: "sanityops-cli-*"
+          out-file-path: release/
 
       - name: Generate checksums
         run: |
-          cd release/binaries
-          sha256sum sanityops-cli-* > ../checksums.txt
-          cat ../checksums.txt
+          cd release
+          sha256sum sanityops-cli-* > checksums.txt
+          cat checksums.txt
 
       - name: Create release manifest
         run: |
@@ -311,22 +138,19 @@ jobs:
           cp scripts/install.sh release/
           cp scripts/install.ps1 release/
 
-      - name: Create GitHub Release
+      - name: Update GitHub Release with additional files
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           name: Release v${{ needs.prepare.outputs.version }}
           files: |
-            release/binaries/*
-            release/checksums.txt
-            release/release.json
-            release/install.sh
-            release/install.ps1
-          generate_release_notes: true
+            release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Deploy to server (depends on package-and-release)
+  # Deploy to server (downloads from GitHub Release)
   deploy:
-    needs: [prepare, package-and-release]
+    needs: [prepare, package]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
