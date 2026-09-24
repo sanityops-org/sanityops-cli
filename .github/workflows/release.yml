@@ -110,7 +110,8 @@ jobs:
             --hidden-import sanityops_cli.help_panel \
             entry.py
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary to release
+        uses: actions/upload-artifact@v4
         with:
           name: sanityops-cli-darwin-${{ matrix.arch }}
           path: dist/sanityops-cli-darwin-${{ matrix.arch }}
@@ -190,7 +191,8 @@ jobs:
             --hidden-import sanityops_cli.help_panel \
             entry.py
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary to release
+        uses: actions/upload-artifact@v4
         with:
           name: sanityops-cli-linux-${{ matrix.arch }}
           path: dist/sanityops-cli-linux-${{ matrix.arch }}
@@ -266,29 +268,33 @@ jobs:
             --hidden-import sanityops_cli.help_panel `
             entry.py
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload binary to release
+        uses: actions/upload-artifact@v4
         with:
           name: sanityops-cli-win-x64
           path: dist/sanityops-cli-win-x64.exe
           retention-days: 1
 
-  package:
+  # Combined package and release job - downloads artifacts, creates release package
+  package-and-release:
     needs: [prepare, build-macos, build-linux, build-windows]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/download-artifact@v4
         with:
-          path: release
+          path: release/binaries
           pattern: sanityops-cli-*
           merge-multiple: true
 
       - name: Generate checksums
         run: |
-          cd release
-          sha256sum sanityops-cli-* > checksums.txt
-          cat checksums.txt
+          cd release/binaries
+          sha256sum sanityops-cli-* > ../checksums.txt
+          cat ../checksums.txt
 
       - name: Create release manifest
         run: |
@@ -305,20 +311,32 @@ jobs:
           cp scripts/install.sh release/
           cp scripts/install.ps1 release/
 
-      - uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: release-${{ needs.prepare.outputs.version }}
-          path: release/
-          retention-days: 30
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: Release v${{ needs.prepare.outputs.version }}
+          files: |
+            release/binaries/*
+            release/checksums.txt
+            release/release.json
+            release/install.sh
+            release/install.ps1
+          generate_release_notes: true
 
+  # Deploy to server (depends on package-and-release)
   deploy:
-    needs: [prepare, package]
+    needs: [prepare, package-and-release]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - name: Download release assets
+        uses: robinraju/release-downloader@v1.8
         with:
-          name: release-${{ needs.prepare.outputs.version }}
-          path: release/
+          tag: v${{ needs.prepare.outputs.version }}
+          fileName: "*"
+          out-file-path: release/
 
       - name: Setup SSH
         run: |
@@ -347,21 +365,3 @@ jobs:
       - name: Cleanup
         if: always()
         run: rm -f ~/.ssh/id_rsa
-
-  github-release:
-    needs: [prepare, package]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-${{ needs.prepare.outputs.version }}
-          path: release/
-
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ needs.prepare.outputs.version }}
-          name: Release v${{ needs.prepare.outputs.version }}
-          files: release/*
-          generate_release_notes: true
