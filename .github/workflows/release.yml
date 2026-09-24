@@ -32,10 +32,30 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "::notice::Building version $VERSION"
 
-  # Single build job that handles all platforms sequentially (no artifacts needed)
-  build-all:
+  # Step 1: Create empty release first
+  create-release:
     needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.prepare.outputs.version }}
+          name: Release v${{ needs.prepare.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Step 2: Build all platforms and upload to existing release
+  build-all:
+    needs: [prepare, create-release]
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -91,26 +111,25 @@ jobs:
             --collect-data sanityops_cli `
             entry.py
 
-      - name: Upload to GitHub Release
+      - name: Upload binaries to existing GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
-          name: Release v${{ needs.prepare.outputs.version }}
           files: |
             dist/sanityops-cli-*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Package job - downloads release assets and creates checksums
+  # Step 3: Package - download all binaries, create checksums and manifest
   package:
-    needs: [prepare, build-all]
+    needs: [prepare, create-release, build-all]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download release assets
+      - name: Download all release assets
         uses: robinraju/release-downloader@v1.8
         with:
           tag: v${{ needs.prepare.outputs.version }}
@@ -138,24 +157,23 @@ jobs:
           cp scripts/install.sh release/
           cp scripts/install.ps1 release/
 
-      - name: Update GitHub Release with additional files
+      - name: Upload additional files to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
-          name: Release v${{ needs.prepare.outputs.version }}
           files: |
             release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Deploy to server (downloads from GitHub Release)
+  # Step 4: Deploy to server
   deploy:
     needs: [prepare, package]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download release assets
+      - name: Download all release assets
         uses: robinraju/release-downloader@v1.8
         with:
           tag: v${{ needs.prepare.outputs.version }}
