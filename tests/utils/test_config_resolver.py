@@ -232,7 +232,7 @@ class TestNestedKeyOperations:
 
 
 class TestConfigResolverPrecedence:
-    """Test precedence chain: project > global > env > default."""
+    """Test precedence chain: env > project > global > default."""
 
     def test_resolve_returns_default_when_nothing_set(self, monkeypatch, tmp_path: Path):
         """Should return default when no config or env set."""
@@ -258,8 +258,8 @@ class TestConfigResolverPrecedence:
         result = resolver.resolve()
         assert result == "https://env.example.com"
 
-    def test_resolve_global_overrides_env(self, monkeypatch, tmp_path: Path):
-        """Global config should override env and default."""
+    def test_resolve_env_overrides_global(self, monkeypatch, tmp_path: Path):
+        """Environment variable should override global config and default."""
         from sanityops_cli.utils.config_resolver import ConfigResolver
 
         monkeypatch.chdir(tmp_path)
@@ -275,16 +275,15 @@ class TestConfigResolverPrecedence:
 
         resolver = ConfigResolver("server.base_url", env_var="SANITYOPS_BASE_URL", default="https://default.com")
         result = resolver.resolve()
-        assert result == "https://global.example.com"
+        assert result == "https://env.example.com"
 
     def test_resolve_project_overrides_global(self, monkeypatch, tmp_path: Path):
-        """Project config should override global, env, default."""
+        """Project config should override global and default."""
         from sanityops_cli.utils.config_resolver import ConfigResolver
 
         monkeypatch.chdir(tmp_path)
         home_dir = tmp_path / "home"
         monkeypatch.setattr(Path, "home", lambda: home_dir)
-        monkeypatch.setenv("SANITYOPS_BASE_URL", "https://env.example.com")
 
         # Create global config
         global_config_dir = home_dir / ".sanityops"
@@ -302,8 +301,27 @@ class TestConfigResolverPrecedence:
         result = resolver.resolve()
         assert result == "https://project.example.com"
 
+    def test_resolve_env_overrides_project(self, monkeypatch, tmp_path: Path):
+        """Environment variable should override project config."""
+        from sanityops_cli.utils.config_resolver import ConfigResolver
+
+        monkeypatch.chdir(tmp_path)
+        home_dir = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home_dir)
+        monkeypatch.setenv("SANITYOPS_BASE_URL", "https://env.example.com")
+
+        # Create project config
+        project_config_dir = tmp_path / ".sanityops"
+        project_config_dir.mkdir(parents=True)
+        project_config = project_config_dir / "inspect_config.yaml"
+        project_config.write_text("server:\n  base_url: https://project.example.com\n")
+
+        resolver = ConfigResolver("server.base_url", env_var="SANITYOPS_BASE_URL", default="https://default.com")
+        result = resolver.resolve()
+        assert result == "https://env.example.com"
+
     def test_resolve_all_sources_returns_all_values(self, monkeypatch, tmp_path: Path):
-        """Should return values from project, global, env, and default sources."""
+        """Should return values from env, project, global, and default sources."""
         from sanityops_cli.utils.config_resolver import ConfigResolver
 
         monkeypatch.chdir(tmp_path)

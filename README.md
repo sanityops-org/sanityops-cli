@@ -107,6 +107,90 @@ sanityops-cli inspect --skip-defect-check
 sanityops-cli inspect --config path/to/config.yaml
 ```
 
+### 4. Generate Repairs (Optional)
+
+After inspection, generate repaired artifacts from the report:
+
+```bash
+# Use the latest inspection report
+sanityops-cli inspect repair
+
+# Use a specific report
+sanityops-cli inspect repair --report .sanityops/results/inspect-20250115-120000.md
+
+# Specify timeout and token budget for large projects
+sanityops-cli inspect repair --timeout 3600 --token-budget 500000
+```
+
+Repairs are written to `.sanityops/repairs/repair-<timestamp>.md` without modifying source files.
+
+## Configuration
+
+### Config Command
+
+Manage server-side configuration (base URL, API key) using the `config` command:
+
+```bash
+# Read a config value
+sanityops-cli config server.base_url
+
+# Set a global config value
+sanityops-cli config server.base_url https://api.sanityops.org
+
+# Set a project-level config value
+sanityops-cli config server.base_url https://api.sanityops.org --local
+
+# Set API key (prompts for masked input if no value provided)
+sanityops-cli config server.api_key
+
+# List all config values
+sanityops-cli config --list
+
+# Remove a config key
+sanityops-cli config --unset server.base_url
+```
+
+### Configuration Precedence
+
+Values are resolved in this priority order (highest to lowest):
+
+1. **Environment Variable** — e.g., `SANITYOPS_BASE_URL`
+2. **Project-level** — `.sanityops/inspect_config.yaml`
+3. **Global** — `~/.sanityops/config`
+4. **Default** — built-in fallback
+
+This ordering ensures CI/CD pipelines can override any project config by injecting environment variables.
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `SANITYOPS_BASE_URL` | Override `server.base_url` |
+| `SANITYOPS_API_KEY` | Override `server.api_key` |
+| `LLM_PROVIDER` | LLM provider (e.g., `anthropic`, `openai`) |
+| `LLM_API_KEY` | LLM API key for defect checking |
+| `LLM_MODEL_ID` | LLM model ID (e.g., `claude-sonnet-4-20250514`) |
+| `LLM_BASE_URL` | Custom LLM base URL |
+
+## Advanced Configuration
+
+### Agent Settings
+
+You can tune the scanner agent behavior in `.sanityops/inspect_config.yaml`:
+
+```yaml
+agent:
+  max_loops: 60          # Maximum agent execution loops
+  token_budget: 200000   # Token budget for agent execution
+  timeout: 1800          # Timeout in seconds (default: 1800 = 30min)
+```
+
+CLI flags (`--timeout`, `--token-budget`) override these values when explicitly set.
+
+### Logging
+
+All CLI operations are logged to `~/.sanityops/logs/sanityops-cli-<YYYY-MM-DD>.log`. Logs include timestamps, log levels, and redacted API keys for security.
+
 ### Check Levels
 
 | Level | Description | Use Case |

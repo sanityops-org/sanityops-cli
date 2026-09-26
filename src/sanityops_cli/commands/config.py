@@ -17,7 +17,7 @@
 
 Config keys use dot notation, e.g. ``server.base_url``. They correspond to
 the sanityops SaaS backend (NOT the LLM model config, which lives under
-``model.*``). Precedence: project-level > global > env var > default.
+``model.*``). Precedence: environment variable > project-level > global > default.
 """
 
 from __future__ import annotations
@@ -110,8 +110,11 @@ def _get_config_usage_panel():
 
     usage_text = f"""\
 Configuration Priority:
-  Project-level (.sanityops/inspect_config.yaml) > Global (~/.sanityops/config)
-  > Environment Variables > Default
+  Environment Variable > Project-level (.sanityops/inspect_config.yaml)
+  > Global (~/.sanityops/config) > Default
+
+  This ordering ensures CI/CD pipelines can override project config by
+  injecting environment variables (e.g., SANITYOPS_BASE_URL).
 
 Available Keys:
   server.base_url  Sanityops SaaS backend URL (default: {DEFAULT_SERVER_BASE_URL})
