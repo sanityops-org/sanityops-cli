@@ -66,7 +66,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Review changes: git show"
 echo "  2. Create and push tag: git tag v$NEW_VERSION && git push origin v$NEW_VERSION"
-echo "  3. GitHub Actions will build and deploy automatically"
+echo "  3. GitHub Actions will build binaries, deploy, and publish to PyPI automatically"
 echo ""
 read -p "Create and push tag now? [y/N] " -n 1 -r
 echo
