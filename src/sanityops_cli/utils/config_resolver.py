@@ -13,7 +13,7 @@
 # limitations under the License.
 #
 
-"""Generic config resolver with precedence chain: project > global > env > default."""
+"""Generic config resolver with precedence chain: env > project > global > default."""
 
 from __future__ import annotations
 
@@ -214,7 +214,11 @@ def _unset_nested_value(data: dict[str, Any], key: str) -> bool:
 class ConfigResolver:
     """Generic config resolver with precedence chain.
 
-    Precedence: project-level > global > environment variable > default.
+    Precedence: environment variable > project-level > global > default.
+
+    This ordering ensures CI/CD pipelines can override project config by
+    injecting environment variables, while local development uses project-level
+    files as the primary source.
 
     Attributes:
         config_key: Dot-separated config key (e.g., "server.base_url").
@@ -238,25 +242,25 @@ class ConfigResolver:
         Returns:
             The resolved value, or None if not found and no default.
         """
-        # 1. Project-level config
-        project_config = _read_yaml_file(get_project_config_path())
-        value = _get_nested_value(project_config, self.config_key)
-        if value is not None:
-            return str(value) if not isinstance(value, str) else value
-
-        # 2. Global config
-        global_config = _read_yaml_file(get_global_config_path())
-        value = _get_nested_value(global_config, self.config_key)
-        if value is not None:
-            return str(value) if not isinstance(value, str) else value
-
-        # 3. Environment variable
+        # 1. Environment variable (highest priority for CI/CD overrides)
         if self.env_var:
             env_value = os.environ.get(self.env_var)
             if env_value is not None:
                 return env_value
 
-        # 4. Default
+        # 2. Project-level config
+        project_config = _read_yaml_file(get_project_config_path())
+        value = _get_nested_value(project_config, self.config_key)
+        if value is not None:
+            return str(value) if not isinstance(value, str) else value
+
+        # 3. Global config
+        global_config = _read_yaml_file(get_global_config_path())
+        value = _get_nested_value(global_config, self.config_key)
+        if value is not None:
+            return str(value) if not isinstance(value, str) else value
+
+        # 4. Default (lowest priority)
         return self.default
 
     def resolve_all_sources(self) -> dict[str, str | None]:
