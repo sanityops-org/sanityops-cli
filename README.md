@@ -143,7 +143,7 @@ What leaves your machine, and when:
 
 - **Local by default.** Artifact analysis and defect checking run on your machine and send artifact content only to the LLM provider you configure (`model:` section or `LLM_*` environment variables). Without a Sanityops server API key, nothing is uploaded to the Sanityops server.
 - **Auto-upload is keyed to the server API key.** If `server.api_key` (or `SANITYOPS_API_KEY`) is set, `inspect` uploads the scanned artifacts — System Prompts, Tool Schemas, Skills — to the Sanityops server after analysis, so they appear in the web dashboard. The first such run also creates the project on the server and binds `project.id`.
-- **The default server is a demo environment.** `server.base_url` defaults to `https://demo.sanityops.org`. If you enable auto-upload, point it at your own deployment first:
+- **Server destination.** `server.base_url` defaults to the Sanityops SaaS service (`https://demo.sanityops.org`). Only change it if you run a private deployment:
 
   ```bash
   sanityops-cli config server.base_url https://api.your-deployment.com
@@ -177,7 +177,7 @@ sanityops-cli config --list
 sanityops-cli config --unset server.base_url
 ```
 
-`server.base_url` defaults to `https://demo.sanityops.org`. Set it to your own deployment before configuring an API key if you plan to use the server upload feature.
+`server.base_url` defaults to the Sanityops SaaS service (`https://demo.sanityops.org`). Change it only if you use a private deployment.
 
 ### Configuration Precedence
 
