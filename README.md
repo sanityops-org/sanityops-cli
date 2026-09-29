@@ -8,8 +8,14 @@ A command-line tool for static defect inspection of AI logical artifacts (System
 
 - **Multi-level inspection depth** — Choose between L1 (fast), L2 (standard), or L3 (deep) check levels
 - **Multiple artifact types** — Inspect System Prompts, Skills, and Tool Schemas
-- **CI/CD ready** — Designed for automated pipeline integration
+- **CI/CD friendly** — Non-interactive runs, configuration via environment variables, dated markdown reports for pipeline artifacts
 - **Configurable rules** — Customize inspection behavior via YAML configuration
+
+## Prerequisites
+
+- **Python >= 3.11** — only needed when installing from PyPI or source; the curl/PowerShell installers ship a standalone binary with no Python requirement.
+- **An LLM API key** — artifact analysis and defect checking are LLM-powered. Use Anthropic, OpenAI, or any compatible provider, configured either in the `model:` section of the config file or via `LLM_*` environment variables (see [Environment Variables](#environment-variables)).
+- **Optional: a Sanityops server API key** — only if you want scanned artifacts uploaded to the Sanityops web dashboard. See [Data Handling](#data-handling) before enabling this.
 
 ## Installation
 
@@ -59,9 +65,9 @@ pip install -e .
 sanityops-cli init
 ```
 
-This creates `.sanityops/inspect_config.yaml` in your current directory with a
-freshly generated project UUID. The generated file matches the template below —
-edit the artifact paths to point at your prompts, tools, and skills.
+This creates `.sanityops/inspect_config.yaml` in your current directory from the built-in template. The `project.id` starts as a placeholder UUID (`00000000-0000-0000-0000-000000000000`); on the first `inspect` run with a server API key configured, the project is created on the Sanityops server and the real id/name are written back to this file. `init` also writes a `.gitignore` inside `.sanityops/` so the config file (which may hold API keys) and scan results never get committed.
+
+Edit the artifact paths to point at your prompts, tools, and skills.
 
 ### 2. Configure Artifacts
 
@@ -69,7 +75,10 @@ Edit `.sanityops/inspect_config.yaml` to specify your artifacts:
 
 ```yaml
 project:
-  id: <your-project-id>          # required: UUID
+  # id starts as a placeholder; on the first inspect run with a server API key,
+  # the project is created automatically and the real id/name are written back.
+  id: 00000000-0000-0000-0000-000000000000
+  name: ""
 
 # Optional: omit to use LLM_* environment variables
 # model:
@@ -107,6 +116,10 @@ sanityops-cli inspect --skip-defect-check
 sanityops-cli inspect --config path/to/config.yaml
 ```
 
+> **Data upload notice:** if a Sanityops server API key is configured (`server.api_key` or `SANITYOPS_API_KEY`), `inspect` automatically uploads the scanned artifacts to the Sanityops server after analysis. Without an API key, everything stays on your machine. See [Data Handling](#data-handling).
+
+`inspect` exits `0` when the run completes — including when defects are found — and non-zero on failure. CI pipelines should therefore gate on the generated report (`.sanityops/results/inspect-*.md`), not on the exit code.
+
 ### 4. Generate Repairs (Optional)
 
 After inspection, generate repaired artifacts from the report:
@@ -123,6 +136,20 @@ sanityops-cli inspect repair --timeout 3600 --token-budget 500000
 ```
 
 Repairs are written to `.sanityops/repairs/repair-<timestamp>.md` without modifying source files.
+
+## Data Handling
+
+What leaves your machine, and when:
+
+- **Local by default.** Artifact analysis and defect checking run on your machine and send artifact content only to the LLM provider you configure (`model:` section or `LLM_*` environment variables). Without a Sanityops server API key, nothing is uploaded to the Sanityops server.
+- **Auto-upload is keyed to the server API key.** If `server.api_key` (or `SANITYOPS_API_KEY`) is set, `inspect` uploads the scanned artifacts — System Prompts, Tool Schemas, Skills — to the Sanityops server after analysis, so they appear in the web dashboard. The first such run also creates the project on the server and binds `project.id`.
+- **The default server is a demo environment.** `server.base_url` defaults to `https://demo.sanityops.org`. If you enable auto-upload, point it at your own deployment first:
+
+  ```bash
+  sanityops-cli config server.base_url https://api.your-deployment.com
+  ```
+
+- **Secrets are protected locally.** API keys are masked in CLI output and redacted from logs, and the `.sanityops/` directory is excluded from git by the `.gitignore` that `init` writes.
 
 ## Configuration
 
@@ -150,6 +177,8 @@ sanityops-cli config --list
 sanityops-cli config --unset server.base_url
 ```
 
+`server.base_url` defaults to `https://demo.sanityops.org`. Set it to your own deployment before configuring an API key if you plan to use the server upload feature.
+
 ### Configuration Precedence
 
 Values are resolved in this priority order (highest to lowest):
@@ -165,8 +194,8 @@ This ordering ensures CI/CD pipelines can override any project config by injecti
 
 | Variable | Description |
 |----------|-------------|
-| `SANITYOPS_BASE_URL` | Override `server.base_url` |
-| `SANITYOPS_API_KEY` | Override `server.api_key` |
+| `SANITYOPS_BASE_URL` | Override `server.base_url` (default: `https://demo.sanityops.org`) |
+| `SANITYOPS_API_KEY` | Override `server.api_key`; when set, `inspect` auto-uploads artifacts to the server |
 | `LLM_PROVIDER` | LLM provider (e.g., `anthropic`, `openai`) |
 | `LLM_API_KEY` | LLM API key for defect checking |
 | `LLM_MODEL_ID` | LLM model ID (e.g., `claude-sonnet-4-20250514`) |
@@ -202,11 +231,6 @@ All CLI operations are logged to `~/.sanityops/logs/sanityops-cli-<YYYY-MM-DD>.l
 ## Documentation
 
 Full documentation is available at [sanityops.org](https://sanityops.org).
-
-## Requirements
-
-- Python >= 3.11
-- OpenAI API key (or compatible LLM provider) for defect checking
 
 ## Development
 
