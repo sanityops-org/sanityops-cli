@@ -13,12 +13,21 @@
 # limitations under the License.
 #
 
+import re
 from pathlib import Path
 
 import anyio
+import yaml
 from rich.console import Console
 
-from sanityops_cli.agents.scanner_agent.models.finding import FindingsResult
+from sanityops_cli.agents.scanner_agent.models.finding import (
+    Finding,
+    FindingsResult,
+    FindingType,
+    PromptContent,
+    Section,
+    SkillContent,
+)
 from sanityops_cli.agents.scanner_agent.prompts import (
     # New analyzer prompts
     ANALYZE_PARENT_PROMPT,
@@ -239,7 +248,94 @@ class ScannerAgent:
                 error_msg += f"\nError Detail:\n{error_detail_str}"
             raise ValidationError(f"Agent execution failed: {error_msg}")
 
-        return self._build_result("", result)
+        findings_result = self._build_result("", result)
+
+        # Deterministic artifact capture: LLM transcription of prompt and
+        # skill files is lossy (random truncation/frontmatter loss), so
+        # replace the LLM's findings for those artifacts with content read
+        # verbatim from disk.
+        prompt_findings: list[Finding] = []
+        for prompt_path in prompts:
+            try:
+                content = Path(prompt_path).read_text(encoding="utf-8")
+            except (FileNotFoundError, PermissionError, UnicodeDecodeError, IsADirectoryError) as e:
+                raise ValidationError(f"Failed to read prompt file {prompt_path}: {e}") from e
+            prompt_findings.append(
+                Finding(
+                    type=FindingType.PROMPT,
+                    relative=prompt_path,  # Absolute path (validated upstream)
+                    content=PromptContent(content=content),
+                )
+            )
+        findings_result.prompts = prompt_findings
+
+        skill_findings: list[Finding] = []
+        for skill_path in skills:
+            try:
+                raw = Path(skill_path).read_text(encoding="utf-8")
+            except (FileNotFoundError, PermissionError, UnicodeDecodeError, IsADirectoryError) as e:
+                raise ValidationError(f"Failed to read skill file {skill_path}: {e}") from e
+
+            # Parse frontmatter: handle both standard format and EOF edge case
+            # Standard: "---\n<yaml>\n---\n<body>"
+            # EOF case: "---\n<yaml>\n---" (no trailing newline)
+            frontmatter: dict = {}
+            body = raw
+            if raw.startswith("---"):
+                # Try standard pattern first, then EOF pattern
+                match = re.match(r"^---\s*\n(.*?)\n---\s*\n?", raw, re.DOTALL)
+                if match:
+                    yaml_content = match.group(1)
+                    try:
+                        parsed = yaml.safe_load(yaml_content)
+                        if isinstance(parsed, dict):
+                            frontmatter = parsed
+                    except yaml.YAMLError as e:
+                        # Log warning but continue with empty frontmatter
+                        if self.logger:
+                            self.logger.warning(f"YAML parse error in {skill_path}: {e}")
+                        frontmatter = {}
+                    body = raw[match.end():]
+
+            sections: list[Section] = []
+            current_title = "Overview"
+            current_lines: list[str] = []
+            for line in body.split("\n"):
+                if line.startswith("## "):
+                    if current_lines:
+                        sections.append(
+                            Section(
+                                title=current_title,
+                                content="\n".join(current_lines).strip(),
+                            )
+                        )
+                    current_title = line[3:].strip()
+                    current_lines = []
+                else:
+                    current_lines.append(line)
+            if current_lines:
+                sections.append(
+                    Section(
+                        title=current_title,
+                        content="\n".join(current_lines).strip(),
+                    )
+                )
+
+            skill_findings.append(
+                Finding(
+                    type=FindingType.SKILL,
+                    relative=skill_path,  # Absolute path (validated upstream)
+                    content=SkillContent(
+                        name=str(frontmatter.get("name", "")),
+                        description=str(frontmatter.get("description", "")),
+                        frontmatter=frontmatter,
+                        sections=sections,
+                    ),
+                )
+            )
+        findings_result.skills = skill_findings
+
+        return findings_result
 
     def analyze_files_sync(
         self,

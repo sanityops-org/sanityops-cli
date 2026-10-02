@@ -18,6 +18,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
@@ -41,22 +42,70 @@ class ToolSchema(BaseModel):
 
 class SkillContent(BaseModel):
     """Extracted content from a skill.md file."""
+
     name: str = Field(description="Skill name from frontmatter")
     description: str = Field(description="Skill description from frontmatter")
+    frontmatter: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Raw YAML frontmatter fields (preserved for QDS-0 gate)",
+    )
     sections: list[Section] = Field(default_factory=list, description="Parsed markdown sections")
 
-    def to_markdown(self) -> str:
-        """Reconstruct sections back to markdown string.
+    #: Frontmatter fields that must be positive integers (QDS-0.4). LLM-based
+    #: extraction can stringify numeric values, so coerce them back to int.
+    _POSITIVE_INT_FIELDS: tuple[str, ...] = (
+        "max_items", "max_chars", "timeout_seconds", "max_tool_calls", "max_retries",
+    )
 
-        Returns:
-            Markdown string with all sections joined by double newlines.
+    @model_validator(mode="after")
+    def _normalize_frontmatter_types(self) -> "SkillContent":
+        # Create a normalized copy to avoid in-place mutation
+        normalized = dict(self.frontmatter)
+        for field_name in self._POSITIVE_INT_FIELDS:
+            value = normalized.get(field_name)
+            if isinstance(value, str) and value.strip().isdigit():
+                normalized[field_name] = int(value.strip())
+            elif isinstance(value, float) and not isinstance(value, bool):
+                # YAML may parse integers as floats (e.g., "5" -> 5.0)
+                normalized[field_name] = int(value)
+            elif isinstance(value, bool):
+                # bool is a subclass of int; reject explicit true/false for int fields
+                normalized.pop(field_name, None)
+            # int values are already correct, no conversion needed
+        boolean_fields = ("partial_result_allowed",)
+        for field_name in boolean_fields:
+            value = normalized.get(field_name)
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in ("true", "false"):
+                    normalized[field_name] = lowered == "true"
+        self.frontmatter = normalized
+        return self
+
+    def to_markdown(self) -> str:
+        """Reconstruct the full skill document: frontmatter plus sections.
+
+        The frontmatter is re-serialized ahead of the body so downstream
+        consumers (e.g. the QDS-0 gate) can re-parse the declared metadata.
         """
+        parts: list[str] = []
+        if self.frontmatter:
+            # yaml is imported at module level; safe_dump preserves frontmatter.
+            parts.append(
+                "---\n"
+                + yaml.safe_dump(self.frontmatter, sort_keys=False, allow_unicode=True)
+                + "---\n"
+            )
         if not self.sections:
-            return ""
-        return "\n\n".join(
-            f"## {section.title}\n\n{section.content}"
-            for section in self.sections
+            if not parts:
+                return ""
+        parts.append(
+            "\n\n".join(
+                f"## {section.title}\n\n{section.content}"
+                for section in self.sections
+            )
         )
+        return "\n".join(parts)
 
 
 class ToolContent(BaseModel):
