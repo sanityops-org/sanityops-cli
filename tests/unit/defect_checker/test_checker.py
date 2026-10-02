@@ -69,7 +69,8 @@ class TestConverters:
         assert out == [{
             "name": "search",
             "description": "Search files",
-            "parameters": {"type": "object"},
+            "inputSchema": {"type": "object"},
+            "parameters": {"type": "object"},  # Deprecated alias for inputSchema
         }]
 
     def test_convert_prompts(self, tmp_path):
