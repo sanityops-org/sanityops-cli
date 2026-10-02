@@ -263,7 +263,7 @@ class ScannerAgent:
             prompt_findings.append(
                 Finding(
                     type=FindingType.PROMPT,
-                    relative=prompt_path,  # Already validated as absolute path
+                    relative=prompt_path,  # Absolute path (validated upstream)
                     content=PromptContent(content=content),
                 )
             )
@@ -275,18 +275,27 @@ class ScannerAgent:
                 raw = Path(skill_path).read_text(encoding="utf-8")
             except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
                 raise ValidationError(f"Failed to read skill file {skill_path}: {e}") from e
-            match = re.match(r"^---\s*\n(.*?)\n---\s*\n", raw, re.DOTALL)
+
+            # Parse frontmatter: handle both standard format and EOF edge case
+            # Standard: "---\n<yaml>\n---\n<body>"
+            # EOF case: "---\n<yaml>\n---" (no trailing newline)
             frontmatter: dict = {}
-            if match:
-                try:
-                    parsed = yaml.safe_load(match.group(1))
-                    if isinstance(parsed, dict):
-                        frontmatter = parsed
-                except yaml.YAMLError:
-                    frontmatter = {}
-                body = raw[match.end():]
-            else:
-                body = raw
+            body = raw
+            if raw.startswith("---"):
+                # Try standard pattern first, then EOF pattern
+                match = re.match(r"^---\s*\n(.*?)\n---\s*\n?", raw, re.DOTALL)
+                if match:
+                    yaml_content = match.group(1)
+                    try:
+                        parsed = yaml.safe_load(yaml_content)
+                        if isinstance(parsed, dict):
+                            frontmatter = parsed
+                    except yaml.YAMLError as e:
+                        # Log warning but continue with empty frontmatter
+                        if self.logger:
+                            self.logger.warning(f"YAML parse error in {skill_path}: {e}")
+                        frontmatter = {}
+                    body = raw[match.end():]
 
             sections: list[Section] = []
             current_title = "Overview"
@@ -315,7 +324,7 @@ class ScannerAgent:
             skill_findings.append(
                 Finding(
                     type=FindingType.SKILL,
-                    relative=skill_path,  # Already validated as absolute path
+                    relative=skill_path,  # Absolute path (validated upstream)
                     content=SkillContent(
                         name=str(frontmatter.get("name", "")),
                         description=str(frontmatter.get("description", "")),

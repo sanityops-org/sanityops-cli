@@ -53,7 +53,7 @@ class SkillContent(BaseModel):
 
     #: Frontmatter fields that must be positive integers (QDS-0.4). LLM-based
     #: extraction can stringify numeric values, so coerce them back to int.
-    _POSITIVE_INT_FIELDS = (
+    _POSITIVE_INT_FIELDS: tuple[str, ...] = (
         "max_items", "max_chars", "timeout_seconds", "max_tool_calls", "max_retries",
     )
 
