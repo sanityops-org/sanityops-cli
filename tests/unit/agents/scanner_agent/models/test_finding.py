@@ -68,6 +68,44 @@ class TestSkillContent:
         skill = SkillContent(name="test", description="desc")
         assert skill.sections == []
 
+    def test_skill_content_frontmatter_type_coercion(self):
+        """Test frontmatter type coercion for integer fields."""
+        # String to int conversion
+        skill = SkillContent(
+            name="test",
+            description="desc",
+            frontmatter={"max_items": "5", "timeout_seconds": "30"},
+        )
+        assert skill.frontmatter["max_items"] == 5
+        assert skill.frontmatter["timeout_seconds"] == 30
+
+    def test_skill_content_float_to_int_coercion(self):
+        """Test float to int conversion (YAML may parse ints as floats)."""
+        skill = SkillContent(
+            name="test",
+            description="desc",
+            frontmatter={"max_items": 5.0, "timeout_seconds": 30.0},
+        )
+        assert skill.frontmatter["max_items"] == 5
+        assert skill.frontmatter["timeout_seconds"] == 30
+        assert isinstance(skill.frontmatter["max_items"], int)
+
+    def test_skill_content_boolean_field_coercion(self):
+        """Test boolean field string-to-bool conversion."""
+        skill = SkillContent(
+            name="test",
+            description="desc",
+            frontmatter={"partial_result_allowed": "true"},
+        )
+        assert skill.frontmatter["partial_result_allowed"] is True
+
+        skill2 = SkillContent(
+            name="test",
+            description="desc",
+            frontmatter={"partial_result_allowed": "false"},
+        )
+        assert skill2.frontmatter["partial_result_allowed"] is False
+
 
 class TestToolContent:
     """Tests for ToolContent model."""

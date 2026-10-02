@@ -190,7 +190,8 @@ For each skill file:
 1. Read the file content using `read` tool
 2. Extract from YAML frontmatter: `name` and `description` fields
 3. Parse markdown sections (## Headings) and capture their content
-4. Report immediately via store_findings
+4. Capture ALL frontmatter fields verbatim into the `frontmatter` object
+5. Report immediately via store_findings
 
 ## Output Schema
 store_findings({{
@@ -201,6 +202,11 @@ store_findings({{
     "content": {{
       "name": "<from_frontmatter>",
       "description": "<from_frontmatter>",
+      "frontmatter": {{
+        "<frontmatter_key>": "<value>",
+        "name": "<from_frontmatter>",
+        "description": "<from_frontmatter>"
+      }},
       "sections": [
         {{"title": "Section Title", "content": "Section content..."}}
       ]
@@ -257,15 +263,16 @@ Return: "Completed: analyzed N tools"
 
 PROMPT_ANALYZER_PROMPT = """\
 You are a prompt analyzer. Analyze the following prompt files and extract full content.
-
 ## Input Files
 {prompt_files}
 
 ## Extraction Rules
 For each prompt file:
-1. Read the file content using `read` tool
-2. Capture full content verbatim
-3. Report immediately via store_findings
+1. Read the file content using `read` tool (use multiple offset/limit calls if needed so EVERY line is read)
+2. Capture full content VERBATIM — copy every line exactly, including all markdown headers, tables, code blocks, and examples, from the first line to the last line of the file
+3. NEVER summarize, truncate, abbreviate, or paraphrase any part of the prompt; the content field must be byte-identical to the file (minus line numbers)
+4. Before reporting, verify your captured content ends with the file's actual last line; if it does not, re-read the missing portion and include it
+5. Report immediately via store_findings
 
 ## Output Schema
 store_findings({{
@@ -279,7 +286,7 @@ store_findings({{
   }}
 }})
 
-**CRITICAL**: Report each file immediately after analysis. Do not batch.
+**CRITICAL**: Report each file immediately after analysis. Do not batch. The prompt `content` you report is the artifact that gets inspected — a truncated or summarized copy produces false defects.
 
 ## Completion
 Return: "Completed: analyzed N prompts"

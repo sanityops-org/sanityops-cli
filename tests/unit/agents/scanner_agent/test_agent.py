@@ -7,6 +7,7 @@ from rich.console import Console
 
 from sanityops_cli.agents.scanner_agent.agent import ScannerAgent
 from sanityops_cli.agents.scanner_agent.hooks.progress_hook import ProgressHook
+from sanityops_cli.agents.scanner_agent.models.finding import FindingType
 from sanityops_cli.logging.logger import Logger
 
 
@@ -103,4 +104,11 @@ class TestScannerAgent:
             prompts=[], tools=[], skills=[str(skill_file)]
         )
         assert _SpyProgressHook.constructed_loggers == [logger]
-        assert result.skills == []
+        # Deterministic capture: skill file is read from disk and populated
+        assert len(result.skills) == 1
+        assert result.skills[0].type == FindingType.SKILL
+        assert result.skills[0].relative == str(skill_file)
+        skill_content = result.skills[0].content
+        assert skill_content is not None
+        assert skill_content.name == "s"
+        assert skill_content.description == "d"
