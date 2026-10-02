@@ -260,9 +260,9 @@ class TestErrorHandling:
     @pytest.mark.anyio
     async def test_raises_on_missing_prompt_file(self, tmp_path):
         """Should raise ValidationError if prompt file doesn't exist."""
-        from sanityops_cli.exceptions.base_exceptions import ValidationError
-
         from rich.console import Console
+
+        from sanityops_cli.exceptions.base_exceptions import ValidationError
 
         agent = ScannerAgent(provider=object(), verbose=False, console=Console())
         with pytest.raises(ValidationError, match="path does not exist"):
@@ -273,9 +273,9 @@ class TestErrorHandling:
     @pytest.mark.anyio
     async def test_raises_on_missing_skill_file(self, tmp_path):
         """Should raise ValidationError if skill file doesn't exist."""
-        from sanityops_cli.exceptions.base_exceptions import ValidationError
-
         from rich.console import Console
+
+        from sanityops_cli.exceptions.base_exceptions import ValidationError
 
         agent = ScannerAgent(provider=object(), verbose=False, console=Console())
         with pytest.raises(ValidationError, match="path does not exist"):

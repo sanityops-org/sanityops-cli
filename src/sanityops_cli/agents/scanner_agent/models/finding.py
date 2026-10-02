@@ -59,20 +59,23 @@ class SkillContent(BaseModel):
 
     @model_validator(mode="after")
     def _normalize_frontmatter_types(self) -> "SkillContent":
+        # Create a normalized copy to avoid in-place mutation
+        normalized = dict(self.frontmatter)
         for field_name in self._POSITIVE_INT_FIELDS:
-            value = self.frontmatter.get(field_name)
+            value = normalized.get(field_name)
             if isinstance(value, str) and value.strip().isdigit():
-                self.frontmatter[field_name] = int(value.strip())
+                normalized[field_name] = int(value.strip())
             elif isinstance(value, bool):
                 # bool is a subclass of int; reject explicit true/false for int fields
-                self.frontmatter.pop(field_name, None)
+                normalized.pop(field_name, None)
         boolean_fields = ("partial_result_allowed",)
         for field_name in boolean_fields:
-            value = self.frontmatter.get(field_name)
+            value = normalized.get(field_name)
             if isinstance(value, str):
                 lowered = value.strip().lower()
                 if lowered in ("true", "false"):
-                    self.frontmatter[field_name] = lowered == "true"
+                    normalized[field_name] = lowered == "true"
+        self.frontmatter = normalized
         return self
 
     def to_markdown(self) -> str:
