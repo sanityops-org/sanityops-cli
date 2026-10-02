@@ -239,7 +239,91 @@ class ScannerAgent:
                 error_msg += f"\nError Detail:\n{error_detail_str}"
             raise ValidationError(f"Agent execution failed: {error_msg}")
 
-        return self._build_result("", result)
+        findings_result = self._build_result("", result)
+
+        # Deterministic artifact capture: LLM transcription of prompt and
+        # skill files is lossy (random truncation/frontmatter loss), so
+        # replace the LLM's findings for those artifacts with content read
+        # verbatim from disk.
+        from sanityops_cli.agents.scanner_agent.models.finding import (
+            Finding as _Finding,
+            FindingType as _FindingType,
+            PromptContent as _PromptContent,
+            SkillContent as _SkillContent,
+            Section as _Section,
+        )
+
+        prompt_findings: list[_Finding] = []
+        for prompt_path in prompts:
+            content = Path(prompt_path).read_text(encoding="utf-8")
+            prompt_findings.append(
+                _Finding(
+                    type=_FindingType.PROMPT,
+                    relative=str(Path(prompt_path).resolve()),
+                    content=_PromptContent(content=content),
+                )
+            )
+        findings_result.prompts = prompt_findings
+
+        import re as _re
+
+        import yaml as _yaml
+
+        skill_findings: list[_Finding] = []
+        for skill_path in skills:
+            raw = Path(skill_path).read_text(encoding="utf-8")
+            match = _re.match(r"^---\s*\n(.*?)\n---\s*\n", raw, _re.DOTALL)
+            frontmatter: dict = {}
+            if match:
+                try:
+                    parsed = _yaml.safe_load(match.group(1))
+                    if isinstance(parsed, dict):
+                        frontmatter = parsed
+                except Exception:
+                    frontmatter = {}
+                body = raw[match.end():]
+            else:
+                body = raw
+
+            sections: list[_Section] = []
+            current_title = "Overview"
+            current_lines: list[str] = []
+            for line in body.split("\n"):
+                if line.startswith("## "):
+                    if current_lines:
+                        sections.append(
+                            _Section(
+                                title=current_title,
+                                content="\n".join(current_lines).strip(),
+                            )
+                        )
+                    current_title = line[3:].strip()
+                    current_lines = []
+                else:
+                    current_lines.append(line)
+            if current_lines:
+                sections.append(
+                    _Section(
+                        title=current_title,
+                        content="\n".join(current_lines).strip(),
+                    )
+                )
+
+            skill_findings.append(
+                _Finding(
+                    type=_FindingType.SKILL,
+                    relative=str(Path(skill_path).resolve()),
+                    content=_SkillContent(
+                        name=str(frontmatter.get("name", "")),
+                        description=str(frontmatter.get("description", "")),
+                        frontmatter=frontmatter,
+                        sections=sections,
+                    ),
+                )
+            )
+        findings_result.skills = skill_findings
+
+        return findings_result
 
     def analyze_files_sync(
         self,

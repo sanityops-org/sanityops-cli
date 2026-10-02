@@ -41,22 +41,70 @@ class ToolSchema(BaseModel):
 
 class SkillContent(BaseModel):
     """Extracted content from a skill.md file."""
+
     name: str = Field(description="Skill name from frontmatter")
     description: str = Field(description="Skill description from frontmatter")
+    frontmatter: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Raw YAML frontmatter fields (preserved for QDS-0 gate)",
+    )
     sections: list[Section] = Field(default_factory=list, description="Parsed markdown sections")
 
-    def to_markdown(self) -> str:
-        """Reconstruct sections back to markdown string.
+    #: Frontmatter fields that must be positive integers (QDS-0.4). LLM-based
+    #: extraction can stringify numeric values, so coerce them back to int.
+    _POSITIVE_INT_FIELDS = (
+        "max_items", "max_chars", "timeout_seconds", "max_tool_calls", "max_retries",
+    )
 
-        Returns:
-            Markdown string with all sections joined by double newlines.
+    @model_validator(mode="after")
+    def _normalize_frontmatter_types(self) -> "SkillContent":
+        for field_name in self._POSITIVE_INT_FIELDS:
+            value = self.frontmatter.get(field_name)
+            if isinstance(value, str) and value.strip().isdigit():
+                self.frontmatter[field_name] = int(value.strip())
+            elif isinstance(value, bool):
+                # bool is a subclass of int; reject explicit true/false for int fields
+                self.frontmatter.pop(field_name, None)
+        boolean_fields = ("partial_result_allowed",)
+        for field_name in boolean_fields:
+            value = self.frontmatter.get(field_name)
+            if isinstance(value, str):
+                lowered = value.strip().lower()
+                if lowered in ("true", "false"):
+                    self.frontmatter[field_name] = lowered == "true"
+        return self
+
+    def to_markdown(self) -> str:
+        """Reconstruct the full skill document: frontmatter plus sections.
+
+        The frontmatter is re-serialized ahead of the body so downstream
+        consumers (e.g. the QDS-0 gate) can re-parse the declared metadata.
         """
+        parts: list[str] = []
+        if self.frontmatter:
+            try:
+                import yaml
+
+                parts.append(
+                    "---\n"
+                    + yaml.safe_dump(self.frontmatter, sort_keys=False, allow_unicode=True)
+                    + "---\n"
+                )
+            except Exception:
+                # Fall back to the two required fields if re-serialization fails.
+                parts.append(
+                    f"---\nname: {self.name}\ndescription: {self.description}\n---\n"
+                )
         if not self.sections:
-            return ""
-        return "\n\n".join(
-            f"## {section.title}\n\n{section.content}"
-            for section in self.sections
+            if not parts:
+                return ""
+        parts.append(
+            "\n\n".join(
+                f"## {section.title}\n\n{section.content}"
+                for section in self.sections
+            )
         )
+        return "\n".join(parts)
 
 
 class ToolContent(BaseModel):
