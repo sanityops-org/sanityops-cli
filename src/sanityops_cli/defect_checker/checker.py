@@ -70,11 +70,12 @@ class DefectChecker:
             content = finding.content
             if content is None or finding.type != FindingType.TOOL:
                 continue
-            result.append({
+            schema = {
                 "name": content.name,
                 "description": content.description,
-                "parameters": content.parameters,
-            })
+                "inputSchema": content.parameters,
+            }
+            result.append(schema)
         return result
 
     def _convert_prompts(self, prompts: list[Finding]) -> list[dict]:
