@@ -65,9 +65,13 @@ class SkillContent(BaseModel):
             value = normalized.get(field_name)
             if isinstance(value, str) and value.strip().isdigit():
                 normalized[field_name] = int(value.strip())
+            elif isinstance(value, float) and not isinstance(value, bool):
+                # YAML may parse integers as floats (e.g., "5" -> 5.0)
+                normalized[field_name] = int(value)
             elif isinstance(value, bool):
                 # bool is a subclass of int; reject explicit true/false for int fields
                 normalized.pop(field_name, None)
+            # int values are already correct, no conversion needed
         boolean_fields = ("partial_result_allowed",)
         for field_name in boolean_fields:
             value = normalized.get(field_name)

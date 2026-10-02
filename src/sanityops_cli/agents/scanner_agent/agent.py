@@ -258,7 +258,7 @@ class ScannerAgent:
         for prompt_path in prompts:
             try:
                 content = Path(prompt_path).read_text(encoding="utf-8")
-            except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
+            except (FileNotFoundError, PermissionError, UnicodeDecodeError, IsADirectoryError) as e:
                 raise ValidationError(f"Failed to read prompt file {prompt_path}: {e}") from e
             prompt_findings.append(
                 Finding(
@@ -273,7 +273,7 @@ class ScannerAgent:
         for skill_path in skills:
             try:
                 raw = Path(skill_path).read_text(encoding="utf-8")
-            except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
+            except (FileNotFoundError, PermissionError, UnicodeDecodeError, IsADirectoryError) as e:
                 raise ValidationError(f"Failed to read skill file {skill_path}: {e}") from e
 
             # Parse frontmatter: handle both standard format and EOF edge case
