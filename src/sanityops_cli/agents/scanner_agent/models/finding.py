@@ -18,6 +18,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
@@ -82,19 +83,12 @@ class SkillContent(BaseModel):
         """
         parts: list[str] = []
         if self.frontmatter:
-            try:
-                import yaml
-
-                parts.append(
-                    "---\n"
-                    + yaml.safe_dump(self.frontmatter, sort_keys=False, allow_unicode=True)
-                    + "---\n"
-                )
-            except Exception:
-                # Fall back to the two required fields if re-serialization fails.
-                parts.append(
-                    f"---\nname: {self.name}\ndescription: {self.description}\n---\n"
-                )
+            # yaml is imported at module level; safe_dump preserves frontmatter.
+            parts.append(
+                "---\n"
+                + yaml.safe_dump(self.frontmatter, sort_keys=False, allow_unicode=True)
+                + "---\n"
+            )
         if not self.sections:
             if not parts:
                 return ""
