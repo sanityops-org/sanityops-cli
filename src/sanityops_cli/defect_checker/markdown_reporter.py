@@ -91,7 +91,7 @@ def _format_permission_table(defects: list[dict]) -> list[str]:
         if not isinstance(details, dict):
             details = {}
 
-        defect_id = _esc_md_cell(defect.get("id"))
+        defect_id = _esc_md_cell(defect.get("id") or "defect")
         name = _esc_md_cell(defect.get("name"))
         severity = _esc_md_cell(defect.get("severity"))
         action = _esc_md_cell(details.get("action"))
