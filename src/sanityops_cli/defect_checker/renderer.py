@@ -41,6 +41,7 @@ _MODULE_TYPE_LABELS: dict[str, str] = {
     "QDS": "Skill",
     "QDT": "Tool",
     "QDP": "Prompt",
+    "QD-PM": "Permission",
 }
 
 
