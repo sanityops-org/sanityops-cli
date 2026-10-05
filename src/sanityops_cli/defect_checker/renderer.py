@@ -185,13 +185,13 @@ class DefectRenderer:
         """
         # Detect permission defects via module, category, or ID prefix
         category = defect.get("category", "")
-        defect_id = defect.get("id", "")
-        if module == "QD-PM" or category == "permission" or defect_id.startswith("QD-PM"):
+        raw_defect_id = defect.get("id", "")
+        if module == "QD-PM" or category == "permission" or raw_defect_id.startswith("QD-PM"):
             return self._format_permission_defect(defect)
 
         # Default formatting for other defect types
         severity = defect.get("severity", "NONE")
-        defect_id = defect.get("id") or "defect"
+        defect_id = raw_defect_id or "defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
         if defect.get("location"):
             lines.append(f"  [dim]Location[/] : {defect['location']}")
@@ -204,7 +204,7 @@ class DefectRenderer:
     def _format_permission_defect(self, defect: dict[str, Any]) -> str:
         """Format a QD-PM permission defect with permission-specific fields.
 
-        Shows: name, action, permission_side, duty_side from details dict.
+        Shows: name, description, action, permission_side, duty_side from details dict.
 
         Note: Missing fields are silently omitted (unlike markdown which uses em dash).
         This is intentional for terminal output compactness.
@@ -216,6 +216,10 @@ class DefectRenderer:
         # Name field (for consistency with markdown table)
         if defect.get("name"):
             lines.append(f"  [dim]Name[/]     : {defect['name']}")
+
+        # Description field (standard field)
+        if defect.get("description"):
+            lines.append(f"  [dim]Desc[/]     : {defect['description']}")
 
         # Standard fields
         if defect.get("location"):
