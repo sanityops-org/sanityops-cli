@@ -193,7 +193,7 @@ class DefectRenderer:
             return self._format_permission_defect(defect)
 
         # Default formatting for other defect types
-        severity = defect.get("severity", "NONE")
+        severity = defect.get("severity") or "NONE"
         defect_id = raw_defect_id or "defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
         if defect.get("location"):
@@ -212,7 +212,7 @@ class DefectRenderer:
         Note: Missing fields are silently omitted (unlike markdown which uses em dash).
         This is intentional for terminal output compactness.
         """
-        severity = defect.get("severity", "NONE")
+        severity = defect.get("severity") or "NONE"
         defect_id = defect.get("id") or "unknown-permission-defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
 

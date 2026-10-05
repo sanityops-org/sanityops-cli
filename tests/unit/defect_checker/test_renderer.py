@@ -469,7 +469,10 @@ class TestPermissionDefects:
         # Should not crash, should show standard fields
 
     def test_permission_defect_detected_by_id_prefix(self):
-        """Permission defect detected by QD-PM ID prefix even without category."""
+        """Permission defect detected by QD-PM ID prefix even with different module.
+
+        This tests the ID prefix fallback detection path.
+        """
         console = Console(record=True, width=100)
         defect = {
             "id": "QD-PM-4.1",  # ID starts with QD-PM
@@ -482,7 +485,7 @@ class TestPermissionDefects:
         result = _result(
             [
                 {
-                    "module": "QD-PM",
+                    "module": "QDS",  # Different module - tests ID prefix detection
                     "status": "completed",
                     "artifacts": [],
                     "defects": [defect],
@@ -491,8 +494,39 @@ class TestPermissionDefects:
         )
         DefectRenderer(console).render(result)
         out = console.export_text()
+        # Should use permission format due to ID prefix
         assert "Action" in out
         assert "read" in out
+
+    def test_permission_defect_detected_by_category(self):
+        """Permission defect detected by category='permission' with non-QD-PM module and ID.
+
+        This tests the category-based fallback detection path.
+        """
+        console = Console(record=True, width=100)
+        defect = {
+            "id": "MISC-1",  # Not QD-PM prefix
+            "name": "Permission issue",
+            "severity": "P1",
+            "category": "permission",  # Category triggers detection
+            "description": "desc",
+            "details": {"action": "write"},
+        }
+        result = _result(
+            [
+                {
+                    "module": "QDT",  # Different module - tests category detection
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [defect],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        # Should use permission format due to category
+        assert "Action" in out
+        assert "write" in out
 
     def test_permission_defect_shows_name_field(self):
         """Permission defects show name field for consistency with markdown."""
