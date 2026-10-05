@@ -187,8 +187,8 @@ class DefectRenderer:
         defect metadata is inconsistent. This is intentional design.
         """
         # Detect permission defects via module, category, or ID prefix
-        category = defect.get("category", "")
-        raw_defect_id = defect.get("id", "")
+        category = defect.get("category") or ""
+        raw_defect_id = defect.get("id") or ""
         if module == "QD-PM" or category == "permission" or raw_defect_id.startswith("QD-PM"):
             return self._format_permission_defect(defect)
 
