@@ -203,9 +203,12 @@ class DefectRenderer:
         """Format a QD-PM permission defect with permission-specific fields.
 
         Shows: name, action, permission_side, duty_side from details dict.
+
+        Note: Missing fields are silently omitted (unlike markdown which uses em dash).
+        This is intentional for terminal output compactness.
         """
         severity = defect.get("severity", "NONE")
-        defect_id = defect.get("id") or "defect"
+        defect_id = defect.get("id") or "unknown-permission-defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
 
         # Name field (for consistency with markdown table)
