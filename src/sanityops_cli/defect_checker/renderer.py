@@ -33,7 +33,7 @@ _MODULE_LABELS: dict[str, str] = {
     "QDT": "Tools",
     "QDP": "Prompts",
     "CROSS": "Cross",
-    "QD-PM": "Permission",
+    "QD-PM": "Permissions",
 }
 
 #: Map module names to singular type labels for panel titles.
@@ -149,20 +149,23 @@ class DefectRenderer:
 
     def _render_artifact_groups(self, results: list[dict[str, Any]]) -> None:
         for result in results:
+            module = result.get("module", "")
             title = resolve_artifact_title(result)
             if title is None:
                 continue
             defects = result.get("defects", [])
             if not defects:
                 continue
-            self._render_group(title, defects)
+            self._render_group(title, defects, module=module)
             self.console.print()
 
-    def _render_group(self, label: str, defects: list[dict[str, Any]]) -> None:
+    def _render_group(
+        self, label: str, defects: list[dict[str, Any]], *, module: str = ""
+    ) -> None:
         lines: list[str] = []
         shown = defects[:MAX_DEFECTS_PER_GROUP]
         for defect in shown:
-            lines.append(self._format_defect(defect))
+            lines.append(self._format_defect(defect, module=module))
 
         hidden = len(defects) - len(shown)
         if hidden > 0:
@@ -171,20 +174,19 @@ class DefectRenderer:
         body = "\n".join(lines)
         self.console.print(Panel(body, title=label, border_style="cyan"))
 
-    def _format_defect(self, defect: dict[str, Any]) -> str:
+    def _format_defect(self, defect: dict[str, Any], *, module: str = "") -> str:
         """Format a defect for terminal display.
 
         Dispatches to specialized formatter for permission defects.
 
-        Note: Detection is by defect content (category/ID prefix), which differs
-        from markdown_reporter's module-based detection. This is intentional:
-        terminal formatting is per-defect, while markdown uses module-level
-        table structure. Both produce consistent output for QD-PM defects.
+        Detection priority: module == "QD-PM" > category == "permission" > ID prefix.
+        This aligns with markdown_reporter's module-based routing while remaining
+        robust for edge cases where defect category/ID may not match module.
         """
-        # Detect permission defects via category or ID prefix
+        # Detect permission defects via module, category, or ID prefix
         category = defect.get("category", "")
         defect_id = defect.get("id", "")
-        if category == "permission" or defect_id.startswith("QD-PM"):
+        if module == "QD-PM" or category == "permission" or defect_id.startswith("QD-PM"):
             return self._format_permission_defect(defect)
 
         # Default formatting for other defect types
