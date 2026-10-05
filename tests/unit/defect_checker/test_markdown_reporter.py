@@ -362,7 +362,7 @@ class TestPermissionReport:
         )
         path = save_markdown_report(response, tmp_path)
         content = path.read_text(encoding="utf-8")
-        assert "## Permission (QD-PM)" in content
+        assert "## Permissions (QD-PM)" in content
         # Extended table header
         assert "| ID | Name | Severity | Action | Permission Side | Duty Side | Fix |" in content
         # Data row with permission fields
@@ -474,7 +474,7 @@ class TestPermissionReport:
         content = path.read_text(encoding="utf-8")
         # Both modules should appear
         assert "## Skills (QDS)" in content
-        assert "## Permission (QD-PM)" in content
+        assert "## Permissions (QD-PM)" in content
         # QDS should use standard table
         assert "| Description | Location | Impact |" in content
         # QD-PM should use extended table

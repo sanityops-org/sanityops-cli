@@ -222,9 +222,7 @@ def _build_report(
             continue
 
         # Use permission-specific table for QD-PM module.
-        # Note: Detection is by module, which differs from renderer's per-defect
-        # detection. This is intentional: markdown uses module-level table structure,
-        # while terminal formatting is per-defect. Both produce consistent output.
+        # Renderer also detects via module (primary), category, or ID prefix for consistency.
         if module == "QD-PM":
             lines.extend(_format_permission_table(defects))
             lines.append("")

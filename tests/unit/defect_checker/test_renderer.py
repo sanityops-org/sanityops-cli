@@ -343,7 +343,7 @@ class TestPermissionDefects:
         }
 
     def test_qdpm_module_rendered(self):
-        """QD-PM module is rendered with 'Permission' label."""
+        """QD-PM module is rendered with 'Permissions' label."""
         console = Console(record=True, width=100)
         result = _result(
             [
@@ -357,7 +357,7 @@ class TestPermissionDefects:
         )
         DefectRenderer(console).render(result)
         out = console.export_text()
-        assert "Permission" in out
+        assert "Permissions" in out
         assert "QD-PM-1.1" in out
 
     def test_permission_defect_shows_action_field(self):
@@ -511,3 +511,33 @@ class TestPermissionDefects:
         out = console.export_text()
         assert "Name" in out
         assert "Permission overflow" in out
+
+    def test_permission_format_used_when_module_is_qdpm(self):
+        """Permission format used when module is QD-PM, even with non-matching ID/category.
+
+        This tests the edge case where module == "QD-PM" but defect ID doesn't start
+        with QD-PM and category is empty - ensuring terminal and markdown stay consistent.
+        """
+        console = Console(record=True, width=100)
+        defect = {
+            "id": "OTHER-1",  # Not QD-PM prefix
+            "name": "Edge case defect",
+            "severity": "P1",
+            "category": "",  # Empty category
+            "details": {"action": "read"},
+        }
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",  # Module is QD-PM
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [defect],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        # Should still use permission format due to module == "QD-PM"
+        assert "Action" in out
+        assert "read" in out
