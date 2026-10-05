@@ -493,3 +493,21 @@ class TestPermissionDefects:
         out = console.export_text()
         assert "Action" in out
         assert "read" in out
+
+    def test_permission_defect_shows_name_field(self):
+        """Permission defects show name field for consistency with markdown."""
+        console = Console(record=True, width=100)
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [self._permission_defect(name="Permission overflow")],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Name" in out
+        assert "Permission overflow" in out

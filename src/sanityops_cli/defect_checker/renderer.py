@@ -175,6 +175,11 @@ class DefectRenderer:
         """Format a defect for terminal display.
 
         Dispatches to specialized formatter for permission defects.
+
+        Note: Detection is by defect content (category/ID prefix), which differs
+        from markdown_reporter's module-based detection. This is intentional:
+        terminal formatting is per-defect, while markdown uses module-level
+        table structure. Both produce consistent output for QD-PM defects.
         """
         # Detect permission defects via category or ID prefix
         category = defect.get("category", "")
@@ -197,11 +202,15 @@ class DefectRenderer:
     def _format_permission_defect(self, defect: dict[str, Any]) -> str:
         """Format a QD-PM permission defect with permission-specific fields.
 
-        Shows: action, permission_side, duty_side from details dict.
+        Shows: name, action, permission_side, duty_side from details dict.
         """
         severity = defect.get("severity", "NONE")
         defect_id = defect.get("id") or "defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
+
+        # Name field (for consistency with markdown table)
+        if defect.get("name"):
+            lines.append(f"  [dim]Name[/]     : {defect['name']}")
 
         # Standard fields
         if defect.get("location"):
