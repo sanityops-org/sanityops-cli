@@ -33,6 +33,7 @@ _MODULE_LABELS: dict[str, str] = {
     "QDT": "Tools",
     "QDP": "Prompts",
     "CROSS": "Cross",
+    "QD-PM": "Permission",
 }
 
 #: Map module names to singular type labels for panel titles.
@@ -170,6 +171,17 @@ class DefectRenderer:
         self.console.print(Panel(body, title=label, border_style="cyan"))
 
     def _format_defect(self, defect: dict[str, Any]) -> str:
+        """Format a defect for terminal display.
+
+        Dispatches to specialized formatter for permission defects.
+        """
+        # Detect permission defects via category or ID prefix
+        category = defect.get("category", "")
+        defect_id = defect.get("id", "")
+        if category == "permission" or defect_id.startswith("QD-PM"):
+            return self._format_permission_defect(defect)
+
+        # Default formatting for other defect types
         severity = defect.get("severity", "NONE")
         defect_id = defect.get("id") or "defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
@@ -179,6 +191,40 @@ class DefectRenderer:
             lines.append(f"  [dim]Impact[/]   : {defect['impact']}")
         if defect.get("fix_suggestion"):
             lines.append(f"  [dim]Fix[/]      : {defect['fix_suggestion']}")
+        return "\n".join(lines)
+
+    def _format_permission_defect(self, defect: dict[str, Any]) -> str:
+        """Format a QD-PM permission defect with permission-specific fields.
+
+        Shows: action, permission_side, duty_side from details dict.
+        """
+        severity = defect.get("severity", "NONE")
+        defect_id = defect.get("id") or "defect"
+        lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
+
+        # Standard fields
+        if defect.get("location"):
+            lines.append(f"  [dim]Location[/] : {defect['location']}")
+        if defect.get("impact"):
+            lines.append(f"  [dim]Impact[/]   : {defect['impact']}")
+
+        # Permission-specific fields from details dict
+        details = defect.get("details", {})
+        if isinstance(details, dict):
+            action = details.get("action")
+            if action:
+                lines.append(f"  [dim]Action[/]   : {action}")
+            permission_side = details.get("permission_side")
+            if permission_side:
+                lines.append(f"  [dim]Permission[/]: {permission_side}")
+            duty_side = details.get("duty_side")
+            if duty_side:
+                lines.append(f"  [dim]Duty[/]     : {duty_side}")
+
+        # Fix suggestion
+        if defect.get("fix_suggestion"):
+            lines.append(f"  [dim]Fix[/]      : {defect['fix_suggestion']}")
+
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
