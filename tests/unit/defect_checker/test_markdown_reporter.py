@@ -319,3 +319,229 @@ class TestCrossArtifactReport:
         assert content.count("## Cross (CROSS)") == 1
         assert "QD-PS-1" in content
         assert "QD-PT-1" in content
+
+
+class TestPermissionReport:
+    """Tests for QD-PM permission defect markdown reporting."""
+
+    def _permission_defect(
+        self,
+        defect_id="QD-PM-1.1",
+        severity="P0",
+        name="Permission overflow",
+        action="read",
+        permission_side="skill -> tool -> params",
+        duty_side="skill -> para.3",
+        fix="Narrow scope",
+    ):
+        """Create a permission defect dict for testing."""
+        return {
+            "id": defect_id,
+            "name": name,
+            "severity": severity,
+            "category": "permission",
+            "description": "Permission exceeds duty boundary",
+            "fix_suggestion": fix,
+            "details": {
+                "action": action,
+                "permission_side": permission_side,
+                "duty_side": duty_side,
+            },
+        }
+
+    def test_permission_module_uses_extended_table(self, tmp_path):
+        """QD-PM defects use extended table with permission columns."""
+        response = _response(
+            results=[
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "defects": [self._permission_defect()],
+                }
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        assert "## Permission (QD-PM)" in content
+        # Extended table header
+        assert "| ID | Name | Severity | Action | Permission Side | Duty Side | Fix |" in content
+        # Data row with permission fields
+        assert "QD-PM-1.1" in content
+        assert "read" in content
+        # Note: `->` is HTML-escaped to `-&gt;` by _esc_md_cell
+        assert "skill -&gt; tool -&gt; params" in content
+
+    def test_permission_defect_without_details(self, tmp_path):
+        """Permission defects without details field render with dashes."""
+        response = _response(
+            results=[
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "defects": [
+                        {
+                            "id": "QD-PM-2.1",
+                            "name": "Permission issue",
+                            "severity": "P1",
+                            "category": "permission",
+                            "fix_suggestion": "Fix it",
+                            # No details dict
+                        }
+                    ],
+                }
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        assert "QD-PM-2.1" in content
+        # Should still have extended table header
+        assert "| Action | Permission Side | Duty Side |" in content
+        # Missing fields should show dashes
+        assert "—" in content
+
+    def test_permission_defect_with_empty_details(self, tmp_path):
+        """Permission defects with empty details dict render gracefully."""
+        response = _response(
+            results=[
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "defects": [
+                        {
+                            "id": "QD-PM-3.1",
+                            "name": "Permission issue",
+                            "severity": "P1",
+                            "category": "permission",
+                            "fix_suggestion": "Fix it",
+                            "details": {},  # Empty dict
+                        }
+                    ],
+                }
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        assert "QD-PM-3.1" in content
+        # Missing fields should show dashes
+        assert "—" in content
+
+    def test_permission_table_multiple_defects(self, tmp_path):
+        """Permission table handles multiple defects correctly."""
+        response = _response(
+            results=[
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "defects": [
+                        self._permission_defect(
+                            defect_id="QD-PM-1.1",
+                            action="read",
+                            permission_side="skill -> tool -> params.read",
+                        ),
+                        self._permission_defect(
+                            defect_id="QD-PM-1.2",
+                            action="write",
+                            permission_side="skill -> tool -> params.write",
+                        ),
+                    ],
+                }
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        assert "QD-PM-1.1" in content
+        assert "QD-PM-1.2" in content
+        assert "read" in content
+        assert "write" in content
+
+    def test_permission_alongside_other_modules(self, tmp_path):
+        """Permission module coexists with other modules in report."""
+        response = _response(
+            results=[
+                {
+                    "module": "QDS",
+                    "status": "completed",
+                    "defects": [_defect(defect_id="QDS-1", severity="P1")],
+                },
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "defects": [self._permission_defect()],
+                },
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        # Both modules should appear
+        assert "## Skills (QDS)" in content
+        assert "## Permission (QD-PM)" in content
+        # QDS should use standard table
+        assert "| Description | Location | Impact |" in content
+        # QD-PM should use extended table
+        assert "| Action | Permission Side | Duty Side |" in content
+
+
+class TestFormatPermissionTable:
+    """Tests for _format_permission_table helper function."""
+
+    def test_formats_single_defect(self):
+        """Formats a single permission defect correctly."""
+        from sanityops_cli.defect_checker.markdown_reporter import _format_permission_table
+
+        defects = [
+            {
+                "id": "QD-PM-1.1",
+                "name": "Permission overflow",
+                "severity": "P0",
+                "fix_suggestion": "Narrow scope",
+                "details": {
+                    "action": "read",
+                    "permission_side": "skill -> tool -> params",
+                    "duty_side": "skill -> para.3",
+                },
+            }
+        ]
+        lines = _format_permission_table(defects)
+        assert len(lines) == 3  # Header + separator + 1 data row
+        assert "QD-PM-1.1" in lines[2]
+        assert "read" in lines[2]
+
+    def test_formats_multiple_defects(self):
+        """Formats multiple permission defects correctly."""
+        from sanityops_cli.defect_checker.markdown_reporter import _format_permission_table
+
+        defects = [
+            {
+                "id": "QD-PM-1.1",
+                "name": "First",
+                "severity": "P0",
+                "details": {"action": "read"},
+            },
+            {
+                "id": "QD-PM-1.2",
+                "name": "Second",
+                "severity": "P1",
+                "details": {"action": "write"},
+            },
+        ]
+        lines = _format_permission_table(defects)
+        assert len(lines) == 4  # Header + separator + 2 data rows
+        assert "read" in lines[2]
+        assert "write" in lines[3]
+
+    def test_handles_missing_details(self):
+        """Handles defects without details dict."""
+        from sanityops_cli.defect_checker.markdown_reporter import _format_permission_table
+
+        defects = [
+            {
+                "id": "QD-PM-1.1",
+                "name": "No details",
+                "severity": "P1",
+                "fix_suggestion": "Fix it",
+                # No details
+            }
+        ]
+        lines = _format_permission_table(defects)
+        assert len(lines) == 3
+        assert "—" in lines[2]  # Missing fields show dash

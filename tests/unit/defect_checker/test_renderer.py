@@ -308,3 +308,188 @@ class TestResolveArtifactTitle:
 
         result = {"artifacts": [{"id": "skill-1", "name": "morning-report"}]}
         assert resolve_artifact_title(result) is None
+
+
+class TestPermissionDefects:
+    """Tests for QD-PM permission defect rendering."""
+
+    def _permission_defect(
+        self,
+        defect_id="QD-PM-1.1",
+        severity="P0",
+        name="Permission overflow",
+        location="skill.md:15",
+        impact="Excessive read access",
+        fix="Narrow permission scope",
+        action="read",
+        permission_side="skill -> tool -> params",
+        duty_side="skill -> para.3 -> stmt.1",
+    ):
+        """Create a permission defect dict for testing."""
+        return {
+            "id": defect_id,
+            "name": name,
+            "severity": severity,
+            "category": "permission",
+            "description": "Permission exceeds duty boundary",
+            "location": location,
+            "impact": impact,
+            "fix_suggestion": fix,
+            "details": {
+                "action": action,
+                "permission_side": permission_side,
+                "duty_side": duty_side,
+            },
+        }
+
+    def test_qdpm_module_rendered(self):
+        """QD-PM module is rendered with 'Permission' label."""
+        console = Console(record=True, width=100)
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [self._permission_defect()],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Permission" in out
+        assert "QD-PM-1.1" in out
+
+    def test_permission_defect_shows_action_field(self):
+        """Permission defects show action field in terminal."""
+        console = Console(record=True, width=100)
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [self._permission_defect(action="write")],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Action" in out
+        assert "write" in out
+
+    def test_permission_defect_shows_permission_side(self):
+        """Permission defects show permission_side field."""
+        console = Console(record=True, width=120)
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [self._permission_defect(permission_side="skill -> tool -> file")],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Permission" in out and "skill -> tool -> file" in out
+
+    def test_permission_defect_shows_duty_side(self):
+        """Permission defects show duty_side field."""
+        console = Console(record=True, width=120)
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [self._permission_defect(duty_side="skill -> para.5")],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Duty" in out and "skill -> para.5" in out
+
+    def test_permission_defect_without_details(self):
+        """Permission defects without details field still render."""
+        console = Console(record=True, width=100)
+        defect = {
+            "id": "QD-PM-2.1",
+            "name": "Permission issue",
+            "severity": "P1",
+            "category": "permission",
+            "description": "desc",
+            "location": "skill.md:20",
+            "impact": "impact",
+            "fix_suggestion": "fix",
+            # No details dict
+        }
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [defect],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "QD-PM-2.1" in out
+        assert "Location" in out
+
+    def test_permission_defect_with_empty_details(self):
+        """Permission defects with empty details dict render gracefully."""
+        console = Console(record=True, width=100)
+        defect = {
+            "id": "QD-PM-3.1",
+            "name": "Permission issue",
+            "severity": "P1",
+            "category": "permission",
+            "description": "desc",
+            "location": "skill.md:30",
+            "details": {},  # Empty dict
+        }
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [defect],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "QD-PM-3.1" in out
+        # Should not crash, should show standard fields
+
+    def test_permission_defect_detected_by_id_prefix(self):
+        """Permission defect detected by QD-PM ID prefix even without category."""
+        console = Console(record=True, width=100)
+        defect = {
+            "id": "QD-PM-4.1",  # ID starts with QD-PM
+            "name": "Permission issue",
+            "severity": "P1",
+            "category": "",  # No category
+            "description": "desc",
+            "details": {"action": "read"},
+        }
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [defect],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Action" in out
+        assert "read" in out
