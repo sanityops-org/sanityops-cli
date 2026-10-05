@@ -180,8 +180,11 @@ class DefectRenderer:
         Dispatches to specialized formatter for permission defects.
 
         Detection priority: module == "QD-PM" > category == "permission" > ID prefix.
-        This aligns with markdown_reporter's module-based routing while remaining
-        robust for edge cases where defect category/ID may not match module.
+        This is more permissive than markdown_reporter's module-only detection.
+        Rationale: terminal output is per-defect and can adapt based on defect
+        content, while markdown uses module-level table structure. The primary
+        path (module == "QD-PM") is shared; fallbacks handle edge cases where
+        defect metadata is inconsistent. This is intentional design.
         """
         # Detect permission defects via module, category, or ID prefix
         category = defect.get("category", "")

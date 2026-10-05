@@ -364,7 +364,7 @@ class TestPermissionReport:
         content = path.read_text(encoding="utf-8")
         assert "## Permissions (QD-PM)" in content
         # Extended table header
-        assert "| ID | Name | Severity | Action | Permission Side | Duty Side | Fix |" in content
+        assert "| ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix |" in content
         # Data row with permission fields
         assert "QD-PM-1.1" in content
         assert "read" in content
