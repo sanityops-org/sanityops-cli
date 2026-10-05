@@ -528,6 +528,35 @@ class TestPermissionDefects:
         assert "Action" in out
         assert "write" in out
 
+    def test_permission_defect_with_none_id_no_crash(self):
+        """Renderer doesn't crash when defect id is None.
+
+        This tests the fix for potential AttributeError when id key exists
+        but value is None.
+        """
+        console = Console(record=True, width=100)
+        defect = {
+            "id": None,  # Explicitly None
+            "name": "Permission issue",
+            "severity": "P1",
+            "category": "permission",
+            "details": {"action": "read"},
+        }
+        result = _result(
+            [
+                {
+                    "module": "QD-PM",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [defect],
+                }
+            ]
+        )
+        # Should not raise AttributeError
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert "Action" in out
+
     def test_permission_defect_shows_name_field(self):
         """Permission defects show name field for consistency with markdown."""
         console = Console(record=True, width=100)
