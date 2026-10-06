@@ -77,6 +77,40 @@ def _aggregate_cross_defects(cross_results: list[dict]) -> list[dict]:
     return defects
 
 
+def _format_permission_table(defects: list[dict]) -> list[str]:
+    """Generate extended markdown table for QD-PM permission defects.
+
+    Columns: ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix
+
+    Note: Missing fields display as em dash (—) via _esc_md_cell(None).
+    This differs from terminal renderer which silently omits missing fields.
+    """
+    lines = []
+    lines.append("| ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix |")
+    lines.append("|---|---|---|---|---|---|---|---|")
+
+    for defect in defects:
+        details = defect.get("details", {})
+        if not isinstance(details, dict):
+            details = {}
+
+        defect_id = _esc_md_cell(defect.get("id") or "unknown-permission-defect")
+        name = _esc_md_cell(defect.get("name"))
+        severity = _esc_md_cell(defect.get("severity"))
+        description = _esc_md_cell(defect.get("description"))
+        action = _esc_md_cell(details.get("action"))
+        permission_side = _esc_md_cell(details.get("permission_side"))
+        duty_side = _esc_md_cell(details.get("duty_side"))
+        fix = _esc_md_cell(defect.get("fix_suggestion"))
+
+        lines.append(
+            f"| {defect_id} | {name} | {severity} | {description} | {action} | "
+            f"{permission_side} | {duty_side} | {fix} |"
+        )
+
+    return lines
+
+
 def _calculate_cross_score(
     defects: list[dict],
     check_level: str,
@@ -188,6 +222,14 @@ def _build_report(
             lines.append("")
             continue
 
+        # Use permission-specific table for QD-PM module.
+        # Renderer also detects via module (primary), category, or ID prefix for consistency.
+        if module == "QD-PM":
+            lines.extend(_format_permission_table(defects))
+            lines.append("")
+            continue
+
+        # Standard defect table for other modules
         lines.append("| ID | Name | Severity | Description | Location | Impact | Fix |")
         lines.append("|---|---|---|---|---|---|---|")
         for defect in defects:

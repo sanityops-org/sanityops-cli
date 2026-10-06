@@ -33,6 +33,7 @@ _MODULE_LABELS: dict[str, str] = {
     "QDT": "Tools",
     "QDP": "Prompts",
     "CROSS": "Cross",
+    "QD-PM": "Permissions",
 }
 
 #: Map module names to singular type labels for panel titles.
@@ -40,6 +41,7 @@ _MODULE_TYPE_LABELS: dict[str, str] = {
     "QDS": "Skill",
     "QDT": "Tool",
     "QDP": "Prompt",
+    "QD-PM": "Permission",
 }
 
 
@@ -147,20 +149,23 @@ class DefectRenderer:
 
     def _render_artifact_groups(self, results: list[dict[str, Any]]) -> None:
         for result in results:
+            module = result.get("module", "")
             title = resolve_artifact_title(result)
             if title is None:
                 continue
             defects = result.get("defects", [])
             if not defects:
                 continue
-            self._render_group(title, defects)
+            self._render_group(title, defects, module=module)
             self.console.print()
 
-    def _render_group(self, label: str, defects: list[dict[str, Any]]) -> None:
+    def _render_group(
+        self, label: str, defects: list[dict[str, Any]], *, module: str = ""
+    ) -> None:
         lines: list[str] = []
         shown = defects[:MAX_DEFECTS_PER_GROUP]
         for defect in shown:
-            lines.append(self._format_defect(defect))
+            lines.append(self._format_defect(defect, module=module))
 
         hidden = len(defects) - len(shown)
         if hidden > 0:
@@ -169,9 +174,27 @@ class DefectRenderer:
         body = "\n".join(lines)
         self.console.print(Panel(body, title=label, border_style="cyan"))
 
-    def _format_defect(self, defect: dict[str, Any]) -> str:
-        severity = defect.get("severity", "NONE")
-        defect_id = defect.get("id") or "defect"
+    def _format_defect(self, defect: dict[str, Any], *, module: str = "") -> str:
+        """Format a defect for terminal display.
+
+        Dispatches to specialized formatter for permission defects.
+
+        Detection priority: module == "QD-PM" > category == "permission" > ID prefix.
+        This is more permissive than markdown_reporter's module-only detection.
+        Rationale: terminal output is per-defect and can adapt based on defect
+        content, while markdown uses module-level table structure. The primary
+        path (module == "QD-PM") is shared; fallbacks handle edge cases where
+        defect metadata is inconsistent. This is intentional design.
+        """
+        # Detect permission defects via module, category, or ID prefix
+        category = defect.get("category") or ""
+        raw_defect_id = defect.get("id") or ""
+        if module == "QD-PM" or category == "permission" or raw_defect_id.startswith("QD-PM"):
+            return self._format_permission_defect(defect)
+
+        # Default formatting for other defect types
+        severity = defect.get("severity") or "NONE"
+        defect_id = raw_defect_id or "defect"
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
         if defect.get("location"):
             lines.append(f"  [dim]Location[/] : {defect['location']}")
@@ -179,6 +202,51 @@ class DefectRenderer:
             lines.append(f"  [dim]Impact[/]   : {defect['impact']}")
         if defect.get("fix_suggestion"):
             lines.append(f"  [dim]Fix[/]      : {defect['fix_suggestion']}")
+        return "\n".join(lines)
+
+    def _format_permission_defect(self, defect: dict[str, Any]) -> str:
+        """Format a QD-PM permission defect with permission-specific fields.
+
+        Shows: name, description, action, permission_side, duty_side from details dict.
+
+        Note: Missing fields are silently omitted (unlike markdown which uses em dash).
+        This is intentional for terminal output compactness.
+        """
+        severity = defect.get("severity") or "NONE"
+        defect_id = defect.get("id") or "unknown-permission-defect"
+        lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
+
+        # Name field (for consistency with markdown table)
+        if defect.get("name"):
+            lines.append(f"  [dim]Name[/]     : {defect['name']}")
+
+        # Description field (standard field)
+        if defect.get("description"):
+            lines.append(f"  [dim]Desc[/]     : {defect['description']}")
+
+        # Standard fields
+        if defect.get("location"):
+            lines.append(f"  [dim]Location[/] : {defect['location']}")
+        if defect.get("impact"):
+            lines.append(f"  [dim]Impact[/]   : {defect['impact']}")
+
+        # Permission-specific fields from details dict
+        details = defect.get("details", {})
+        if isinstance(details, dict):
+            action = details.get("action")
+            if action:
+                lines.append(f"  [dim]Action[/]   : {action}")
+            permission_side = details.get("permission_side")
+            if permission_side:
+                lines.append(f"  [dim]Permission[/]: {permission_side}")
+            duty_side = details.get("duty_side")
+            if duty_side:
+                lines.append(f"  [dim]Duty[/]     : {duty_side}")
+
+        # Fix suggestion
+        if defect.get("fix_suggestion"):
+            lines.append(f"  [dim]Fix[/]      : {defect['fix_suggestion']}")
+
         return "\n".join(lines)
 
     # ------------------------------------------------------------------
