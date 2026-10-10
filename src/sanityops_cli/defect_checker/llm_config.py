@@ -102,10 +102,13 @@ def resolve_llm_config(config_path: str | None = None) -> dict[str, str]:
     if config_values:
         return config_values
 
-    # Fall back to ProviderConfig (env vars)
+    # Fall back to ProviderConfig (env vars). PROVIDER is the field that reads
+    # the documented LLM_PROVIDER variable (env_prefix is "LLM_"); the
+    # LLM_PROVIDER *alias* field listens on LLM_LLM_PROVIDER, so reading it here
+    # left llm_provider None and made the SDK refuse every env-configured run.
     config = ProviderConfig()
     return {
-        "llm_provider": config.LLM_PROVIDER,
+        "llm_provider": config.PROVIDER,
         "llm_api_key": config.API_KEY,
         "llm_model_id": config.MODEL_ID,
         "llm_base_url": config.BASE_URL or "",
