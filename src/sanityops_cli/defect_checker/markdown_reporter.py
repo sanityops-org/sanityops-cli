@@ -21,9 +21,12 @@ import html
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sanityops_cli.defect_checker.renderer import _MODULE_LABELS
+
+if TYPE_CHECKING:
+    from sanityops_cli.code_contract_checker.models import QCInspectionResult
 
 _log = logging.getLogger(__name__)
 
@@ -69,11 +72,13 @@ def _aggregate_cross_defects(cross_results: list[dict]) -> list[dict]:
         for d in result.get("defects") or []:
             if not isinstance(d, dict):
                 continue
-            defects.append({
-                "defect_id": d.get("id"),
-                "defect_level": d.get("severity"),
-                "relation": d.get("category"),
-            })
+            defects.append(
+                {
+                    "defect_id": d.get("id"),
+                    "defect_level": d.get("severity"),
+                    "relation": d.get("category"),
+                }
+            )
     return defects
 
 
@@ -86,7 +91,9 @@ def _format_permission_table(defects: list[dict]) -> list[str]:
     This differs from terminal renderer which silently omits missing fields.
     """
     lines = []
-    lines.append("| ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix |")
+    lines.append(
+        "| ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix |"
+    )
     lines.append("|---|---|---|---|---|---|---|---|")
 
     for defect in defects:
@@ -129,6 +136,7 @@ def _calculate_cross_score(
         return None
     try:
         from defect_check.cross.scoring import CrossScoringCalculator
+
         scoring = CrossScoringCalculator().calculate_score(defects, check_level, mode=None)
     except Exception as e:
         # Intentional broad catch: SDK import, configuration, or calculation
@@ -141,12 +149,103 @@ def _calculate_cross_score(
     }
 
 
+def _build_qc_section(qc_result: QCInspectionResult) -> list[str]:
+    """Build the QC Lint section of the report.
+
+    Args:
+        qc_result: The QC inspection result.
+
+    Returns:
+        List of markdown lines for the QC section.
+    """
+    lines: list[str] = []
+
+    lines.append("## Code Contract Inspection (QC Lint)")
+    lines.append("")
+    lines.append(
+        "> Code Contract inspection runs BEFORE LLM-based defect check, "
+        "using pure AST parsing and pattern matching (no LLM required)."
+    )
+    lines.append("")
+
+    # QC Summary table
+    lines.append("| Metric | Value |")
+    lines.append("|---|---|")
+    lines.append(f"| Total artifacts | {qc_result.total_artifacts} |")
+    lines.append(f"| Total defects | {qc_result.total_defects} |")
+    lines.append(f"| P0 (blocking) | {qc_result.p0_count} |")
+    lines.append(f"| P1 (warning) | {qc_result.p1_count} |")
+    lines.append(f"| P2 (advisory) | {qc_result.p2_count} |")
+    qc_gate_style = "**FAIL**" if qc_result.gate_result == "FAIL" else "PASS"
+    lines.append(f"| QC Gate | {qc_gate_style} |")
+    lines.append(f"| Inspection time | {qc_result.inspection_time_seconds:.2f}s |")
+    lines.append("")
+
+    # Artifacts with defects
+    all_artifacts = [
+        ("Skills", qc_result.skills),
+        ("Tools", qc_result.tools),
+        ("Prompts", qc_result.prompts),
+    ]
+
+    for group_name, artifacts in all_artifacts:
+        artifacts_with_defects = [a for a in artifacts if a.defects]
+        if not artifacts_with_defects:
+            continue
+
+        lines.append(f"### {group_name}")
+        lines.append("")
+
+        for artifact in artifacts_with_defects:
+            lines.append(f"#### {artifact.artifact_name}")
+            lines.append("")
+            lines.append(f"- **Path**: `{artifact.artifact_path}`")
+            lines.append(f"- **Defects**: {artifact.total_defects}")
+            lines.append("")
+
+            lines.append("| Rule | Severity | Line | Description | Fix |")
+            lines.append("|---|---|---|---|---|")
+            for d in artifact.defects:
+                rule_id = d.rule_id.value if hasattr(d.rule_id, "value") else str(d.rule_id)
+                severity = d.severity.value if hasattr(d.severity, "value") else str(d.severity)
+                line = str(d.line_number) if d.line_number else "-"
+                desc = _esc_md_cell(d.description)
+                fix = _esc_md_cell(d.fix_suggestion)
+                lines.append(f"| {rule_id} | {severity} | {line} | {desc} | {fix} |")
+            lines.append("")
+
+    # Rule reference
+    lines.append("### QC Rule Reference")
+    lines.append("")
+    lines.append("| Rule ID | Name | Severity | Description |")
+    lines.append("|---|---|---|---|")
+
+    from sanityops_cli.code_contract_checker.models import RULE_DEFINITIONS, QCRuleID
+
+    for rule_id in QCRuleID:
+        if rule_id in RULE_DEFINITIONS:
+            info = RULE_DEFINITIONS[rule_id]
+            severity = (
+                info["severity"].value
+                if hasattr(info["severity"], "value")
+                else str(info["severity"])
+            )
+            lines.append(
+                f"| {rule_id.value} | {info['name']} | {severity} | {info['description']} |"
+            )
+
+    lines.append("")
+
+    return lines
+
+
 def _build_report(
     response: dict[str, Any],
     *,
     project_id: str | None,
     check_level: str,
     generated_at: datetime,
+    qc_result: QCInspectionResult | None = None,
 ) -> str:
     """Render the full markdown report body."""
     summary = response.get("summary", {})
@@ -169,6 +268,10 @@ def _build_report(
     if exec_time is not None:
         lines.append(f"- **Execution time**: {exec_time:.2f}s")
     lines.append("")
+
+    # QC Lint section (before LLM-based defect check)
+    if qc_result is not None:
+        lines.extend(_build_qc_section(qc_result))
 
     # Summary
     lines.append("## Summary")
@@ -195,12 +298,14 @@ def _build_report(
         mapped_defects = _aggregate_cross_defects(cross_results)
         cross_score = _calculate_cross_score(mapped_defects, check_level)
 
-        module_results.append({
-            "module": "CROSS",
-            "status": "completed",
-            "defects": cross_defects,
-            "score": cross_score,
-        })
+        module_results.append(
+            {
+                "module": "CROSS",
+                "status": "completed",
+                "defects": cross_defects,
+                "score": cross_score,
+            }
+        )
 
     # Per-module results
     for result in module_results:
@@ -266,6 +371,7 @@ def save_markdown_report(
     *,
     project_id: str | None = None,
     check_level: str = "L2",
+    qc_result: QCInspectionResult | None = None,
 ) -> Path:
     """Persist a full markdown report and return the written file path.
 
@@ -274,6 +380,7 @@ def save_markdown_report(
         output_dir: Directory where the report will be written.
         project_id: Optional project identifier to include in the report.
         check_level: Inspection level (L1/L2/L3) to include in the report.
+        qc_result: Optional QC inspection result to include in the report.
 
     Returns:
         Path to the written markdown file.
@@ -285,7 +392,13 @@ def save_markdown_report(
     filename = f"inspect-{generated_at.strftime('%Y%m%d-%H%M%S-%f')}.md"
     path = output_dir / filename
 
-    body = _build_report(response, project_id=project_id, check_level=check_level, generated_at=generated_at)
+    body = _build_report(
+        response,
+        project_id=project_id,
+        check_level=check_level,
+        generated_at=generated_at,
+        qc_result=qc_result,
+    )
     path.write_text(body, encoding="utf-8")
 
     return path
