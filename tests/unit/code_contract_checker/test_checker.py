@@ -81,6 +81,19 @@ class TestCodeContractChecker:
         result = CodeContractChecker().check_from_paths([str(prompt)], [], [])
         assert result.inspection_time_seconds >= 0
 
+    def test_binary_file_skipped(self, tmp_path: Path):
+        """A file that fails UTF-8 decoding is skipped without crashing."""
+        binary = tmp_path / "b.md"
+        binary.write_bytes(b"\x80\x81\x82\xff\xfe")
+        result = CodeContractChecker().check_from_paths([str(binary)], [], [])
+        assert result.prompts[0].total_defects == 0
+
+    def test_empty_file_no_defects(self, tmp_path: Path):
+        empty = tmp_path / "empty.md"
+        empty.write_text("", encoding="utf-8")
+        result = CodeContractChecker().check_from_paths([str(empty)], [], [])
+        assert result.prompts[0].total_defects == 0
+
 
 class TestSaveQcReport:
     def _qc_result(self) -> QCInspectionResult:
