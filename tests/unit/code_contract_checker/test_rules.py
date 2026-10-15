@@ -71,6 +71,17 @@ class TestQc02LanguageDeclaration:
         assert result.defects[0].severity == Severity.P1
         assert result.defects[0].line_number == 7
 
+    def test_empty_language_reports_p1(self):
+        result = _result()
+        check_qc_0_2_language_declaration("", result, "$.c", 7)
+        assert len(result.defects) == 1
+        assert result.defects[0].severity == Severity.P1
+
+    def test_whitespace_language_reports_p1(self):
+        result = _result()
+        check_qc_0_2_language_declaration("   ", result, "$.c", 7)
+        assert len(result.defects) == 1
+
     def test_declared_language_no_defects(self):
         result = _result()
         check_qc_0_2_language_declaration("python", result, "$.c", 7)
@@ -278,5 +289,12 @@ class TestQc33HardcodedDemoValue:
     def test_real_value_ok(self):
         result = _result()
         code = 'password = "correct-horse-battery-staple"\n'
+        check_qc_3_3_hardcoded_demo_value(code, "python", result, "$.c", 0)
+        assert result.defects == []
+
+    def test_comment_example_not_flagged(self):
+        """Documentation examples in comments should not be flagged."""
+        result = _result()
+        code = '# password = "password"\n'
         check_qc_3_3_hardcoded_demo_value(code, "python", result, "$.c", 0)
         assert result.defects == []

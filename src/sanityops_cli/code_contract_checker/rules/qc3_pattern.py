@@ -306,6 +306,11 @@ def check_qc_3_3_hardcoded_demo_value(
     lines = code.split("\n")
 
     for i, line in enumerate(lines):
+        # Skip comment-only lines to avoid flagging documentation examples
+        # like "# password = 'password'".
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
         for pattern, pattern_type in WEAK_CREDENTIAL_PATTERNS:
             match = pattern.search(line)
             if match:
