@@ -114,7 +114,7 @@ class CodeContractChecker:
         result.inspection_time_seconds = perf_counter() - start_time
         return result
 
-    def _read_artifact(self, path: str, artifact_result: QCArtifactResult) -> str | None:
+    def _read_artifact(self, path: str) -> str | None:
         """Read an artifact file, returning None on read failure."""
         try:
             return Path(path).read_text(encoding="utf-8")
@@ -139,7 +139,7 @@ class CodeContractChecker:
             checked_at=datetime.now().isoformat(),
         )
 
-        content = self._read_artifact(path, artifact_result)
+        content = self._read_artifact(path)
         if content is None:
             return artifact_result
 
@@ -176,7 +176,7 @@ class CodeContractChecker:
             checked_at=datetime.now().isoformat(),
         )
 
-        content = self._read_artifact(path, artifact_result)
+        content = self._read_artifact(path)
         if content is None:
             return artifact_result
 
@@ -331,7 +331,7 @@ class CodeContractChecker:
             checked_at=datetime.now().isoformat(),
         )
 
-        content = self._read_artifact(path, artifact_result)
+        content = self._read_artifact(path)
         if content is None:
             return artifact_result
 
