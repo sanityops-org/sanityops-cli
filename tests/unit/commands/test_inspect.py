@@ -58,6 +58,43 @@ def test_inspect_skips_defect_check_when_flag_set(monkeypatch, tmp_path):
     assert called["analyze"] is True
 
 
+def test_inspect_skip_defect_check_saves_qc_report(monkeypatch, tmp_path):
+    """--skip-defect-check still runs the QC lint and saves a standalone QC report."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Skill file with an embedded code block carrying a detectable QC defect
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text(
+        "---\nname: s\ndescription: d\n---\n# X\n\n"
+        "```python\nx = undefined_name\n```\n"
+    )
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    class FakeAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            return _findings()
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FakeAgent(),
+    )
+
+    result = runner.invoke(app, ["inspect", "--config", str(cfg), "--skip-defect-check"])
+    assert result.exit_code == 0
+
+    # The QC report goes to <config_dir>/results/, which is tmp_path here
+    # (the config file sits directly in tmp_path, not .sanityops/).
+    results_dir = tmp_path / "results"
+    qc_reports = sorted(results_dir.glob("qc-inspect-*.md"))
+    assert qc_reports, "QC report should be saved when defect check is skipped"
+    text = qc_reports[-1].read_text(encoding="utf-8")
+    assert "Code Contract Inspection Report" in text
+    assert "QC-1.1" in text
+
+
 def test_inspect_writes_dated_log_file(monkeypatch, tmp_path):
     """Inspect should create a dated log file under ~/.sanityops/logs."""
     monkeypatch.setenv("HOME", str(tmp_path))

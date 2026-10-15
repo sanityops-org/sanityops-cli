@@ -241,7 +241,9 @@ class CodeContractChecker:
             language: The declared language.
             artifact_result: The artifact result to add defects to.
             location: JSONPath-like location of the code.
-            line_offset: Line number offset for the code.
+            line_offset: Line offset added to each AST node's own line number
+                to produce the absolute line in the source. Pass 0 for whole
+                files; for embedded blocks pass the block's starting line.
         """
         for check in _QC_PYTHON_CHECKS:
             check(code, language, artifact_result, location, line_offset)
