@@ -49,6 +49,13 @@ def check_qc_1_1_undefined_name(
     - With statement context variables
     - Class attributes accessed via self/cls
 
+    Known limitation: definitions are collected into a single flat set
+    without nesting scopes, so a name defined inside one function is
+    treated as defined everywhere in the snippet (e.g. a variable set in
+    ``foo()`` will not be flagged when referenced in ``bar()``). This is
+    an intentional trade-off: false negatives are preferred over the
+    false positives a heuristic scope stack would produce on fragments.
+
     Args:
         code: The code snippet to check.
         language: The declared language.
@@ -99,12 +106,6 @@ def check_qc_1_1_undefined_name(
         # Class definitions
         elif isinstance(node, ast.ClassDef):
             defined_names.add(node.name)
-        # Top-level assignments (module-level variables)
-        elif isinstance(node, ast.Assign):
-            # Only track module-level assignments (those not inside functions)
-            # We need to check the parent, but ast.walk doesn't give us that
-            # So we'll use a different approach with a visitor
-            pass
 
     # Use a scope-aware visitor to collect all defined names
     class ScopeCollector(ast.NodeVisitor):
