@@ -40,6 +40,23 @@ class TestCodeContractChecker:
         result = CodeContractChecker().check_from_paths([str(prompt)], [], [])
         assert result.prompts[0].total_defects >= 1
 
+    def test_nested_heading_sections_are_separate(self, tmp_path: Path):
+        """H3 headings start their own section instead of folding into H2."""
+        skill = tmp_path / "SKILL.md"
+        skill.write_text(
+            "---\nname: s\ndescription: d\n---\n\n"
+            "## Parent\n\nintro\n\n"
+            "### Sub\n\n```python\nx = missing_a\n```\n\n"
+            "## Other\n\n```python\ny = missing_b\n```\n",
+            encoding="utf-8",
+        )
+        result = CodeContractChecker().check_from_paths([], [], [str(skill)])
+        # Both defects found; the H3 block is checked under its own section
+        assert result.skills[0].total_defects >= 2
+        locations = [d.location for d in result.skills[0].defects]
+        assert any("$.sections.Sub." in loc for loc in locations)
+        assert any("$.sections.Other." in loc for loc in locations)
+
     def test_clean_artifact_has_no_defects(self, tmp_path: Path):
         skill = tmp_path / "SKILL.md"
         skill.write_text(

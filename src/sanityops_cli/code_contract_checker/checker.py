@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -431,7 +432,11 @@ class CodeContractChecker:
         return frontmatter, body
 
     def _parse_markdown_sections(self, content: str) -> list[tuple[str, str]]:
-        """Parse markdown into sections by headings.
+        """Parse markdown into sections by headings of any level.
+
+        Every ATX heading (``#`` through ``######``) starts a new section so
+        code blocks under ``###``/``####`` headings are attributed to their
+        own section rather than their parent ``##`` block.
 
         Args:
             content: Markdown content.
@@ -439,16 +444,18 @@ class CodeContractChecker:
         Returns:
             List of (section_title, section_content) tuples.
         """
+        heading_re = re.compile(r"^(#{1,6})\s+(.*)$")
         sections: list[tuple[str, str]] = []
         current_title = ""
         current_content: list[str] = []
 
         for line in content.split("\n"):
-            if line.startswith("## "):
+            match = heading_re.match(line)
+            if match:
                 # Save previous section
                 if current_content:
                     sections.append((current_title, "\n".join(current_content)))
-                current_title = line[3:].strip()
+                current_title = match.group(2).strip()
                 current_content = []
             else:
                 current_content.append(line)
