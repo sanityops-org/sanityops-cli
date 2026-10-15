@@ -21,6 +21,7 @@ import platform
 import sys
 from datetime import datetime
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import anyio
@@ -198,7 +199,7 @@ def _report_program_error(
     avoid reporting the same failure twice.
     """
     if not step_summary_shown:
-        console.print(f"[red]✗ Error in step \"{escape(step_name)}\"[/]")
+        console.print(f'[red]✗ Error in step "{escape(step_name)}"[/]')
     console.print(f"  Message: {escape(str(error))}")
     console.print(f"\nSee log for details: {logger.get_log_path()}")
     console.print("To report this issue, attach the log file to:")
@@ -283,7 +284,8 @@ def inspect_repair(
     # annotation pattern. This is intentional and standard for Typer commands.
     report: Path | None = typer.Option(  # noqa: B008
         None,
-        "--report", "-r",
+        "--report",
+        "-r",
         help=(
             "Path to the inspection report (.md) to repair from. "
             "If omitted, uses the newest .sanityops/results/inspect-*.md."
@@ -291,7 +293,8 @@ def inspect_repair(
     ),
     config: str | None = typer.Option(
         None,
-        "--config", "-c",
+        "--config",
+        "-c",
         help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
@@ -435,9 +438,7 @@ def inspect_repair(
     except ValidationError as e:
         if _is_rate_limit_error(e):
             console.print("[red]✗ Repair failed: the LLM service is rate limited.[/red]")
-            console.print(
-                "  The server-side model quota is exhausted."
-            )
+            console.print("  The server-side model quota is exhausted.")
             console.print("  Wait a minute and re-run, or raise the backend quota.")
         else:
             console.print(f"[red]✗ Repair failed: {escape(str(e))}[/red]")
@@ -473,7 +474,8 @@ def inspect(
     ctx: typer.Context,
     config: str | None = typer.Option(
         None,
-        "--config", "-c",
+        "--config",
+        "-c",
         help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
@@ -499,6 +501,14 @@ def inspect(
         200000,
         "--token-budget",
         help="Token budget for agent execution (default: 200000). Increase for large projects.",
+    ),
+    skip_qc_lint: bool = typer.Option(
+        False,
+        "--skip-qc-lint",
+        help=(
+            "Skip the Code Contract lint check before LLM analysis. "
+            "Note: QC gate failures are advisory and do not block the inspection."
+        ),
     ),
 ):
     """Inspect and defect-check the configured artifacts."""
@@ -548,7 +558,40 @@ def inspect(
         f"{len(tool_files)} tools, {len(skill_files)} skills[/dim]\n"
     )
 
-    # Step 2: Run ScannerAgent analysis
+    # Step 2: Code Contract Lint (QC inspection) - No LLM required
+    # Run before ScannerAgent to catch syntax errors early
+    qc_result = None
+    if not skip_qc_lint:
+        from sanityops_cli.code_contract_checker.checker import CodeContractChecker
+        from sanityops_cli.code_contract_checker.renderer import QCRenderer
+
+        qc_checker = CodeContractChecker(verbose=verbose)
+        if verbose:
+            console.print("[bold]Code Contract Inspection (QC Lint)[/bold]")
+            console.print("  Checking: syntax, resources, code patterns")
+
+        qc_started = perf_counter()
+        qc_result = qc_checker.check_from_paths(
+            prompts=prompt_files,
+            tools=tool_files,
+            skills=skill_files,
+        )
+        qc_elapsed = perf_counter() - qc_started
+
+        # Render QC results
+        qc_renderer = QCRenderer(console)
+        qc_renderer.render(qc_result)
+
+        logger.info(
+            f"QC lint completed in {qc_elapsed:.2f}s: {qc_result.total_defects} defects "
+            f"(P0: {qc_result.p0_count}, P1: {qc_result.p1_count}, P2: {qc_result.p2_count}), "
+            f"gate {qc_result.gate_result}"
+        )
+    else:
+        logger.info("QC lint check skipped")
+        console.print("[dim]QC lint check skipped (--skip-qc-lint).[/dim]")
+
+    # Step 3: Run ScannerAgent analysis
     try:
         with tracker.step("Analyzing artifacts...") as step:
             # Resolve LLM config (config file model section or env vars)
@@ -572,7 +615,9 @@ def inspect(
             # CLI flag wins when it differs from default; otherwise config file wins
             effective_timeout = timeout if timeout != 1800 else agent_cfg.get("timeout", timeout)
             effective_budget = (
-                token_budget if token_budget != 200000 else max(agent_cfg.get("token_budget", 0), 200000)
+                token_budget
+                if token_budget != 200000
+                else max(agent_cfg.get("token_budget", 0), 200000)
             )
 
             if verbose:
@@ -614,6 +659,16 @@ def inspect(
     # Step 4: Run defect check and render (unless skipped)
     if skip_defect_check:
         console.print("[dim]Defect check skipped (--skip-defect-check).[/dim]")
+
+        # Save QC report before exiting
+        if qc_result is not None:
+            from sanityops_cli.code_contract_checker.markdown_reporter import save_qc_report
+
+            qc_report_dir = loader.config_path.parent / "results"
+            qc_report_path = save_qc_report(qc_result, qc_report_dir, project_id=project_id)
+            if qc_report_path:
+                console.print(f"[dim]QC report saved: {qc_report_path}[/dim]")
+
         tracker.summary()
         raise typer.Exit()
 
@@ -635,9 +690,11 @@ def inspect(
     try:
         report_dir = loader.config_path.parent / "results"
         report_path = save_markdown_report(
-            response, report_dir,
+            response,
+            report_dir,
             project_id=project_id,
             check_level=check_level,
+            qc_result=qc_result,
         )
     except OSError as e:
         console.print(f"[yellow]⚠ Could not save markdown report: {escape(str(e))}[/yellow]")

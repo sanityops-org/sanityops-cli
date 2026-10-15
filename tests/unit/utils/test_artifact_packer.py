@@ -106,7 +106,7 @@ class TestPackFromFindings:
         assert "<!-- BEGIN: prompt.md -->" in result["prompt_content"]
         assert "<!-- BEGIN: b.md -->" in result["prompt_content"]
 
-    def test_packs_tools_into_openai_format(self, tool_file) -> None:
+    def test_packs_tools_into_flat_format(self, tool_file) -> None:
         tools = [
             _make_tool_finding(
                 tool_file,
@@ -120,9 +120,11 @@ class TestPackFromFindings:
         assert result["tools_schema"] is not None
         parsed = json.loads(result["tools_schema"])
         assert isinstance(parsed, list)
-        assert parsed[0]["type"] == "function"
-        assert parsed[0]["function"]["name"] == "search"
-        assert parsed[0]["function"]["description"] == "Search the web"
+        assert parsed[0]["name"] == "search"
+        assert parsed[0]["description"] == "Search the web"
+        assert parsed[0]["parameters"] == {"type": "object", "properties": {}}
+        assert "type" not in parsed[0]
+        assert "function" not in parsed[0]
 
     def test_ignores_findings_with_no_content(self, prompt_file) -> None:
         prompts = [Finding(type=FindingType.PROMPT, relative=prompt_file)]  # content is None
@@ -172,3 +174,60 @@ class TestIgnoreNonMatchingContent:
         # The defensive isinstance check should skip it and return None
         result = _pack_tools_from_findings([finding])
         assert result is None
+
+
+class TestArtifactPackerOpenAIFlattening:
+    """Path-based tool packing normalizes OpenAI wrapper to flat format."""
+
+    def test_path_based_pack_normalizes_openai_wrapped_tools(self, tmp_path) -> None:
+        from sanityops_cli.utils.artifact_packer import ArtifactPacker
+
+        tool_file = tmp_path / "openai_tool.json"
+        tool_file.write_text(
+            json.dumps(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search",
+                        "description": "Search the web",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        packer = ArtifactPacker(prompts=[], tools=[str(tool_file)], skills=[])
+        result = packer.pack()
+
+        assert result["tools_schema"] is not None
+        parsed = json.loads(result["tools_schema"])
+        assert isinstance(parsed, list)
+        assert parsed[0]["name"] == "search"
+        assert parsed[0]["description"] == "Search the web"
+        assert parsed[0]["parameters"] == {"type": "object", "properties": {}}
+        assert "type" not in parsed[0]
+        assert "function" not in parsed[0]
+
+    def test_path_based_pack_keeps_flat_tools_unchanged(self, tmp_path) -> None:
+        from sanityops_cli.utils.artifact_packer import ArtifactPacker
+
+        tool_file = tmp_path / "flat_tool.json"
+        tool_file.write_text(
+            json.dumps(
+                {
+                    "name": "search",
+                    "description": "Search the web",
+                    "parameters": {"type": "object", "properties": {}},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        packer = ArtifactPacker(prompts=[], tools=[str(tool_file)], skills=[])
+        result = packer.pack()
+
+        parsed = json.loads(result["tools_schema"])
+        assert parsed[0]["name"] == "search"
+        assert parsed[0]["description"] == "Search the web"
+        assert "function" not in parsed[0]

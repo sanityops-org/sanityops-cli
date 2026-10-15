@@ -45,6 +45,44 @@ _MODULE_TYPE_LABELS: dict[str, str] = {
 }
 
 
+def _normalize_defect_location(location: Any) -> str:
+    """Normalize location to align $.inputSchema and $.parameters paths.
+
+    The tool conversion emits both ``inputSchema`` and ``parameters`` keys for
+    backward compatibility, so the SDK may report the same defect under either
+    path. Normalizing both to ``$.parameters`` lets the dedup helpers below
+    collapse those duplicates.
+    """
+    if location is None:
+        return ""
+    loc_str = str(location).strip()
+    if loc_str.startswith("$.inputSchema"):
+        return "$.parameters" + loc_str[len("$.inputSchema") :]
+    if loc_str.startswith("inputSchema"):
+        return "parameters" + loc_str[len("inputSchema") :]
+    return loc_str
+
+
+def _dedup_defects(defects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Deduplicate findings based on (id, normalized_location).
+
+    Non-dict entries are dropped so callers can rely on dicts downstream.
+    """
+    seen: set[tuple[str, str]] = set()
+    deduped: list[dict[str, Any]] = []
+    for defect in defects:
+        if not isinstance(defect, dict):
+            continue
+        defect_id = str(defect.get("id") or "")
+        loc = _normalize_defect_location(defect.get("location"))
+        key = (defect_id, loc)
+        if defect_id and key in seen:
+            continue
+        seen.add(key)
+        deduped.append(defect)
+    return deduped
+
+
 def _resolve_artifact_names(result: dict[str, Any]) -> str | None:
     """Resolve artifact names from defect's artifact_refs.
 
@@ -153,7 +191,7 @@ class DefectRenderer:
             title = resolve_artifact_title(result)
             if title is None:
                 continue
-            defects = result.get("defects", [])
+            defects = _dedup_defects(result.get("defects", []))
             if not defects:
                 continue
             self._render_group(title, defects, module=module)

@@ -321,6 +321,55 @@ class TestCrossArtifactReport:
         assert "QD-PT-1" in content
 
 
+class TestFailedModuleReport:
+    def test_failed_module_renders_error_callout(self, tmp_path):
+        """A failed module with error info shows a CAUTION callout, not 'No defects found'."""
+        response = _response(
+            results=[
+                {
+                    "module": "CROSS",
+                    "status": "failed",
+                    "defects": [],
+                    "error": {
+                        "code": "INSPECTION_FAILED",
+                        "message": "RateLimitError: 429 No deployments available",
+                    },
+                },
+                {
+                    "module": "QD-PM",
+                    "status": "failed",
+                    "defects": [],
+                    "error": {
+                        "code": "INSPECTION_FAILED",
+                        "message": "RateLimitError: 429 No deployments available",
+                    },
+                },
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        assert "## Cross (CROSS) — failed" in content
+        assert "## Permissions (QD-PM) — failed" in content
+        assert "[!CAUTION]" in content
+        assert "Cross inspection failed (INSPECTION_FAILED)" in content
+        assert "Permissions inspection failed (INSPECTION_FAILED)" in content
+        assert "RateLimitError: 429 No deployments available" in content
+        assert "No cross-artifact defects found." not in content
+        assert "No defects found." not in content
+
+    def test_failed_module_without_error_still_shows_no_defects(self, tmp_path):
+        """A failed module without error info falls back to 'No defects found'."""
+        response = _response(
+            results=[
+                {"module": "QDS", "status": "failed", "defects": []},
+            ]
+        )
+        path = save_markdown_report(response, tmp_path)
+        content = path.read_text(encoding="utf-8")
+        assert "## Skills (QDS) — failed" in content
+        assert "No defects found." in content
+
+
 class TestPermissionReport:
     """Tests for QD-PM permission defect markdown reporting."""
 
