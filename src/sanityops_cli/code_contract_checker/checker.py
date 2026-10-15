@@ -195,7 +195,7 @@ class CodeContractChecker:
         except (json.JSONDecodeError, yaml.YAMLError):
             # Not valid JSON/YAML - try to extract code blocks from raw content
             code_blocks = extract_code_blocks(content, artifact_result, location_prefix="$.content")
-            self._check_code_blocks(code_blocks, artifact_result)
+            self._check_code_blocks(code_blocks, artifact_result, location_prefix="$.content")
             return artifact_result
 
         # Check description field
@@ -204,7 +204,7 @@ class CodeContractChecker:
             code_blocks = extract_code_blocks(
                 description, artifact_result, location_prefix="$.description"
             )
-            self._check_code_blocks(code_blocks, artifact_result)
+            self._check_code_blocks(code_blocks, artifact_result, location_prefix="$.description")
 
         # Check parameter descriptions and examples
         parameters = data.get("parameters", {})
@@ -273,7 +273,9 @@ class CodeContractChecker:
                 code_blocks = extract_code_blocks(
                     description, artifact_result, location_prefix=f"{prop_location}.description"
                 )
-                self._check_code_blocks(code_blocks, artifact_result)
+                self._check_code_blocks(
+                    code_blocks, artifact_result, location_prefix=f"{prop_location}.description"
+                )
 
             # Check default value if it looks like code
             default = prop_def.get("default")
@@ -282,7 +284,9 @@ class CodeContractChecker:
                 code_blocks = extract_code_blocks(
                     default, artifact_result, location_prefix=f"{prop_location}.default"
                 )
-                self._check_code_blocks(code_blocks, artifact_result)
+                self._check_code_blocks(
+                    code_blocks, artifact_result, location_prefix=f"{prop_location}.default"
+                )
 
             # Check examples
             examples = prop_def.get("examples", [])
@@ -294,7 +298,11 @@ class CodeContractChecker:
                             artifact_result,
                             location_prefix=f"{prop_location}.examples[{idx}]",
                         )
-                        self._check_code_blocks(code_blocks, artifact_result)
+                        self._check_code_blocks(
+                            code_blocks,
+                            artifact_result,
+                            location_prefix=f"{prop_location}.examples[{idx}]",
+                        )
 
             # Check nested object properties
             if prop_def.get("type") == "object":
@@ -344,7 +352,9 @@ class CodeContractChecker:
             code_blocks = extract_code_blocks(
                 description, artifact_result, location_prefix="$.frontmatter.description"
             )
-            self._check_code_blocks(code_blocks, artifact_result)
+            self._check_code_blocks(
+                code_blocks, artifact_result, location_prefix="$.frontmatter.description"
+            )
 
         # Check markdown body sections
         sections = self._parse_markdown_sections(body)
@@ -355,7 +365,9 @@ class CodeContractChecker:
                 artifact_result,
                 location_prefix=f"$.sections.{safe_title}",
             )
-            self._check_code_blocks(code_blocks, artifact_result)
+            self._check_code_blocks(
+                code_blocks, artifact_result, location_prefix=f"$.sections.{safe_title}"
+            )
 
         return artifact_result
 
@@ -419,13 +431,15 @@ class CodeContractChecker:
         self,
         code_blocks: list[tuple[str, str, int]],
         artifact_result: QCArtifactResult,
+        location_prefix: str = "$",
     ) -> None:
         """Apply all QC checks to a list of code blocks.
 
         Args:
             code_blocks: List of (code, language, line_number) tuples.
             artifact_result: The artifact result to add defects to.
+            location_prefix: Prefix for defect locations.
         """
         for idx, (code, language, line_number) in enumerate(code_blocks):
-            location = f"$.code_blocks[{idx}]"
+            location = f"{location_prefix}.code_blocks[{idx}]"
             self._run_qc_checks(code, language, artifact_result, location, line_number)

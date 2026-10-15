@@ -262,14 +262,11 @@ def check_qc_1_1_undefined_name(
                 return
 
             # Skip common patterns that are context-dependent
-            # - Private names (start with _)
+            # - Private names (start with _), including __dunder__ names
             # - self, cls (used in methods)
-            # - __dunder__ names
             if name.startswith("_"):
                 return
             if name in ("self", "cls"):
-                return
-            if name.startswith("__") and name.endswith("__"):
                 return
 
             self.undefined.append((name, node.lineno))
