@@ -171,6 +171,20 @@ class ArtifactPacker:
             for tool_def in tools_list:
                 if not isinstance(tool_def, dict):
                     continue
+                # Normalize OpenAI function calling format to the flat,
+                # provider-neutral form. Both upload paths (push via paths and
+                # inspect via findings) must produce the same structure: the
+                # CLI does not know which provider the project will use, so the
+                # backend converts to the selected provider format when a model
+                # endpoint is actually configured.
+                if "name" not in tool_def and isinstance(tool_def.get("function"), dict):
+                    fn = tool_def["function"]
+                    if fn.get("name"):
+                        tool_def = {
+                            "name": fn.get("name"),
+                            "description": fn.get("description", ""),
+                            "parameters": fn.get("parameters", {}),
+                        }
                 name = tool_def.get("name")
                 if not name:
                     continue
@@ -306,17 +320,19 @@ def _pack_prompts_from_findings(prompts: list[Finding]) -> str | None:
 
 
 def _pack_tools_from_findings(tools: list[Finding]) -> str | None:
-    """Merge tool schemas from findings into OpenAI function calling format.
+    """Merge tool schemas from findings into the provider-neutral tool format.
 
-    Output format follows OpenAI function calling schema:
+    The CLI cannot know which model provider will be configured after the
+    project is uploaded. Keep the scanner's normalized tool contract here;
+    the backend converts it to the selected provider format only when a model
+    endpoint is actually used.
+
+    Output format:
     [
       {
-        "type": "function",
-        "function": {
-          "name": "...",
-          "description": "...",
-          "parameters": {...}
-        }
+        "name": "...",
+        "description": "...",
+        "parameters": {...}
       }
     ]
 
@@ -333,14 +349,13 @@ def _pack_tools_from_findings(tools: list[Finding]) -> str | None:
         if not isinstance(finding.content, ToolContent):
             continue
 
-        # Build OpenAI function calling format
+        # Keep the normalized, provider-neutral representation. Do not add
+        # an OpenAI ``type``/``function`` wrapper here because the CLI does
+        # not know which provider the project will use later.
         tool_def = {
-            "type": "function",
-            "function": {
-                "name": finding.content.name,
-                "description": finding.content.description,
-                "parameters": finding.content.parameters,
-            },
+            "name": finding.content.name,
+            "description": finding.content.description,
+            "parameters": finding.content.parameters,
         }
         all_tools.append(tool_def)
 
@@ -382,7 +397,8 @@ def _pack_skills_from_findings(skills: list[Finding]) -> tuple[str, bytes] | Non
                     zf.writestr(f"{skill_name}/SKILL.md", text_content)
                 except OSError as e:
                     warnings.warn(
-                        f"Could not read skill file for ZIP archive: {skill_path}: {e}", stacklevel=2
+                        f"Could not read skill file for ZIP archive: {skill_path}: {e}",
+                        stacklevel=2,
                     )
 
             elif skill_path.is_dir():
@@ -401,7 +417,8 @@ def _pack_skills_from_findings(skills: list[Finding]) -> tuple[str, bytes] | Non
                             zf.writestr(f"{skill_name}/{rel_path}", binary_content)
                         except OSError as e:
                             warnings.warn(
-                                f"Could not read file for ZIP archive: {file_path}: {e}", stacklevel=2
+                                f"Could not read file for ZIP archive: {file_path}: {e}",
+                                stacklevel=2,
                             )
 
     return ("skills.zip", buffer.getvalue())
