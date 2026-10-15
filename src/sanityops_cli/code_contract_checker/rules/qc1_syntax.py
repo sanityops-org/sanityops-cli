@@ -143,8 +143,11 @@ def check_qc_1_1_undefined_name(
             self.generic_visit(node)
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            # Same as FunctionDef
-            self.visit_FunctionDef(node)  # type: ignore
+            # Same as FunctionDef. The type ignore is safe: both node types
+            # expose the identical fields we read (name, args, body), so
+            # reusing the sync visitor is correct despite the nominal type
+            # difference between AsyncFunctionDef and FunctionDef.
+            self.visit_FunctionDef(node)  # type: ignore[arg-type]
 
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
             self.defined.add(node.name)

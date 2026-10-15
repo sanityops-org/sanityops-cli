@@ -124,6 +124,20 @@ class TestQc03StructuralCompleteness:
         check_qc_0_3_structural_completeness(code, "python", result, "$.c", 0)
         assert result.defects == []
 
+    def test_fstring_brackets_not_flagged(self):
+        """Curly braces inside an f-string must not be treated as scope."""
+        result = _result()
+        code = 'name = "x"\nmsg = f"{{ {name} }}"\n'
+        check_qc_0_3_structural_completeness(code, "python", result, "$.c", 0)
+        assert result.defects == []
+
+    def test_multiline_string_brackets_ignored(self):
+        """Brackets inside a triple-quoted string must be ignored."""
+        result = _result()
+        code = 'doc = """(\nunbalanced [ bracket\n"""\n'
+        check_qc_0_3_structural_completeness(code, "python", result, "$.c", 0)
+        assert result.defects == []
+
 
 class TestExtractCodeBlocks:
     def test_extracts_python_block(self):
