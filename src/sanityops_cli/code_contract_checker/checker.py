@@ -101,21 +101,24 @@ class CodeContractChecker:
             QCInspectionResult with all defects found.
         """
         start_time = perf_counter()
+        # Single timestamp for the whole run so all artifacts in one
+        # inspection share a consistent checked_at value.
+        checked_at = datetime.now().isoformat()
         result = QCInspectionResult()
 
         # Check prompts
         for path in prompts:
-            artifact_result = self._check_prompt(path)
+            artifact_result = self._check_prompt(path, checked_at)
             result.prompts.append(artifact_result)
 
         # Check tools
         for path in tools:
-            artifact_result = self._check_tool(path)
+            artifact_result = self._check_tool(path, checked_at)
             result.tools.append(artifact_result)
 
         # Check skills
         for path in skills:
-            artifact_result = self._check_skill(path)
+            artifact_result = self._check_skill(path, checked_at)
             result.skills.append(artifact_result)
 
         result.inspection_time_seconds = perf_counter() - start_time
@@ -134,11 +137,12 @@ class CodeContractChecker:
                 logger.warning("Could not read %s: %s", path, e)
             return None
 
-    def _check_prompt(self, path: str) -> QCArtifactResult:
+    def _check_prompt(self, path: str, checked_at: str) -> QCArtifactResult:
         """Check a prompt file for code contract violations.
 
         Args:
             path: Absolute path to the prompt file.
+            checked_at: ISO timestamp shared across the inspection run.
 
         Returns:
             QCArtifactResult with any defects found.
@@ -147,7 +151,7 @@ class CodeContractChecker:
             artifact_type="prompt",
             artifact_path=path,
             artifact_name=Path(path).name,
-            checked_at=datetime.now().isoformat(),
+            checked_at=checked_at,
         )
 
         content = self._read_artifact(path)
@@ -163,7 +167,7 @@ class CodeContractChecker:
 
         return artifact_result
 
-    def _check_tool(self, path: str) -> QCArtifactResult:
+    def _check_tool(self, path: str, checked_at: str) -> QCArtifactResult:
         """Check a tool schema file for code contract violations.
 
         Code snippets can appear in:
@@ -176,6 +180,7 @@ class CodeContractChecker:
 
         Args:
             path: Absolute path to the tool schema file.
+            checked_at: ISO timestamp shared across the inspection run.
 
         Returns:
             QCArtifactResult with any defects found.
@@ -184,7 +189,7 @@ class CodeContractChecker:
             artifact_type="tool",
             artifact_path=path,
             artifact_name=Path(path).stem,
-            checked_at=datetime.now().isoformat(),
+            checked_at=checked_at,
         )
 
         content = self._read_artifact(path)
@@ -345,7 +350,7 @@ class CodeContractChecker:
                     max_depth=max_depth,
                 )
 
-    def _check_skill(self, path: str) -> QCArtifactResult:
+    def _check_skill(self, path: str, checked_at: str) -> QCArtifactResult:
         """Check a skill file for code contract violations.
 
         Code snippets can appear in:
@@ -354,6 +359,7 @@ class CodeContractChecker:
 
         Args:
             path: Absolute path to the skill file.
+            checked_at: ISO timestamp shared across the inspection run.
 
         Returns:
             QCArtifactResult with any defects found.
@@ -362,7 +368,7 @@ class CodeContractChecker:
             artifact_type="skill",
             artifact_path=path,
             artifact_name=Path(path).stem,
-            checked_at=datetime.now().isoformat(),
+            checked_at=checked_at,
         )
 
         content = self._read_artifact(path)
