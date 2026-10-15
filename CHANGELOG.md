@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Code Contract (QC) lint check before LLM analysis: AST-based static inspection
+  of embedded code blocks and Python source files (syntax, undefined names,
+  resource leaks, code patterns) with `--skip-qc-lint` to opt out
+
+### Changed
+
+- **Breaking**: tool schema uploads now emit the provider-neutral flat format
+  `{name, description, parameters}` in both upload paths (push and inspect).
+  The OpenAI `{type, function}` wrapper is stripped during packing; the
+  backend converts to the selected provider format when a model endpoint is set.
+
+### Fixed
+
+- Failed module inspections now render a CAUTION callout instead of a
+  misleading "No defects found" in markdown reports
+- Duplicate defects reported under both `$.inputSchema` and `$.parameters`
+  are deduplicated in terminal and markdown output
+
 ## [0.0.8] - 2026-09-21
 
 ### Added
