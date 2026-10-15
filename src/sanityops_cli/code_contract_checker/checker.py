@@ -52,6 +52,9 @@ MAX_TOOL_SCHEMA_DEPTH = 10
 #: All QC checks applied to every Python code snippet, in order.
 #: Adding a new rule here automatically applies it to both embedded
 #: code blocks and whole Python source files.
+#: Note: QC-0.2 (language declaration) is intentionally absent here - it
+#: operates on the fence marker rather than the code body, so it is run
+#: inside extract_code_blocks during block discovery instead.
 _QC_PYTHON_CHECKS = (
     check_qc_0_1_syntax_parsability,
     check_qc_0_3_structural_completeness,
