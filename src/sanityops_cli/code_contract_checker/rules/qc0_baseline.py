@@ -375,7 +375,9 @@ def check_qc_0_3_structural_completeness(
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(code).readline))
     except (tokenize.TokenError, IndentationError, SyntaxError):
-        # Code already fails to tokenize - QC-0.1 will catch the syntax error.
+        # Silent skip is acceptable: a snippet that fails to tokenize is
+        # syntactically invalid, and QC-0.1 reports that as a P0 defect,
+        # so there is no useful bracket analysis left to do here.
         tokens = []
 
     for tok in tokens:

@@ -250,7 +250,16 @@ def _build_report(
     generated_at: datetime,
     qc_result: QCInspectionResult | None = None,
 ) -> str:
-    """Render the full markdown report body."""
+    """Render the full markdown report body.
+
+    Args:
+        response: Raw dict returned by defect_check.check().
+        project_id: Optional project identifier to include in the report.
+        check_level: Inspection level (L1/L2/L3) to include in the report.
+        generated_at: Timestamp used for the report header and filename.
+        qc_result: Optional QC inspection result rendered as a section
+            before the LLM-based defect check summary.
+    """
     summary = response.get("summary", {})
     results = response.get("results", [])
     errors = response.get("errors", [])
