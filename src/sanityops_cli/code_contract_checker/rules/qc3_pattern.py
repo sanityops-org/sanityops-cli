@@ -29,8 +29,8 @@ from .qc0_baseline import PYTHON_STDLIB
 
 # Weak credential patterns
 WEAK_CREDENTIAL_PATTERNS = [
-    (re.compile(r'password\s*=\s*["\'](\d{4,6})["\']'), "sequential digits"),
-    (re.compile(r'password\s*=\s*["\']123{2,}["\']'), "sequential digits"),
+    (re.compile(r'password\s*=\s*["\'](\d{4,6})["\']'), "short numeric password"),
+    (re.compile(r'password\s*=\s*["\']123{2,}["\']'), "repeated digits"),
     (re.compile(r'password\s*=\s*["\'](password|passwd|pwd)["\']', re.I), "common password"),
     (re.compile(r'api_key\s*=\s*["\']xxx["\']'), "placeholder value"),
     (re.compile(r'api_key\s*=\s*["\']your[_-]?api[_-]?key["\']', re.I), "placeholder value"),

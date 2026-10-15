@@ -320,14 +320,22 @@ class CodeContractChecker:
                 nested_props = prop_def.get("properties", {})
                 if isinstance(nested_props, dict):
                     self._check_tool_parameters(
-                        prop_def, artifact_result, prop_location, depth=depth + 1
+                        prop_def,
+                        artifact_result,
+                        prop_location,
+                        depth=depth + 1,
+                        max_depth=max_depth,
                     )
 
             # Check items for array types
             items = prop_def.get("items", {})
             if isinstance(items, dict) and items.get("type") == "object":
                 self._check_tool_parameters(
-                    items, artifact_result, f"{prop_location}.items", depth=depth + 1
+                    items,
+                    artifact_result,
+                    f"{prop_location}.items",
+                    depth=depth + 1,
+                    max_depth=max_depth,
                 )
 
     def _check_skill(self, path: str) -> QCArtifactResult:
