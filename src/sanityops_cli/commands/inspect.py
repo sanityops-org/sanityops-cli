@@ -505,7 +505,10 @@ def inspect(
     skip_qc_lint: bool = typer.Option(
         False,
         "--skip-qc-lint",
-        help="Skip the Code Contract lint check before LLM analysis.",
+        help=(
+            "Skip the Code Contract lint check before LLM analysis. "
+            "Note: QC gate failures are advisory and do not block the inspection."
+        ),
     ),
 ):
     """Inspect and defect-check the configured artifacts."""
