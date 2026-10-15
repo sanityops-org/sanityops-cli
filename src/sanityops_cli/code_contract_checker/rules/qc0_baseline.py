@@ -30,12 +30,15 @@ if TYPE_CHECKING:
 
 # Language identifier patterns for Markdown code blocks
 # Trailing newline is optional so code blocks at end of file are still matched.
+# [^\n]* accepts languages with non-word characters (c++, c#) and
+# full info strings ("python title"); only the first token is used as
+# the language identifier during normalization.
 # Known limitations (accepted for a lightweight scanner):
 # - Nested fences (``` inside ```) are not supported; the first closing
 #   fence ends the block.
 # - Tilde-delimited fences (~~~) are not matched.
 # - An opening fence with more than three backticks is not matched.
-CODE_BLOCK_PATTERN = re.compile(r"```(\w*)\s*\n(.*?)```(?:\n|$)", re.DOTALL)
+CODE_BLOCK_PATTERN = re.compile(r"```([^\n]*)\n(.*?)```(?:\n|$)", re.DOTALL)
 
 # Language aliases mapping
 LANGUAGE_ALIASES = {
@@ -459,7 +462,10 @@ def extract_code_blocks(
     blocks: list[tuple[str, str, int]] = []
 
     for match in CODE_BLOCK_PATTERN.finditer(content):
-        lang = match.group(1).strip() if match.group(1) else ""
+        # The info string may carry extra tokens (e.g. "python title=...").
+        # Only the first whitespace-separated token is the language.
+        info = match.group(1).strip() if match.group(1) else ""
+        lang = info.split()[0] if info else ""
         code = match.group(2)
 
         # Find the line number of the opening fence

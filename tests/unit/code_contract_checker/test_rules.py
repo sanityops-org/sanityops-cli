@@ -160,6 +160,20 @@ class TestExtractCodeBlocks:
         extract_code_blocks("```\nx = 1\n```", result, "$")
         assert "QC-0.2" in _rule_ids(result)
 
+    def test_language_with_non_word_chars(self):
+        """Languages like c++ / c# must be recognized."""
+        result = _result()
+        blocks = extract_code_blocks("```c++\nint x;\n```", result, "$")
+        assert len(blocks) == 1
+        assert blocks[0][1] == "c++"
+
+    def test_info_string_extra_tokens(self):
+        """Only the first token of the info string is the language."""
+        result = _result()
+        blocks = extract_code_blocks("```python title=example\nx = 1\n```", result, "$")
+        assert len(blocks) == 1
+        assert blocks[0][1] == "python"
+
 
 class TestQc11UndefinedName:
     def test_undefined_name_detected(self):
