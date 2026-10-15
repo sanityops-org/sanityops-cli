@@ -2,7 +2,12 @@
 
 from rich.console import Console
 
-from sanityops_cli.defect_checker.renderer import FULL_EXPERIENCE_URL, DefectRenderer
+from sanityops_cli.defect_checker.renderer import (
+    FULL_EXPERIENCE_URL,
+    DefectRenderer,
+    _dedup_defects,
+    _normalize_defect_location,
+)
 
 
 def _result(results, summary=None):
@@ -133,6 +138,65 @@ class TestRender:
         out = console.export_text()
         assert "c1" in out
         assert "Cross" in out
+
+
+class TestDedupDefects:
+    def test_normalize_input_schema_location(self):
+        """$.inputSchema paths normalize to $.parameters for dedup."""
+        assert (
+            _normalize_defect_location("$.inputSchema.properties.foo")
+            == "$.parameters.properties.foo"
+        )
+        assert (
+            _normalize_defect_location("inputSchema.properties.foo")
+            == "parameters.properties.foo"
+        )
+        assert _normalize_defect_location("$.parameters.properties.foo") == "$.parameters.properties.foo"
+        assert _normalize_defect_location(None) == ""
+
+    def test_dedup_collapses_same_id_and_location(self):
+        """Defects with same id + normalized location collapse to one."""
+        defects = [
+            {"id": "QD-T-1", "location": "$.inputSchema.properties.a"},
+            {"id": "QD-T-1", "location": "$.parameters.properties.a"},
+            {"id": "QD-T-2", "location": "$.parameters.properties.b"},
+        ]
+        deduped = _dedup_defects(defects)
+        assert len(deduped) == 2
+
+    def test_dedup_keeps_distinct_locations(self):
+        """Same id at different locations stays distinct."""
+        defects = [
+            {"id": "QD-T-1", "location": "$.parameters.properties.a"},
+            {"id": "QD-T-1", "location": "$.parameters.properties.b"},
+        ]
+        assert len(_dedup_defects(defects)) == 2
+
+    def test_dedup_skips_non_dict_entries(self):
+        """Non-dict entries are dropped by dedup."""
+        defects = [{"id": "QD-T-1", "location": "x"}, "garbage", 42]
+        deduped = _dedup_defects(defects)
+        assert len(deduped) == 1
+
+    def test_render_dedups_input_schema_duplicates(self):
+        """Duplicate defects across inputSchema/parameters render once."""
+        console = Console(record=True, width=80)
+        result = _result(
+            [
+                {
+                    "module": "QDT",
+                    "status": "completed",
+                    "artifacts": [],
+                    "defects": [
+                        _qds_defect("QD-T-1", "P1", location="$.inputSchema.properties.a"),
+                        _qds_defect("QD-T-1", "P1", location="$.parameters.properties.a"),
+                    ],
+                }
+            ]
+        )
+        DefectRenderer(console).render(result)
+        out = console.export_text()
+        assert out.count("QD-T-1") == 1
 
 
 class TestResolveArtifactNames:

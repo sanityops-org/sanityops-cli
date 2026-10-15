@@ -23,7 +23,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sanityops_cli.defect_checker.renderer import _MODULE_LABELS
+from sanityops_cli.defect_checker.renderer import (
+    _MODULE_LABELS,
+    _dedup_defects,
+)
 
 if TYPE_CHECKING:
     from sanityops_cli.code_contract_checker.models import QCInspectionResult
@@ -322,7 +325,7 @@ def _build_report(
         label = _MODULE_LABELS.get(module, module)
         result_status = result.get("status", "unknown")
         score = result.get("score")
-        defects = result.get("defects", [])
+        defects = _dedup_defects(result.get("defects", []))
         error = result.get("error")
 
         score_str = _format_score(score)

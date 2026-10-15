@@ -70,14 +70,21 @@ class DefectChecker:
             content = finding.content
             if content is None or finding.type != FindingType.TOOL:
                 continue
+            # Strip a legacy ``inputSchema`` key when the schema was authored
+            # with both aliases. Sending both inflates the payload and makes
+            # the SDK report the same defect twice under two locations.
+            params = content.parameters
+            if isinstance(params, dict) and "inputSchema" in params and "parameters" in params:
+                params = dict(params)
+                params.pop("inputSchema", None)
             # NOTE: inputSchema is the canonical key for the tool input schema.
             # We also include "parameters" as an alias for backward compatibility
             # with older consumers. This alias will be deprecated in a future release.
             schema = {
                 "name": content.name,
                 "description": content.description,
-                "inputSchema": content.parameters,
-                "parameters": content.parameters,  # Deprecated: use inputSchema
+                "inputSchema": params,
+                "parameters": params,  # Deprecated: use inputSchema
             }
             result.append(schema)
         return result
