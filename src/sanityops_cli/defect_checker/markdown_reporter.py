@@ -23,6 +23,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from sanityops_cli.code_contract_checker.models import (
+    RULE_DEFINITIONS,
+    QCRuleID,
+)
 from sanityops_cli.defect_checker.renderer import (
     _MODULE_LABELS,
     _dedup_defects,
@@ -222,8 +226,6 @@ def _build_qc_section(qc_result: QCInspectionResult) -> list[str]:
     lines.append("")
     lines.append("| Rule ID | Name | Severity | Description |")
     lines.append("|---|---|---|---|")
-
-    from sanityops_cli.code_contract_checker.models import RULE_DEFINITIONS, QCRuleID
 
     for rule_id in QCRuleID:
         if rule_id in RULE_DEFINITIONS:

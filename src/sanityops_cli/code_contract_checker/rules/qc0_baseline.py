@@ -17,7 +17,9 @@
 from __future__ import annotations
 
 import ast
+import io
 import re
+import tokenize
 from typing import TYPE_CHECKING
 
 from ..models import QCDefect, QCRuleID, Severity
@@ -367,9 +369,6 @@ def check_qc_0_3_structural_completeness(
     # Use Python's tokenize to skip string/comment tokens.
     brackets = {"(": ")", "[": "]", "{": "}"}
     stack: list[str] = []
-
-    import io
-    import tokenize
 
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(code).readline))
