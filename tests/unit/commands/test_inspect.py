@@ -95,6 +95,44 @@ def test_inspect_skip_defect_check_saves_qc_report(monkeypatch, tmp_path):
     assert "QC-1.1" in text
 
 
+def test_inspect_qc_gate_fail_does_not_block_flow(monkeypatch, tmp_path):
+    """A QC P0 defect fails the gate but does not abort the inspection flow."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Skill file with a Python block containing a syntax error -> QC-0.1 P0
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text(
+        "---\nname: s\ndescription: d\n---\n# X\n\n"
+        "```python\ndef broken(:\n```\n"
+    )
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    called = {"analyze": False}
+
+    class FakeAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            called["analyze"] = True
+            return _findings()
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FakeAgent(),
+    )
+
+    result = runner.invoke(app, ["inspect", "--config", str(cfg), "--skip-defect-check"])
+    assert result.exit_code == 0
+    # The QC gate FAIL is advisory: ScannerAgent analysis still runs
+    assert called["analyze"] is True
+    # The QC report reflects the failing gate
+    results_dir = tmp_path / "results"
+    qc_reports = sorted(results_dir.glob("qc-inspect-*.md"))
+    assert qc_reports
+    assert "FAIL" in qc_reports[-1].read_text(encoding="utf-8")
+
+
 def test_inspect_writes_dated_log_file(monkeypatch, tmp_path):
     """Inspect should create a dated log file under ~/.sanityops/logs."""
     monkeypatch.setenv("HOME", str(tmp_path))

@@ -203,8 +203,13 @@ class CodeContractChecker:
                 data = json.loads(content)
             else:
                 data = yaml.safe_load(content)
-        except (json.JSONDecodeError, yaml.YAMLError):
-            # Not valid JSON/YAML - try to extract code blocks from raw content
+        except (json.JSONDecodeError, yaml.YAMLError) as e:
+            # Not valid JSON/YAML - try to extract code blocks from raw content.
+            # Log at DEBUG so a fallback stays explainable without spamming
+            # normal output.
+            logger.debug(
+                "Could not parse %s as JSON/YAML, falling back to code blocks: %s", path, e
+            )
             code_blocks = extract_code_blocks(content, artifact_result, location_prefix="$.content")
             self._check_code_blocks(code_blocks, artifact_result, location_prefix="$.content")
             return artifact_result

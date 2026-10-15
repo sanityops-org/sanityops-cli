@@ -26,27 +26,31 @@ if TYPE_CHECKING:
 
 
 #: Call names that open files and should be closed or used as context manager.
-FILE_OPEN_CALLS = {"open", "io.open", "builtins.open", "pdfplumber.open"}
+FILE_OPEN_CALLS = frozenset({"open", "io.open", "builtins.open", "pdfplumber.open"})
 
 #: Call names that create network connections needing close/context manager.
-NETWORK_CONN_CALLS = {
-    "http.client.HTTPSConnection",
-    "http.client.HTTPConnection",
-    "socket.socket",
-    "urllib.request.urlopen",
-    "aiohttp.ClientSession",
-}
+NETWORK_CONN_CALLS = frozenset(
+    {
+        "http.client.HTTPSConnection",
+        "http.client.HTTPConnection",
+        "socket.socket",
+        "urllib.request.urlopen",
+        "aiohttp.ClientSession",
+    }
+)
 
 #: High-risk operation call names that should be wrapped in try/except.
-HIGH_RISK_CALLS = {
-    "open",
-    "requests.get",
-    "requests.post",
-    "urllib.request.urlopen",
-    "connect",
-    "cursor",
-    "execute",
-}
+HIGH_RISK_CALLS = frozenset(
+    {
+        "open",
+        "requests.get",
+        "requests.post",
+        "urllib.request.urlopen",
+        "connect",
+        "cursor",
+        "execute",
+    }
+)
 
 
 def _call_name(node: ast.Call) -> str | None:
@@ -304,7 +308,10 @@ def check_qc_2_3_missing_exception_handling(
         if hasattr(ast, "TryStar"):
 
             def visit_TryStar(self, node: ast.AST) -> None:
-                for stmt in node.body:
+                # Runtime-guaranteed ast.TryStar on 3.11+; the ast.AST
+                # annotation is a compatibility concession, hence the
+                # ignore below.
+                for stmt in node.body:  # type: ignore[union-attr]
                     for child in ast.walk(stmt):
                         lineno = getattr(child, "lineno", None)
                         if isinstance(lineno, int):
