@@ -296,9 +296,11 @@ def check_qc_2_3_missing_exception_handling(
             self.generic_visit(node)
 
         # Python 3.11+ adds ast.TryStar for `try*` / `except*` syntax.
-        # Use getattr to safely handle older Python versions where this node type
-        # does not exist. The method is only called by ast.NodeVisitor if the
-        # node type exists.
+        # The hasattr guard keeps this file importable on older interpreters,
+        # which is why the parameter is annotated as ast.AST: ast.TryStar
+        # cannot be referenced in annotations evaluated on Python < 3.11.
+        # The method only runs on 3.11+ where the argument is always a
+        # real ast.TryStar node.
         if hasattr(ast, "TryStar"):
 
             def visit_TryStar(self, node: ast.AST) -> None:
