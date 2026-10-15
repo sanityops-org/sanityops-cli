@@ -125,10 +125,9 @@ def check_qc_1_1_undefined_name(
                     # self.x = ... - don't add x, only check the base
                     pass
 
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            # Function name is defined
+        def _collect_function_signature(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+            """Record the function name and all parameter names as defined."""
             self.defined.add(node.name)
-            # Function parameters are defined within the function
             for arg in node.args.args:
                 self.defined.add(arg.arg)
             for arg in node.args.posonlyargs:
@@ -139,15 +138,17 @@ def check_qc_1_1_undefined_name(
                 self.defined.add(node.args.vararg.arg)
             if node.args.kwarg:
                 self.defined.add(node.args.kwarg.arg)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._collect_function_signature(node)
             # Visit function body
             self.generic_visit(node)
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            # Same as FunctionDef. The type ignore is safe: both node types
-            # expose the identical fields we read (name, args, body), so
-            # reusing the sync visitor is correct despite the nominal type
-            # difference between AsyncFunctionDef and FunctionDef.
-            self.visit_FunctionDef(node)  # type: ignore[arg-type]
+            # Same handling as the sync visitor; the union-typed helper
+            # makes the shared signature explicit.
+            self._collect_function_signature(node)
+            self.generic_visit(node)
 
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
             self.defined.add(node.name)

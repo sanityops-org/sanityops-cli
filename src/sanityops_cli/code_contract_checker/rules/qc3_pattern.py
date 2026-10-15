@@ -170,8 +170,8 @@ def check_qc_3_2_missing_import(
                         if isinstance(elt, ast.Name):
                             self.local_names.add(elt.id)
 
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            # Function parameters
+        def _collect_function_signature(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+            """Record all parameter names of the function as local names."""
             for arg in node.args.args:
                 self.local_names.add(arg.arg)
             for arg in node.args.posonlyargs:
@@ -182,10 +182,16 @@ def check_qc_3_2_missing_import(
                 self.local_names.add(node.args.vararg.arg)
             if node.args.kwarg:
                 self.local_names.add(node.args.kwarg.arg)
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._collect_function_signature(node)
             self.generic_visit(node)
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            self.visit_FunctionDef(node)  # type: ignore
+            # Same handling as the sync visitor; the union-typed helper
+            # makes the shared signature explicit.
+            self._collect_function_signature(node)
+            self.generic_visit(node)
 
         def visit_Assign(self, node: ast.Assign) -> None:
             self._collect_assignment_targets(node.targets)
