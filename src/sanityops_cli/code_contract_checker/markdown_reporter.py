@@ -21,6 +21,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from .models import RULE_DEFINITIONS, QCRuleID
+
 if TYPE_CHECKING:
     from .models import QCArtifactResult, QCInspectionResult
 
@@ -141,8 +143,6 @@ def _generate_markdown(
             "|---------|------|----------|-------------|",
         ]
     )
-
-    from .models import RULE_DEFINITIONS, QCRuleID
 
     for rule_id in QCRuleID:
         if rule_id in RULE_DEFINITIONS:
