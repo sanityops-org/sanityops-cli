@@ -241,7 +241,6 @@ PYTHON_STDLIB = frozenset(
         "warnings",
         "xml",
         "xmlrpc",
-        "yaml",
     }
 )
 
