@@ -295,13 +295,19 @@ def check_qc_2_3_missing_exception_handling(
                         try_lines.add(lineno)
             self.generic_visit(node)
 
-        def visit_TryStar(self, node: ast.TryStar) -> None:  # Python 3.11+
-            for stmt in node.body:
-                for child in ast.walk(stmt):
-                    lineno = getattr(child, "lineno", None)
-                    if isinstance(lineno, int):
-                        try_lines.add(lineno)
-            self.generic_visit(node)
+        # Python 3.11+ adds ast.TryStar for `try*` / `except*` syntax.
+        # Use getattr to safely handle older Python versions where this node type
+        # does not exist. The method is only called by ast.NodeVisitor if the
+        # node type exists.
+        if hasattr(ast, "TryStar"):
+
+            def visit_TryStar(self, node: ast.AST) -> None:
+                for stmt in node.body:
+                    for child in ast.walk(stmt):
+                        lineno = getattr(child, "lineno", None)
+                        if isinstance(lineno, int):
+                            try_lines.add(lineno)
+                self.generic_visit(node)
 
     TryCollector().visit(tree)
 
