@@ -25,6 +25,7 @@ from ..models import QCDefect, QCRuleID, Severity
 if TYPE_CHECKING:
     from ..models import QCArtifactResult
 
+from .qc0_baseline import PYTHON_STDLIB
 
 # Weak credential patterns
 WEAK_CREDENTIAL_PATTERNS = [
@@ -262,39 +263,9 @@ def check_qc_3_2_missing_import(
     collector = ModuleUsageCollector()
     collector.visit(tree)
 
-    # Common stdlib modules that should be imported
-    stdlib_modules = {
-        "os",
-        "sys",
-        "re",
-        "json",
-        "yaml",
-        "datetime",
-        "time",
-        "pathlib",
-        "collections",
-        "itertools",
-        "functools",
-        "typing",
-        "dataclasses",
-        "io",
-        "csv",
-        "math",
-        "random",
-        "logging",
-        "subprocess",
-        "http",
-        "urllib",
-        "socket",
-        "asyncio",
-        "tempfile",
-        "shutil",
-        "glob",
-    }
-
     for name, line in collector.potential_modules.items():
         # Check if this looks like a module usage
-        if name in stdlib_modules:
+        if name in PYTHON_STDLIB:
             defect = QCDefect(
                 rule_id=QCRuleID.QC_3_2,
                 name="Missing Import",
