@@ -297,13 +297,22 @@ def _build_report(
         cross_defects = [d for r in cross_results for d in (r.get("defects") or [])]
         mapped_defects = _aggregate_cross_defects(cross_results)
         cross_score = _calculate_cross_score(mapped_defects, check_level)
+        cross_error = next((r.get("error") for r in cross_results if r.get("error")), None)
+        cross_statuses = [r.get("status") for r in cross_results]
+        if any(s == "failed" for s in cross_statuses):
+            aggregated_cross_status = "failed"
+        elif all(s == "skipped" for s in cross_statuses):
+            aggregated_cross_status = "skipped"
+        else:
+            aggregated_cross_status = "completed"
 
         module_results.append(
             {
                 "module": "CROSS",
-                "status": "completed",
+                "status": aggregated_cross_status,
                 "defects": cross_defects,
                 "score": cross_score,
+                "error": cross_error,
             }
         )
 
@@ -314,6 +323,7 @@ def _build_report(
         result_status = result.get("status", "unknown")
         score = result.get("score")
         defects = result.get("defects", [])
+        error = result.get("error")
 
         score_str = _format_score(score)
         header = f"## {label} ({module}) — {result_status}"
@@ -323,8 +333,18 @@ def _build_report(
         lines.append("")
 
         if not defects:
-            lines.append("No defects found.")
-            lines.append("")
+            # Failed module with error info: render CAUTION callout instead of a
+            # misleading "No defects found" (defects may be absent because the
+            # check crashed, e.g. on rate limiting, not because code is clean).
+            if result_status == "failed" and isinstance(error, dict):
+                err_code = error.get("code") or "FAILED"
+                err_msg = error.get("message") or "Inspection execution failed."
+                lines.append("> [!CAUTION]")
+                lines.append(f"> **{label} inspection failed ({err_code})**: {err_msg}")
+                lines.append("")
+            else:
+                lines.append("No defects found.")
+                lines.append("")
             continue
 
         # Use permission-specific table for QD-PM module.
