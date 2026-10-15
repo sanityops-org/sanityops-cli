@@ -321,7 +321,9 @@ def check_qc_1_4_type_mismatch(
     - String passed to function expecting int (e.g., range("5"))
     - Wrong number of arguments to builtins
 
-    This is a simplified check using AST pattern matching.
+    Intentionally narrow scope: only the small table of common builtins
+    below is inspected. This is a heuristic signal, not a type checker —
+    full signature analysis is out of scope for a lightweight lint pass.
 
     Args:
         code: The code snippet to check.
