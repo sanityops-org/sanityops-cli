@@ -45,6 +45,10 @@ from .rules import (
 
 logger = logging.getLogger(__name__)
 
+#: Maximum nesting depth when recursing into nested tool parameter schemas.
+#: Prevents stack overflow on malformed or adversarial deeply-nested schemas.
+MAX_TOOL_SCHEMA_DEPTH = 10
+
 #: All QC checks applied to every Python code snippet, in order.
 #: Adding a new rule here automatically applies it to both embedded
 #: code blocks and whole Python source files.
@@ -242,7 +246,7 @@ class CodeContractChecker:
         location_prefix: str,
         *,
         depth: int = 0,
-        max_depth: int = 10,
+        max_depth: int = MAX_TOOL_SCHEMA_DEPTH,
     ) -> None:
         """Recursively check tool parameters for code snippets.
 

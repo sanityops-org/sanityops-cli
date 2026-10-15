@@ -22,6 +22,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .models import (
+    GateResult,
     QCArtifactResult,
     QCDefect,
     QCInspectionResult,
@@ -65,7 +66,7 @@ class QCRenderer:
         severity_str = f"P0: {result.p0_count}   P1: {result.p1_count}   P2: {result.p2_count}"
         table.add_row("Severity", severity_str)
 
-        gate_style = "red bold" if result.gate_result == "FAIL" else "green bold"
+        gate_style = "red bold" if result.gate_result == GateResult.FAIL else "green bold"
         table.add_row("QC Gate", f"[{gate_style}]{result.gate_result}[/]")
 
         table.add_row("Inspection time", f"{result.inspection_time_seconds:.2f}s")
@@ -164,7 +165,7 @@ class QCRenderer:
         Args:
             result: The QC inspection result.
         """
-        if result.gate_result == "FAIL":
+        if result.gate_result == GateResult.FAIL:
             self.console.print(
                 Panel(
                     "[red bold]QC Gate: FAIL[/]\n\n"

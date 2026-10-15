@@ -30,6 +30,11 @@ if TYPE_CHECKING:
 
 # Language identifier patterns for Markdown code blocks
 # Trailing newline is optional so code blocks at end of file are still matched.
+# Known limitations (accepted for a lightweight scanner):
+# - Nested fences (``` inside ```) are not supported; the first closing
+#   fence ends the block.
+# - Tilde-delimited fences (~~~) are not matched.
+# - An opening fence with more than three backticks is not matched.
 CODE_BLOCK_PATTERN = re.compile(r"```(\w*)\s*\n(.*?)```(?:\n|$)", re.DOTALL)
 
 # Language aliases mapping
