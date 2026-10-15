@@ -123,6 +123,9 @@ class CodeContractChecker:
         try:
             return Path(path).read_text(encoding="utf-8")
         except (FileNotFoundError, PermissionError, UnicodeDecodeError) as e:
+            # Always keep a DEBUG trail so silent skips stay debuggable;
+            # verbose mode additionally surfaces a warning to the user.
+            logger.debug("Could not read %s: %s", path, e)
             if self.verbose:
                 logger.warning("Could not read %s: %s", path, e)
             return None

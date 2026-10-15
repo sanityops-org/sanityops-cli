@@ -94,6 +94,20 @@ class TestCodeContractChecker:
         result = CodeContractChecker().check_from_paths([str(empty)], [], [])
         assert result.prompts[0].total_defects == 0
 
+    def test_deeply_nested_schema_returns_safely(self, tmp_path: Path):
+        """A schema nested beyond MAX_TOOL_SCHEMA_DEPTH must not recurse forever."""
+        # Build a schema nested well beyond the depth limit
+        inner: dict = {"type": "object", "properties": {}}
+        for _ in range(25):
+            inner = {"type": "object", "properties": {"level": inner}}
+        tool = tmp_path / "deep.json"
+        tool.write_text(
+            json.dumps({"name": "t", "description": "d", "parameters": inner}),
+            encoding="utf-8",
+        )
+        result = CodeContractChecker().check_from_paths([], [str(tool)], [])
+        assert result.tools[0].total_defects == 0
+
 
 class TestSaveQcReport:
     def _qc_result(self) -> QCInspectionResult:
