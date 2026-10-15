@@ -1,4 +1,5 @@
 """Unit tests for the inspect command defect-check wiring."""
+
 import io
 
 from rich.console import Console
@@ -19,6 +20,7 @@ def _findings():
         FindingType,
         SkillContent,
     )
+
     # SKILL findings require `relative` to be an absolute directory path,
     # so use mkdtemp rather than a file.
     path = tempfile.mkdtemp()
@@ -64,8 +66,7 @@ def test_inspect_skip_defect_check_saves_qc_report(monkeypatch, tmp_path):
     # Skill file with an embedded code block carrying a detectable QC defect
     skill_file = tmp_path / "skill.md"
     skill_file.write_text(
-        "---\nname: s\ndescription: d\n---\n# X\n\n"
-        "```python\nx = undefined_name\n```\n"
+        "---\nname: s\ndescription: d\n---\n# X\n\n" "```python\nx = undefined_name\n```\n"
     )
     cfg = tmp_path / "inspect_config.yaml"
     cfg.write_text(
@@ -101,8 +102,7 @@ def test_inspect_qc_gate_fail_does_not_block_flow(monkeypatch, tmp_path):
     # Skill file with a Python block containing a syntax error -> QC-0.1 P0
     skill_file = tmp_path / "skill.md"
     skill_file.write_text(
-        "---\nname: s\ndescription: d\n---\n# X\n\n"
-        "```python\ndef broken(:\n```\n"
+        "---\nname: s\ndescription: d\n---\n# X\n\n" "```python\ndef broken(:\n```\n"
     )
     cfg = tmp_path / "inspect_config.yaml"
     cfg.write_text(
@@ -131,6 +131,37 @@ def test_inspect_qc_gate_fail_does_not_block_flow(monkeypatch, tmp_path):
     qc_reports = sorted(results_dir.glob("qc-inspect-*.md"))
     assert qc_reports
     assert "FAIL" in qc_reports[-1].read_text(encoding="utf-8")
+
+
+def test_inspect_skip_qc_lint_skips_qc_stage(monkeypatch, tmp_path):
+    """--skip-qc-lint skips the QC stage: no QC report, skip notice shown."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text("---\nname: s\ndescription: d\n---\n# X\n")
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    class FakeAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            return _findings()
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FakeAgent(),
+    )
+
+    result = runner.invoke(
+        app, ["inspect", "--config", str(cfg), "--skip-qc-lint", "--skip-defect-check"]
+    )
+    assert result.exit_code == 0
+    assert "QC lint check skipped" in result.stdout
+
+    # No QC report is written when the QC lint is skipped
+    results_dir = tmp_path / "results"
+    assert not list(results_dir.glob("qc-inspect-*.md"))
 
 
 def test_inspect_writes_dated_log_file(monkeypatch, tmp_path):

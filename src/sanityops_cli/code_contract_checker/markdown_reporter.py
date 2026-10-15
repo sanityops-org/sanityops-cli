@@ -49,7 +49,9 @@ def save_qc_report(
         output_dir = output_dir.expanduser().resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        # Microsecond precision matches the main inspect report naming and
+        # prevents filename collisions for reports saved within the same second.
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
         filename = f"qc-inspect-{timestamp}.md"
         path = output_dir / filename
 

@@ -286,7 +286,7 @@ def check_qc_0_1_syntax_parsability(
             location=location,
             evidence=code[:200] if len(code) > 200 else code,
             fix_suggestion=f"Fix syntax error at line {e.lineno}: {e.msg}",
-            line_number=(line_offset + (e.lineno or 1)) if e.lineno else line_offset + 1,
+            line_number=line_offset + (e.lineno or 1),
             artifact_path=artifact_result.artifact_path,
             artifact_type=artifact_result.artifact_type,
             language=language,
