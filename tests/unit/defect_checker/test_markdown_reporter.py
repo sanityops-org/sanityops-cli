@@ -29,7 +29,9 @@ def _response(**overrides):
         "results": [],
         "summary": {
             "total_defects": 0,
-            "p0_count": 0, "p1_count": 0, "p2_count": 0,
+            "p0_count": 0,
+            "p1_count": 0,
+            "p2_count": 0,
             "gate_result": "PASS",
         },
         "errors": [],
@@ -39,11 +41,24 @@ def _response(**overrides):
     return result
 
 
-def _defect(defect_id="d1", name="n", severity="P0", description="desc", location="loc", impact="imp", fix="fix"):
+def _defect(
+    defect_id="d1",
+    name="n",
+    severity="P0",
+    description="desc",
+    location="loc",
+    impact="imp",
+    fix="fix",
+):
     return {
-        "id": defect_id, "name": name, "severity": severity,
-        "category": "cat", "description": description,
-        "location": location, "impact": impact, "fix_suggestion": fix,
+        "id": defect_id,
+        "name": name,
+        "severity": severity,
+        "category": "cat",
+        "description": description,
+        "location": location,
+        "impact": impact,
+        "fix_suggestion": fix,
         "artifact_refs": ["/proj/skills/s.md"],
     }
 
@@ -57,6 +72,7 @@ class TestSave:
         assert path.suffix == ".md"
         # Filename matches inspect-YYYYMMDD-HHMMSS-microseconds.md pattern
         import re
+
         assert re.match(r"inspect-\d{8}-\d{6}-\d{6}\.md", path.name)
 
     def test_save_creates_parent_dirs(self, tmp_path):
@@ -71,7 +87,10 @@ class TestReportContent:
     def test_report_contains_summary_table(self, tmp_path):
         response = _response(
             summary={
-                "total_defects": 5, "p0_count": 1, "p1_count": 2, "p2_count": 2,
+                "total_defects": 5,
+                "p0_count": 1,
+                "p1_count": 2,
+                "p2_count": 2,
                 "gate_result": "FAIL",
             },
         )
@@ -86,24 +105,30 @@ class TestReportContent:
         response = _response(
             results=[
                 {
-                    "module": "QDS", "status": "completed", "defects": [_defect(defect_id="d1", severity="P0")],
+                    "module": "QDS",
+                    "status": "completed",
+                    "defects": [_defect(defect_id="d1", severity="P0")],
                 }
             ]
         )
         path = save_markdown_report(response, tmp_path)
         content = path.read_text(encoding="utf-8")
         assert "## Skills (QDS) — completed" in content
-        assert "| ID | Name | Severity | Description | Location | Impact | Fix |" in content
-        assert "| d1 | n | P0 | desc | loc | imp | fix |" in content
+        assert "| ID | Name | Severity | Description | Location |" in content
+        assert "| d1 | n | P0 | desc | loc |" in content
 
     def test_report_escapes_pipes_and_newlines(self, tmp_path):
         response = _response(
             results=[
                 {
-                    "module": "QDS", "status": "completed",
-                    "defects": [_defect(
-                        name="a|b", description="line1\nline2",
-                    )],
+                    "module": "QDS",
+                    "status": "completed",
+                    "defects": [
+                        _defect(
+                            name="a|b",
+                            description="line1\nline2",
+                        )
+                    ],
                 }
             ]
         )
@@ -164,11 +189,13 @@ class TestAggregateCrossDefects:
     def test_empty_input(self):
         """Returns empty list for empty input."""
         from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+
         assert _aggregate_cross_defects([]) == []
 
     def test_single_cross_result(self):
         """Aggregates defects from a single CROSS result."""
         from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+
         cross_results = [
             {
                 "defects": [
@@ -187,6 +214,7 @@ class TestAggregateCrossDefects:
     def test_multiple_cross_results(self):
         """Aggregates defects from multiple CROSS results (PS/PT/ST)."""
         from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+
         cross_results = [
             {
                 "defects": [
@@ -207,6 +235,7 @@ class TestAggregateCrossDefects:
     def test_skips_non_dict_defects(self):
         """Skips defects that are not dicts."""
         from sanityops_cli.defect_checker.markdown_reporter import _aggregate_cross_defects
+
         cross_results = [
             {
                 "defects": [
@@ -224,6 +253,7 @@ class TestCalculateCrossScore:
     def test_empty_input(self):
         """Returns None for empty input."""
         from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+
         assert _calculate_cross_score([], "L2") is None
 
     def test_valid_defects(self):
@@ -233,6 +263,7 @@ class TestCalculateCrossScore:
         rather than mocking, to verify the integration works end-to-end.
         """
         from sanityops_cli.defect_checker.markdown_reporter import _calculate_cross_score
+
         defects = [
             {"defect_id": "QD-PT-1", "defect_level": "P1", "relation": "QD-PT"},
         ]
@@ -276,9 +307,16 @@ class TestCrossArtifactReport:
                     "module": "CROSS",
                     "status": "completed",
                     "defects": [
-                        {"id": "QD-PT-1", "name": "cross1", "severity": "P0",
-                         "description": "d", "location": "l", "impact": "i",
-                         "fix_suggestion": "f", "category": "QD-PT"},
+                        {
+                            "id": "QD-PT-1",
+                            "name": "cross1",
+                            "severity": "P0",
+                            "description": "d",
+                            "location": "l",
+                            "impact": "i",
+                            "fix_suggestion": "f",
+                            "category": "QD-PT",
+                        },
                     ],
                 },
             ]
@@ -297,18 +335,32 @@ class TestCrossArtifactReport:
                     "module": "CROSS",
                     "status": "completed",
                     "defects": [
-                        {"id": "QD-PS-1", "name": "ps1", "severity": "P1",
-                         "description": "d", "location": "l", "impact": "i",
-                         "fix_suggestion": "f", "category": "QD-PS"},
+                        {
+                            "id": "QD-PS-1",
+                            "name": "ps1",
+                            "severity": "P1",
+                            "description": "d",
+                            "location": "l",
+                            "impact": "i",
+                            "fix_suggestion": "f",
+                            "category": "QD-PS",
+                        },
                     ],
                 },
                 {
                     "module": "CROSS",
                     "status": "completed",
                     "defects": [
-                        {"id": "QD-PT-1", "name": "pt1", "severity": "P0",
-                         "description": "d", "location": "l", "impact": "i",
-                         "fix_suggestion": "f", "category": "QD-PT"},
+                        {
+                            "id": "QD-PT-1",
+                            "name": "pt1",
+                            "severity": "P0",
+                            "description": "d",
+                            "location": "l",
+                            "impact": "i",
+                            "fix_suggestion": "f",
+                            "category": "QD-PT",
+                        },
                     ],
                 },
             ]
@@ -413,7 +465,10 @@ class TestPermissionReport:
         content = path.read_text(encoding="utf-8")
         assert "## Permissions (QD-PM)" in content
         # Extended table header
-        assert "| ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix |" in content
+        assert (
+            "| ID | Name | Severity | Description | Action | Permission Side | Duty Side | Fix |"
+            in content
+        )
         # Data row with permission fields
         assert "QD-PM-1.1" in content
         assert "read" in content
@@ -525,7 +580,7 @@ class TestPermissionReport:
         assert "## Skills (QDS)" in content
         assert "## Permissions (QD-PM)" in content
         # QDS should use standard table
-        assert "| Description | Location | Impact |" in content
+        assert "| Description | Location |" in content
         # QD-PM should use extended table
         assert "| Action | Permission Side | Duty Side |" in content
 

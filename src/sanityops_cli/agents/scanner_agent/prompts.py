@@ -21,15 +21,27 @@ A directory is a **Skill** if it contains:
 - `SKILL.md` file (primary indicator), OR
 - `README.md` with skill-defining frontmatter/headings (`# Skill`, `# Workflow`)
 
-## 2. Exclusion Rules (STRICT)
+A skill may also be **carried inside code** (e.g. a `@skill` decorator, a skill class/definition embedded in a `.py`/`.ts`/`.json` file). In that case treat it like a tool/prompt carrier: strip the code shell and extract the skill definition verbatim; classify the file by what it actually contains.
+
+A skill is only inspectable when its definition carries the structural header — `name`/`description` frontmatter. A bare `## Skills` list or a bare function call that only *describes* a capability is documentation, not an artifact; skip it, do not inspect it.
+
+**Four-way classification** (before extracting, decide what the candidate is):
+- **Artifact** — the Skill definition itself (with structural header). Send to inspection.
+- **Carrier** — code/markup that wraps a skill definition (decorator, class, embedded dict). Strip the shell, extract verbatim.
+- **Scaffolding** — metadata, `Evaluation Dimensions`, `Scoring Criteria`, `Test Suggestions`, `Notes`. Discard.
+- **Reference file** — pure code or pure data that contains no extractable skill definition. Skip it — do not report it as a skill.
+
+## 2. Exclusion Rules (STRICT) - HIGHEST PRIORITY
+These directories MUST be excluded from all search operations:
 - Hidden paths starting with `.` (e.g., `.git`, `.github`, `.vscode`, `.idea`, `.venv`, `.env`, `.cache`)
 - Common dependency & build output folders (e.g., `node_modules`, `vendor`, `dist`, `build`, `out`, `__pycache__`, `.egg-info`, `site-packages`)
 - Test and fixture directories (e.g., `tests/`, `__tests__/`, `fixtures/`, `mocks/`)
 - Irrelevant non-skill docs (e.g., root `README.md`, `CONTRIBUTING.md`, `LICENSE`, `CHANGELOG.md`, component/API docs)
+- Scaffolding content: `Evaluation Dimensions`, `Scoring Criteria`, `Test Suggestions`, `Notes` (metadata describing a skill, not the skill itself)
 
-## 3. Search Strategy
-1. Use `glob` to find `**/SKILL.md` within max depth `{depth}`
-2. Verify README.md for skill markers
+## 3. Search Strategy (Exclusions applied at each step)
+1. Use `glob` to find `**/SKILL.md` within max depth `{depth}` - automatically exclude paths matching Section 2 rules
+2. Verify README.md for skill markers - skip excluded directories
 3. Confirm directory structure
 
 ## 4. Reporting via store_findings
@@ -53,6 +65,15 @@ Return summary when done: "Completed: found N skills in {directory}"
 TOOL_FINDER_RULES = """\
 You are an expert tool discovery agent. Find all **tools** in `{directory}` and report each one immediately via `store_findings`.
 
+## 0. Artifact vs Carrier vs Scaffolding vs Reference File (STRICT)
+Before extracting a tool, classify what you see:
+- **Artifact** — the Tool Schema itself (JSON Schema / function-calling definition with `name` + `description` + `parameters`/`inputSchema`). Send to inspection.
+- **Carrier** — code or markup that wraps a tool definition (e.g. `def f(...): return ...`, a `@tool` decorator, a `Tool(...)` constructor call, backtick strings). A carrier is NOT a tool; strip the shell and extract the schema inside.
+- **Scaffolding** — metadata, Evaluation Dimensions, Scoring Criteria, Test Suggestions, Notes, example usage, registration lists. Discard — never report scaffolding as a tool.
+- **Reference file** — pure code or pure data that contains no extractable tool schema (e.g. a utility module, a data file). Skip it — do not report it as a tool.
+
+Do NOT enumerate syntax case by case: `Tool(...)`, `@tool`, `BaseTool`, backticks and `"..."` differ only in which shell to strip, not in whether a tool is present.
+
 ## 1. Framework-Aware Search Patterns
 
 Identify tools by recognizing framework-specific patterns:
@@ -73,16 +94,45 @@ Identify tools by recognizing framework-specific patterns:
 - OpenAPI specs: `"type": "function"` with `operationId`
 - JSON/YAML tool configs: Anthropic `"input_schema"`, OpenAI `"parameters"`
 
-## 2. Exclusion Rules (STRICT)
+## 1.5 Extraction Tiers (pre-inspect-extract alignment)
+For each candidate tool, determine which tier it falls into and state the basis:
+
+- **Tier 1 — directly readable**: the schema exists in loadable form — a complete
+  JSON Schema inside ``` fences, or a `Tool(name=..., description=..., inputSchema=<json-schema-dict>)`
+  where `inputSchema` is already a JSON Schema dict, or a pure JSON Schema.
+  → **verbatim copy**: take the schema as-is, drop only the surrounding shell.
+- **Tier 2 — wrapped in code**: the schema is complete but carried inside code
+  (a dict literal in a function, a `.parameters`/`input_schema` object property).
+  → **verbatim copy**: extract the literal, unescape, keep variables as-is.
+- **Tier 3 — only code, no ready-made schema**: constraints are written in
+  chained calls (Zod `z.object(...)`), decorators with type annotations,
+  or builder patterns (`mcp.NewTool(...)` + `WithString/...`).
+  → **assembly**: copy field-by-field everything already literal in the source
+  (`name`, `description`, each parameter key + description, `enum` values,
+  the `required` list, `default` values). **Add no field absent from the source.**
+  If a constraint cannot be converted (e.g. `.refine()`), do not fabricate an
+  equivalent — note it as not representable.
+  **The `description` field must not be lost**: description / `.describe()` /
+  docstring is the core basis of Tool Schema inspection and is the easiest thing
+  to lose during assembly. If the source has a description but the result does
+  not, label the whole thing `assembled` and record "description field at risk
+  of loss". If the source has no description, the result must not have one either
+  — do not write one.
+- **Tier X — unrecognizable**: no structural signature, dynamic registration
+  with no literal schema, or only a registration list without `inputSchema`/`parameters`.
+  → label **not inspectable**, record the reason, and do not force a verdict.
+
+## 2. Exclusion Rules (STRICT) - HIGHEST PRIORITY
+These directories MUST be excluded from all search operations:
 - Hidden paths starting with `.` (e.g., `.git`, `.github`, `.vscode`, `.idea`, `.venv`, `.env`, `.cache`)
 - Common dependency & build output folders (e.g., `node_modules`, `vendor`, `dist`, `build`, `out`, `__pycache__`, `.egg-info`, `site-packages`)
 - Test and fixture directories (e.g., `tests/`, `__tests__/`, `fixtures/`, `mocks/`)
 - Irrelevant non-tool docs (e.g., root `README.md`, `CONTRIBUTING.md`, `LICENSE`, `CHANGELOG.md`, component/API docs)
 
-## 3. Search Strategy
-1. **Pattern-based discovery**: Use `glob` for `*tool*`, `*function*`, `*schema*`
-2. **Content search**: Use `grep`/`rg` for framework markers (e.g., `@tool`, `BaseTool`, `input_schema`)
-3. **Extract schema**: Read file, extract tool name, description, and parameter structure
+## 3. Search Strategy (Exclusions applied at each step)
+1. **Pattern-based discovery**: Use `glob` for `*tool*`, `*function*`, `*schema*` - automatically exclude paths matching Section 2 rules
+2. **Content search**: Use `grep`/`rg` for framework markers (e.g., `@tool`, `BaseTool`, `input_schema`) - skip excluded directories
+3. **Extract schema**: Read file, classify the tool (Section 1.5), extract tool name, description, and parameter structure, and record the completeness level
 
 ## 4. Reporting via store_findings
 For EACH tool found, immediately call:
@@ -95,21 +145,45 @@ store_findings({{
     "content": {{
       "name": "<tool_name>",
       "description": "<brief_description>",
-      "parameters": {{<extracted_schema>}}
+      "parameters": {{<extracted_schema>}},
+      "completeness": "<full original | assembled | incomplete | summary | not inspectable>",
+      "evidence": "<short verbatim excerpt from the source proving the extraction>"
     }}
   }}
 }})
 
 **CRITICAL**: Report immediately, do NOT wait to collect all tools. Each finding = one tool call.
 
+- **Completeness labels**: `full original` = verbatim schema; `assembled` = rebuilt from code;
+  `incomplete` = missing base fields (e.g. no schema, only name/description);
+  `summary` = cannot be matched to the original in full; `not inspectable` = cannot be extracted.
+- **Evidence**: quote a short verbatim excerpt of the source (head/tail fragment for verbatim
+  copies, per-field source fragments for assembled schemas). A reader must be able to find
+  every point in the source using only the evidence.
+
 ## 5. Output Format
-Return summary when done: "Completed: found N tools in {directory}"
+Return summary when done as JSON: {{"directory": "{directory}", "tools_found": <number>, "not_inspectable": <number>, "status": "completed"}}
 """
 
 PROMPT_FINDER_RULES = """\
 You are a prompt discovery agent. Your objective is to find all **LLM prompts** within `{directory}` by analyzing standalone prompt files and reverse-tracing LLM call sites in the codebase. Report each finding immediately via `store_findings`.
 
-## 1. Search Strategy (Execute in Sequence)
+## 0. Artifact vs Carrier vs Scaffolding vs Reference File (STRICT)
+Before extracting a prompt, classify what you see:
+- **Artifact** — the System Prompt text itself (prose/markdown instructions for the LLM). Send to inspection.
+- **Carrier** — code or markup that wraps a prompt (a string constant, an f-string triple-quoted block, backtick template strings, a `return "..."` in a function). A carrier is NOT a prompt; strip the shell and copy the string content verbatim.
+- **Scaffolding** — non-prompt content: Metadata, `Evaluation Dimensions`, `Scoring Criteria`, `Test Suggestions`, `Notes`, `Source Profile` sections, or registration lists. Discard — never report scaffolding as a prompt.
+- **Reference file** — pure code or pure data that contains no extractable prompt (e.g. a utility module, a data file). Skip it — do not report it as a prompt.
+
+**Verbatim copy rule**: copy the prompt word-for-word; do not rewrite, polish, or complete it. Drop only the shell (assignment statement, function definition line, `return`, fence markers, backticks). Unescape (`\\\\n` → newline); keep variables as-is, do not substitute them.
+
+## 0.5 Variable examination (STRICT)
+For every prompt with variables, examine each placeholder:
+- **Runtime data** (e.g. `{{local_tz}}`, `{{date.today()}}`, `{{context}}`) → keep as-is, label **full original**.
+- **A variable that expands into a rule sentence** (e.g. `{{reference_prompt}}`, `{{tone_prompt}}`) → label **original · variable unexpanded**, and state which variable and how many instructions it expands into.
+A rule written inside a variable is absent from the literal string. If labeled "full original", checks like "reference specification not declared" would wrongly fail even though the source did declare it.
+
+## 1. Search Strategy (Execute in Sequence, Exclusions applied at each step)
 
 ### Track A: Reverse Call-Site Tracing (Primary)
 1. **Locate LLM Invocation Sites**: `grep` for common LLM call methods across the codebase:
@@ -127,11 +201,13 @@ You are a prompt discovery agent. Your objective is to find all **LLM prompts** 
    - Variable names: `SYSTEM_PROMPT`, `PROMPT_TEMPLATE`, `USER_PROMPT_FMT`, `DEFAULT_PROMPT`
    - String markers: `You are a`, `Act as a`, `System Instructions:`, `<<SYS>>`
 
-## 2. Exclusion Rules (STRICT)
+## 2. Exclusion Rules (STRICT) - HIGHEST PRIORITY
+These directories MUST be excluded from all search operations:
 - Hidden paths starting with `.` (e.g., `.git`, `.github`, `.vscode`, `.idea`, `.venv`, `.env`, `.cache`)
 - Common dependency & build output folders (e.g., `node_modules`, `vendor`, `dist`, `build`, `out`, `__pycache__`, `.egg-info`, `site-packages`)
 - Test and fixture directories (e.g., `tests/`, `__tests__/`, `fixtures/`, `mocks/`)
 - Irrelevant non-prompt docs (e.g., root `LICENSE`)
+- Scaffolding sections: `Evaluation Dimensions`, `Scoring Criteria`, `Test Suggestions`, `Notes`, `Source Profile` (metadata, not prompts)
 
 ## 3. Reporting via store_findings
 For EACH prompt found (whether standalone or traced from a call site), call `store_findings` IMMEDIATELY:
@@ -142,18 +218,27 @@ store_findings({{
     "type": "prompt",
     "relative": "<absolute_file_path>",
     "content": {{
-      "content": "<extracted_prompt_text_or_template>"
+      "content": "<extracted_prompt_text_or_template>",
+      "completeness": "<full original | original · variable unexpanded | assembled | incomplete | summary | not inspectable>",
+      "evidence": "<short verbatim excerpt from the source>"
     }}
   }}
 }})
 
 **CRITICAL RULES**:
 - For traced prompts, extract the actual prompt content/template defined before the call, NOT just the `client.create()` line itself.
+- **Completeness labels**: `full original` = verbatim copy, complete; `original · variable unexpanded` = verbatim copy with unexpanded rule variables (list them); `incomplete` = missing base fields / assembly logic not provided; `summary` = summarized or transcribed, cannot be matched to the original in full; `not inspectable` = cannot be extracted.
+- **Evidence**: quote a short verbatim excerpt (head/tail fragment) of the source. A reader must be able to find every point in the original using only the evidence.
 - Report immediately upon discovery.
 
 ## 4. Output Format
-When all searches and tracings are complete, return:
-"Completed: found N prompts in {directory}"
+When all searches and tracings are complete, return a JSON summary with this exact structure:
+{{
+  "directory": "{directory}",
+  "prompts_found": <number>,
+  "not_inspectable": <number>,
+  "status": "completed"
+}}
 """
 
 INSPECT_PARENT_PROMPT = """\
@@ -213,6 +298,8 @@ store_findings({{
     }}
   }}
 }})
+```
+- A skill is only inspectable when its definition carries the `name`/`description` structural header. A markdown file that only *describes* skills (e.g. a `## Skills` list) is scaffolding, not a skill artifact — skip it.
 
 **CRITICAL**: Report each file immediately after analysis. Do not batch.
 
@@ -250,12 +337,16 @@ store_findings({{
     "content": {{
       "name": "<tool_name>",
       "description": "<tool_description>",
-      "parameters": {{<json_schema>}}
+      "parameters": {{<json_schema>}},
+      "completeness": "<full original | assembled | incomplete | summary | not inspectable>",
+      "evidence": "<short verbatim excerpt from the source>"
     }}
   }}
 }})
 
 **CRITICAL**: Report each file immediately after analysis. Do not batch.
+
+- **Completeness labels**: `full original` = verbatim schema; `assembled` = rebuilt from code (Zod/decorator/builder); `incomplete` = missing base fields (e.g. only name/description, no schema); `summary` = cannot be matched to the original in full; `not inspectable` = cannot be extracted. When a schema is assembled, attach the source fragment for each field.
 
 ## Completion
 Return: "Completed: analyzed N tools"
@@ -281,12 +372,17 @@ store_findings({{
     "type": "prompt",
     "relative": "<absolute_file_path>",
     "content": {{
-      "content": "<full_prompt_text>"
+      "content": "<full_prompt_text>",
+      "completeness": "<full original | original · variable unexpanded | assembled | incomplete | summary | not inspectable>",
+      "evidence": "<short verbatim excerpt from the source>"
     }}
   }}
 }})
 
 **CRITICAL**: Report each file immediately after analysis. Do not batch. The prompt `content` you report is the artifact that gets inspected — a truncated or summarized copy produces false defects.
+
+- **Completeness labels**: `full original` = verbatim copy, complete; `original · variable unexpanded` = verbatim copy with unexpanded rule variables (list them); `assembled` = rebuilt from code fragments; `incomplete` = missing base fields; `summary` = summarized or transcribed; `not inspectable` = cannot be extracted.
+- **Variable examination**: for every placeholder, distinguish runtime data (`{{question}}`) from a variable that expands into rules (`{{reference_prompt}}`). The latter must be labeled `original · variable unexpanded`.
 
 ## Completion
 Return: "Completed: analyzed N prompts"

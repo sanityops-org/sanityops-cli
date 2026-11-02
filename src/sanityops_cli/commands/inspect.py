@@ -277,7 +277,7 @@ def _write_repairs_markdown(
 # ============================================================================
 
 
-@inspect_app.command("repair")
+# @inspect_app.command("repair")  # Disabled: repair command is closed
 def inspect_repair(
     ctx: typer.Context,
     # B008: Typer requires function calls in argument defaults for its CLI option
