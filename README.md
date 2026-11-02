@@ -120,23 +120,6 @@ sanityops-cli inspect --config path/to/config.yaml
 
 `inspect` exits `0` when the run completes — including when defects are found — and non-zero on failure. CI pipelines should therefore gate on the generated report (`.sanityops/results/inspect-*.md`), not on the exit code.
 
-### 4. Generate Repairs (Optional)
-
-After inspection, generate repaired artifacts from the report:
-
-```bash
-# Use the latest inspection report
-sanityops-cli inspect repair
-
-# Use a specific report
-sanityops-cli inspect repair --report .sanityops/results/inspect-20250115-120000.md
-
-# Specify timeout and token budget for large projects
-sanityops-cli inspect repair --timeout 3600 --token-budget 500000
-```
-
-Repairs are written to `.sanityops/repairs/repair-<timestamp>.md` without modifying source files.
-
 ## Data Handling
 
 What leaves your machine, and when:

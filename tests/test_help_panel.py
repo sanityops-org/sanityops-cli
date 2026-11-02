@@ -39,12 +39,10 @@ def _run_entry_point(*args: str) -> tuple[int, str]:
 
 
 def test_getting_started_text_content():
-    """Verify the Getting Started text contains all 4 steps."""
+    """Verify the Getting Started text contains the inspection steps."""
     assert "sanityops-cli init" in GETTING_STARTED_TEXT
     assert "inspect_config.yaml" in GETTING_STARTED_TEXT
     assert "sanityops-cli inspect" in GETTING_STARTED_TEXT
-    assert "sanityops-cli inspect repair" in GETTING_STARTED_TEXT
-    assert "(optional)" in GETTING_STARTED_TEXT
 
 
 def test_getting_started_panel_returns_panel():

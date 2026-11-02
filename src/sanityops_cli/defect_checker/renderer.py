@@ -197,9 +197,7 @@ class DefectRenderer:
             self._render_group(title, defects, module=module)
             self.console.print()
 
-    def _render_group(
-        self, label: str, defects: list[dict[str, Any]], *, module: str = ""
-    ) -> None:
+    def _render_group(self, label: str, defects: list[dict[str, Any]], *, module: str = "") -> None:
         lines: list[str] = []
         shown = defects[:MAX_DEFECTS_PER_GROUP]
         for defect in shown:
@@ -236,10 +234,7 @@ class DefectRenderer:
         lines = [f"[bold red]✗ [{severity}] {defect_id}[/]"]
         if defect.get("location"):
             lines.append(f"  [dim]Location[/] : {defect['location']}")
-        if defect.get("impact"):
-            lines.append(f"  [dim]Impact[/]   : {defect['impact']}")
-        if defect.get("fix_suggestion"):
-            lines.append(f"  [dim]Fix[/]      : {defect['fix_suggestion']}")
+        # Removed: impact, fix_suggestion
         return "\n".join(lines)
 
     def _format_permission_defect(self, defect: dict[str, Any]) -> str:
@@ -265,8 +260,6 @@ class DefectRenderer:
         # Standard fields
         if defect.get("location"):
             lines.append(f"  [dim]Location[/] : {defect['location']}")
-        if defect.get("impact"):
-            lines.append(f"  [dim]Impact[/]   : {defect['impact']}")
 
         # Permission-specific fields from details dict
         details = defect.get("details", {})
@@ -281,10 +274,7 @@ class DefectRenderer:
             if duty_side:
                 lines.append(f"  [dim]Duty[/]     : {duty_side}")
 
-        # Fix suggestion
-        if defect.get("fix_suggestion"):
-            lines.append(f"  [dim]Fix[/]      : {defect['fix_suggestion']}")
-
+        # Removed: impact, fix_suggestion
         return "\n".join(lines)
 
     # ------------------------------------------------------------------

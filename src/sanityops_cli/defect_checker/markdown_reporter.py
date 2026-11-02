@@ -51,21 +51,6 @@ def _esc_md_cell(text: str | None) -> str:
     return text.strip()
 
 
-def _format_score(score: dict[str, Any] | None) -> str:
-    """Format score/grade/gate for a section header, or empty string."""
-    if score is None:
-        return ""
-    parts = []
-    if "total_score" in score:
-        max_score = score.get("max_score", 100.0)
-        parts.append(f"score {score['total_score']}/{max_score}")
-    if score.get("grade"):
-        parts.append(f"grade {score['grade']}")
-    if score.get("gate_result"):
-        parts.append(f"gate {score['gate_result']}")
-    return ", ".join(parts)
-
-
 def _aggregate_cross_defects(cross_results: list[dict]) -> list[dict]:
     """Aggregate defects from all CROSS sub-results (PS/PT/ST) into one list.
 
@@ -335,14 +320,10 @@ def _build_report(
         module = result.get("module", "")
         label = _MODULE_LABELS.get(module, module)
         result_status = result.get("status", "unknown")
-        score = result.get("score")
         defects = _dedup_defects(result.get("defects", []))
         error = result.get("error")
 
-        score_str = _format_score(score)
         header = f"## {label} ({module}) — {result_status}"
-        if score_str:
-            header += f", {score_str}"
         lines.append(header)
         lines.append("")
 
@@ -369,20 +350,15 @@ def _build_report(
             continue
 
         # Standard defect table for other modules
-        lines.append("| ID | Name | Severity | Description | Location | Impact | Fix |")
-        lines.append("|---|---|---|---|---|---|---|")
+        lines.append("| ID | Name | Severity | Description | Location |")
+        lines.append("|---|---|---|---|---|")
         for defect in defects:
             defect_id = _esc_md_cell(defect.get("id"))
             name = _esc_md_cell(defect.get("name"))
             severity = _esc_md_cell(defect.get("severity"))
             description = _esc_md_cell(defect.get("description"))
             location = _esc_md_cell(defect.get("location"))
-            impact = _esc_md_cell(defect.get("impact"))
-            fix = _esc_md_cell(defect.get("fix_suggestion"))
-            lines.append(
-                f"| {defect_id} | {name} | {severity} | {description} |"
-                f" {location} | {impact} | {fix} |"
-            )
+            lines.append(f"| {defect_id} | {name} | {severity} | {description} | {location} |")
         lines.append("")
 
     # Errors section
