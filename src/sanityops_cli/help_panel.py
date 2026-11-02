@@ -6,8 +6,7 @@ from rich.text import Text
 GETTING_STARTED_TEXT = """\
   1. Run 'sanityops-cli init' to create the default configuration
   2. Edit .sanityops/inspect_config.yaml to configure your project
-  3. Run 'sanityops-cli inspect' to start the inspection
-  4. Run 'sanityops-cli inspect repair' to generate fixes (optional)
+  3. Run 'sanityops-cli inspect' to start the inspection\
 """
 
 ADVANCED_USAGE_TEXT = """\
@@ -25,7 +24,7 @@ def get_getting_started_panel() -> Panel:
     """Create the Getting Started panel for help output.
 
     Returns:
-        A Rich Panel containing the 4-step Getting Started workflow.
+        A Rich Panel containing the 3-step Getting Started workflow.
     """
     return Panel(
         Text(GETTING_STARTED_TEXT, justify="left"),

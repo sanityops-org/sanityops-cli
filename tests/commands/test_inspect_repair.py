@@ -27,12 +27,14 @@ class TestFindLatestReport:
     def test_returns_none_when_dir_not_exists(self, tmp_path: Path):
         """Returns None when results directory does not exist."""
         from sanityops_cli.commands.inspect import _find_latest_report
+
         result = _find_latest_report(tmp_path / "nonexistent")
         assert result is None
 
     def test_returns_none_when_no_reports(self, tmp_path: Path):
         """Returns None when no inspect reports exist."""
         from sanityops_cli.commands.inspect import _find_latest_report
+
         (tmp_path / "results").mkdir()
         result = _find_latest_report(tmp_path / "results")
         assert result is None
@@ -127,18 +129,15 @@ class TestWriteRepairsMarkdown:
 
 
 class TestInspectRepairCommand:
-    """Integration tests for inspect repair command."""
+    """The repair command is disabled (closed); its helpers remain for reference."""
 
-    def test_repair_command_shows_help(self):
-        """Repair command shows help without error."""
+    def test_repair_command_not_registered(self):
+        """The disabled repair command is no longer registered on the CLI."""
         result = runner.invoke(inspect_app, ["repair", "--help"])
-        assert result.exit_code == 0
-        assert "repair" in result.output.lower()
+        assert result.exit_code != 0
 
-    def test_repair_command_requires_config_or_report(self, tmp_path: Path, monkeypatch):
-        """Repair command fails gracefully when no config exists."""
-        # Change to temp directory with no config
+    def test_repair_command_rejected_without_help(self, tmp_path: Path, monkeypatch):
+        """Invoking the disabled repair command fails with a usage error."""
         monkeypatch.chdir(tmp_path)
         result = runner.invoke(inspect_app, ["repair"])
-        # Should fail because no config exists
         assert result.exit_code != 0

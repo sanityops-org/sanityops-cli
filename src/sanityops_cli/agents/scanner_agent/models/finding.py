@@ -30,6 +30,7 @@ class FindingType(StrEnum):
 
 class Section(BaseModel):
     """A markdown section within a skill file."""
+
     title: str = Field(description="Section heading text")
     content: str = Field(description="Section body content")
 
@@ -37,7 +38,9 @@ class Section(BaseModel):
 class ToolSchema(BaseModel):
     name: str
     description: str = ""
-    parameters: dict = Field(default_factory=dict,description="Tool parameters, JSON Schema (Draft-07) format")
+    parameters: dict = Field(
+        default_factory=dict, description="Tool parameters, JSON Schema (Draft-07) format"
+    )
 
 
 class SkillContent(BaseModel):
@@ -54,7 +57,11 @@ class SkillContent(BaseModel):
     #: Frontmatter fields that must be positive integers (QDS-0.4). LLM-based
     #: extraction can stringify numeric values, so coerce them back to int.
     _POSITIVE_INT_FIELDS: tuple[str, ...] = (
-        "max_items", "max_chars", "timeout_seconds", "max_tool_calls", "max_retries",
+        "max_items",
+        "max_chars",
+        "timeout_seconds",
+        "max_tool_calls",
+        "max_retries",
     )
 
     @model_validator(mode="after")
@@ -100,23 +107,45 @@ class SkillContent(BaseModel):
             if not parts:
                 return ""
         parts.append(
-            "\n\n".join(
-                f"## {section.title}\n\n{section.content}"
-                for section in self.sections
-            )
+            "\n\n".join(f"## {section.title}\n\n{section.content}" for section in self.sections)
         )
         return "\n".join(parts)
 
 
 class ToolContent(BaseModel):
     """Extracted content from a tool file."""
+
     name: str = Field(description="Tool name from definition")
     description: str = Field(description="Tool description")
-    parameters: dict[str, Any] = Field(default_factory=dict, description="JSON Schema of parameters")
+    parameters: dict[str, Any] = Field(
+        default_factory=dict, description="JSON Schema of parameters"
+    )
+    #: pre-inspect-extract alignment: extraction fidelity labels. Default empty
+    #: when the analyzer does not provide them (backward compatible).
+    completeness: str = Field(
+        default="",
+        description=(
+            "Completeness level per pre-inspect-extract: full original / "
+            "assembled / incomplete / summary / not inspectable"
+        ),
+    )
+    evidence: str = Field(
+        default="", description="Short verbatim excerpt from the source proving the extraction"
+    )
 
 
 class PromptContent(BaseModel):
     content: str
+    #: pre-inspect-extract alignment: extraction fidelity labels. Default empty
+    #: when the analyzer does not provide them (backward compatible).
+    completeness: str = Field(
+        default="",
+        description=(
+            "Completeness level per pre-inspect-extract: full original / "
+            "original · variable unexpanded / assembled / incomplete / summary / not inspectable"
+        ),
+    )
+    evidence: str = Field(default="", description="Short verbatim excerpt from the source")
 
 
 class Finding(BaseModel):
