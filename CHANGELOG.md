@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking**: `inspect` no longer accepts `--check-level`; the defect check
+  always runs at the deep L3 level
 - **Breaking**: tool schema uploads now emit the provider-neutral flat format
   `{name, description, parameters}` in both upload paths (push and inspect).
   The OpenAI `{type, function}` wrapper is stripped during packing; the

@@ -94,7 +94,7 @@ class TestReportContent:
                 "gate_result": "FAIL",
             },
         )
-        path = save_markdown_report(response, tmp_path, check_level="L2")
+        path = save_markdown_report(response, tmp_path, check_level="L3")
         content = path.read_text(encoding="utf-8")
         assert "## Summary" in content
         assert "| Total defects | 5 |" in content

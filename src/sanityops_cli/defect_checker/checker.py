@@ -42,7 +42,7 @@ class DefectChecker:
     async def check(
         self,
         findings: FindingsResult,
-        check_level: str = "L2",
+        check_level: str = "L3",
     ) -> dict:
         """Run defect check and return the raw SDK response dict."""
         tools = self._convert_tools(findings.tools)
