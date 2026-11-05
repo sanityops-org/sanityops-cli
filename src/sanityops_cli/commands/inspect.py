@@ -50,6 +50,9 @@ inspect_app = typer.Typer()
 #: URL users attach log files to when reporting issues.
 ISSUE_URL = "https://github.com/sanityops-org/sanityops-cli/issues"
 
+#: Defect check depth used for every inspection run (fixed, not user-configurable).
+DEFAULT_CHECK_LEVEL = "L3"
+
 
 def _load_agent_config(config_path: Path) -> dict:
     """Read the optional `agent:` section from inspect_config.yaml.
@@ -479,11 +482,6 @@ def inspect(
         help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
-    check_level: str = typer.Option(
-        "L2",
-        "--check-level",
-        help="Defect check level: L1 (fast), L2 (standard), L3 (deep).",
-    ),
     skip_defect_check: bool = typer.Option(
         False,
         "--skip-defect-check",
@@ -515,10 +513,6 @@ def inspect(
     # Skip callback execution when a subcommand is invoked
     if ctx.invoked_subcommand is not None:
         return
-
-    if check_level not in {"L1", "L2", "L3"}:
-        console.print(f"[red]✗ Invalid check level: {escape(check_level)} (must be L1/L2/L3)[/red]")
-        raise typer.Exit(code=EXIT_FAILURE)
 
     logger = Logger()
     tracker = ProgressTracker(console, logger, verbose=verbose)
@@ -674,7 +668,7 @@ def inspect(
 
     async def run_check():
         checker = DefectChecker(llm_config)
-        return await checker.check(result, check_level=check_level)
+        return await checker.check(result, check_level=DEFAULT_CHECK_LEVEL)
 
     try:
         with tracker.step("Running defect check..."):
@@ -693,7 +687,7 @@ def inspect(
             response,
             report_dir,
             project_id=project_id,
-            check_level=check_level,
+            check_level=DEFAULT_CHECK_LEVEL,
             qc_result=qc_result,
         )
     except OSError as e:
