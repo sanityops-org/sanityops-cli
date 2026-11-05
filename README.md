@@ -6,7 +6,7 @@ A command-line tool for static defect inspection of AI logical artifacts (System
 
 ## Features
 
-- **Multi-level inspection depth** — Choose between L1 (fast), L2 (standard), or L3 (deep) check levels
+- **Deep inspection** — Runs a comprehensive L3 defect check on every artifact by default
 - **Multiple artifact types** — Inspect System Prompts, Skills, and Tool Schemas
 - **CI/CD friendly** — Non-interactive runs, configuration via environment variables, dated markdown reports for pipeline artifacts
 - **Configurable rules** — Customize inspection behavior via YAML configuration
@@ -100,14 +100,8 @@ skills:
 ### 3. Run Inspection
 
 ```bash
-# Standard inspection (L2 depth)
+# Standard inspection (deep L3 defect check)
 sanityops-cli inspect
-
-# Fast inspection (L1 depth)
-sanityops-cli inspect --check-level L1
-
-# Deep inspection (L3 depth)
-sanityops-cli inspect --check-level L3
 
 # Skip defect check, only analyze artifacts
 sanityops-cli inspect --skip-defect-check
@@ -202,14 +196,6 @@ CLI flags (`--timeout`, `--token-budget`) override these values when explicitly 
 ### Logging
 
 All CLI operations are logged to `~/.sanityops/logs/sanityops-cli-<YYYY-MM-DD>.log`. Logs include timestamps, log levels, and redacted API keys for security.
-
-### Check Levels
-
-| Level | Description | Use Case |
-|-------|-------------|----------|
-| L1 | Fast | Quick validation during development |
-| L2 | Standard | Default, balanced depth for regular use |
-| L3 | Deep | Comprehensive analysis for production releases |
 
 ## Documentation
 

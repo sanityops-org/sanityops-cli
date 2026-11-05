@@ -380,7 +380,7 @@ def save_markdown_report(
     output_dir: Path,
     *,
     project_id: str | None = None,
-    check_level: str = "L2",
+    check_level: str = "L3",
     qc_result: QCInspectionResult | None = None,
 ) -> Path:
     """Persist a full markdown report and return the written file path.
