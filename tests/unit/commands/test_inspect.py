@@ -335,3 +335,70 @@ def test_inspect_prints_banner_before_project_id(monkeypatch, tmp_path):
         i for i, line in enumerate(lines) if f"sanityops-cli v{__version__}" in line
     )
     assert "Project ID: not set" in lines[banner_line_idx + 1]
+
+
+def test_inspect_check_level_flag_removed(monkeypatch, tmp_path):
+    """--check-level is no longer an accepted option (fixed at L3)."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text("---\nname: s\ndescription: d\n---\n# X\n")
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    class FakeAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            return _findings()
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FakeAgent(),
+    )
+
+    result = runner.invoke(app, ["inspect", "--config", str(cfg), "--check-level", "L1"])
+    assert result.exit_code != 0
+    combined = result.stdout + (result.stderr or "")
+    assert "no such option" in combined.lower()
+
+
+def test_inspect_runs_defect_check_at_l3(monkeypatch, tmp_path):
+    """The defect check always runs at the fixed L3 level and reports it."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    skill_file = tmp_path / "skill.md"
+    skill_file.write_text("---\nname: s\ndescription: d\n---\n# X\n")
+    cfg = tmp_path / "inspect_config.yaml"
+    cfg.write_text(
+        "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+        f"skills:\n  - file: {skill_file}\n"
+    )
+
+    class FakeAgent:
+        def analyze_files_sync(self, prompts, tools, skills):
+            return _findings()
+
+    monkeypatch.setattr(
+        "sanityops_cli.commands.inspect.ScannerAgent",
+        lambda *a, **k: FakeAgent(),
+    )
+
+    captured = {}
+
+    async def fake_check(self, findings, check_level="L2"):
+        captured["check_level"] = check_level
+        return {
+            "status": "completed",
+            "summary": {"total_defects": 0, "p0_count": 0, "p1_count": 0, "p2_count": 0, "gate_result": "PASS"},
+            "results": [],
+            "errors": [],
+            "metadata": {},
+        }
+
+    monkeypatch.setattr(
+        "sanityops_cli.defect_checker.checker.DefectChecker.check", fake_check
+    )
+
+    result = runner.invoke(app, ["inspect", "--config", str(cfg)])
+    assert result.exit_code == 0
+    assert captured["check_level"] == "L3"

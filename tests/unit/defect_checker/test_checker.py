@@ -132,12 +132,12 @@ class TestCheck:
                 "llm_base_url": "",
             }
         )
-        await checker.check(result, check_level="L2")
+        await checker.check(result, check_level="L3")
 
         assert captured["skills"] == [{"id": str(skill_dir), "name": "s", "content": ""}]
         assert captured["tools"] == []
         assert captured["prompts"] == []
-        assert captured["kwargs"]["check_level"] == "L2"
+        assert captured["kwargs"]["check_level"] == "L3"
         assert captured["kwargs"]["llm_provider"] == "anthropic"
         assert captured["kwargs"]["llm_api_key"] == "k"
         assert captured["kwargs"]["llm_model_id"] == "m"
