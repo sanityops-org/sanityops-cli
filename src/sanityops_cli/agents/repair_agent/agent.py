@@ -107,7 +107,7 @@ class RepairAgent:
 
         from sanityops_cli.agents.repair_agent.prompts import REPAIR_AGENT_PROMPT
         from sanityops_cli.agents.repair_agent.tools.store_repairs_tool import StoreRepairsTool
-        from sanityops_cli.agents.scanner_agent.tools.readfile_tool import FileReadTool
+        from sanityops_cli.agents.tools.readfile_tool import FileReadTool
 
         report = Path(report_path).resolve()
         if not report.is_file():
@@ -158,9 +158,9 @@ class RepairAgent:
 
         hook_executor = HookExecutor()
         if self.verbose and self.logger:
-            from sanityops_cli.agents.scanner_agent.hooks.progress_hook import ProgressHook
+            from sanityops_cli.agents.progress_hook import LoggingProgressHook
             hook_executor.register(
-                ProgressHook(self.console, verbose=self.verbose, logger=self.logger)
+                LoggingProgressHook(self.console, logger=self.logger, verbose=self.verbose)
             )
 
         factory = AgentFactory(
