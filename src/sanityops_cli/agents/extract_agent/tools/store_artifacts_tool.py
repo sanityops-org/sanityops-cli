@@ -1,0 +1,505 @@
+# Copyright 2026 zipsonken
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+"""The ExtractAgent's sole output channel.
+
+Implements the chunked-delivery protocol from the skill-based inspect design
+(§5.2–§5.3). The tool is the integrity authority: chunk sequences are
+validated as they arrive, and the CLI reads finalized records from the tool
+instance (instance state, not ClassVar) after the agent run ends.
+
+Delivery contract surfaced to the LLM (mirrored by the contract appendix):
+
+- ``add_artifact`` — upsert one chunk of an artifact record. First chunk must
+  declare ``total_chunks``; ``seq`` must arrive in order; ``final=true`` only
+  on ``seq == total_chunks - 1`` and must carry the record metadata
+  (completeness/L/evidence/...). Re-sending from ``seq=0`` replaces the
+  earlier stream (last complete stream wins) — but only once the restart
+  itself validates, so a malformed restart never destroys a good stream.
+- ``add_reference`` — one reference-layer record.
+- ``set_attribution`` — the set-level attribution statement.
+- ``list`` — read-only resync of everything stored so far.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+
+from sanityops_agent.tools.base import Tool, ToolResult
+
+from sanityops_cli.inspect_pipeline.models import (
+    ARTIFACT_TYPES,
+    ATTRIBUTION_STATUSES,
+    COMPLETENESS_LABELS,
+    L_LEVELS,
+    Attribution,
+    ExtractedArtifact,
+    ExtractedReference,
+    FieldEvidence,
+)
+
+#: Maximum content chars per chunk. 6000 chars ≈ 1500 tokens on the chars/4
+#: heuristic and stays safe for CJK (≈1 token/char → 6000 tokens, still well
+#: under the provider's 8192-token output ceiling together with tool-call
+#: overhead).
+MAX_CHUNK_CHARS = 6000
+
+
+@dataclass
+class _ChunkState:
+    chunks: list[str] = field(default_factory=list)
+    total_chunks: int | None = None
+    final: bool = False
+    meta: dict = field(default_factory=dict)  # metadata from the final chunk
+    source: str = ""
+    resends: int = 0
+
+
+class StoreArtifactsTool(Tool):
+    """Structured output channel for the ExtractAgent.
+
+    One instance per agent run; the CLI reads ``finalize()`` from the same
+    instance it registered, so state is intentionally per-instance.
+    """
+
+    name = "store_artifacts"
+    description = (
+        "Store extraction results: artifact records (chunked for oversized "
+        "content), cross-artifact references, and the set-level attribution "
+        "statement. This is the only way to report extracted artifacts."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": ["add_artifact", "add_reference", "set_attribution", "list"],
+                "description": "Which store operation to perform.",
+            },
+            "artifact": {
+                "type": "object",
+                "description": "Required for add_artifact. One chunk of an artifact record.",
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": list(ARTIFACT_TYPES),
+                        "description": "Artifact type.",
+                    },
+                    "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Artifact name (the upsert key together with type).",
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": (
+                            "Verbatim artifact text for this chunk. For type='tool' "
+                            "you may omit content and deliver the parsed schema object."
+                        ),
+                    },
+                    "schema": {
+                        "type": "object",
+                        "description": (
+                            "The parsed tool schema as a JSON object. Required for "
+                            "inspectable tools; do not stringify it."
+                        ),
+                    },
+                    "completeness": {
+                        "type": "string",
+                        "enum": list(COMPLETENESS_LABELS),
+                        "description": "Completeness label (exact six labels).",
+                    },
+                    "L": {
+                        "type": "string",
+                        "enum": list(L_LEVELS),
+                        "description": (
+                            "Assigned level; 'undetermined' when facts are "
+                            "insufficient. L4 is rejected."
+                        ),
+                    },
+                    "evidence": {
+                        "type": "string",
+                        "description": "Verbatim head/tail source excerpt proving the extraction.",
+                    },
+                    "field_evidence": {
+                        "type": "array",
+                        "description": "Per-field provenance; required when completeness='assembled'.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field": {"type": "string"},
+                                "snippet": {"type": "string"},
+                            },
+                            "required": ["field", "snippet"],
+                        },
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Absolute path of the source file.",
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Required when completeness='not inspectable'.",
+                    },
+                    "seq": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "0-based chunk sequence number.",
+                    },
+                    "total_chunks": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Total number of chunks; declare on the first chunk.",
+                    },
+                    "final": {
+                        "type": "boolean",
+                        "description": "True only on the last chunk (seq == total_chunks - 1).",
+                    },
+                },
+                "required": ["type", "name"],
+            },
+            "reference": {
+                "type": "object",
+                "description": "Required for add_reference.",
+                "properties": {
+                    "name": {"type": "string", "minLength": 1},
+                    "referenced_by": {"type": "string", "minLength": 1},
+                    "relationship": {"type": "string", "minLength": 1},
+                },
+                "required": ["name", "referenced_by", "relationship"],
+            },
+            "attribution": {
+                "type": "object",
+                "description": "Required for set_attribution.",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": list(ATTRIBUTION_STATUSES),
+                        "description": "'single' (one agent's set) or 'pending' (unresolved).",
+                    },
+                    "note": {"type": "string"},
+                },
+                "required": ["status"],
+            },
+        },
+        "required": ["operation"],
+    }
+    tags = ["extract", "store"]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._streams: dict[tuple[str, str], _ChunkState] = {}
+        self._references: list[ExtractedReference] = []
+        self._attribution: Attribution | None = None
+        self._resend_log: list[str] = []
+        self._candidates: list[dict] = []
+
+    # ------------------------------------------------------------------
+    # Tool entry
+    # ------------------------------------------------------------------
+
+    async def execute(self, **kwargs) -> ToolResult:  # noqa: ANN003
+        operation = kwargs.get("operation")
+        if operation == "add_artifact":
+            return self._add_artifact(kwargs.get("artifact") or {})
+        if operation == "add_reference":
+            return self._add_reference(kwargs.get("reference") or {})
+        if operation == "set_attribution":
+            return self._set_attribution(kwargs.get("attribution") or {})
+        if operation == "list":
+            return self._list()
+        return self._error(f"unknown operation '{operation}'")
+
+    # ------------------------------------------------------------------
+    # Operations
+    # ------------------------------------------------------------------
+
+    def _add_artifact(self, artifact: dict) -> ToolResult:
+        for required in ("type", "name"):
+            if not artifact.get(required):
+                return self._error(f"artifact.{required} is required")
+        a_type, name = artifact["type"], artifact["name"]
+        if a_type not in ARTIFACT_TYPES:
+            return self._error(f"artifact.type must be one of {ARTIFACT_TYPES}, got {a_type!r}")
+
+        seq = artifact.get("seq", 0)
+        if not isinstance(seq, int) or seq < 0:
+            return self._error(f"artifact.seq must be a non-negative integer, got {seq!r}")
+
+        key = (a_type, name)
+        existing = self._streams.get(key)
+        is_restart = existing is not None and seq == 0 and len(existing.chunks) > 0
+
+        # Basic per-chunk validation (enum values, field bindings) before any
+        # state mutation: a malformed restart must never destroy a good stream.
+        meta_error = self._validate_chunk(artifact, final=False)
+        if meta_error:
+            return self._error(meta_error)
+
+        if is_restart and existing is not None:
+            state = _ChunkState(resends=existing.resends + 1)
+        elif existing is not None:
+            state = existing
+        else:
+            if seq != 0:
+                return self._error(
+                    f"artifact {a_type}/{name}: first chunk must have seq=0, got {seq}"
+                )
+            state = _ChunkState()
+
+        if state.total_chunks is None:
+            total = artifact.get("total_chunks")
+            if not isinstance(total, int) or total < 1:
+                return self._error(
+                    f"artifact {a_type}/{name}: first chunk must declare total_chunks >= 1"
+                )
+            state.total_chunks = total
+
+        if seq != len(state.chunks):
+            return self._error(
+                f"artifact {a_type}/{name}: expected chunk {len(state.chunks)}, got seq={seq}; "
+                f"retransmit from seq=0 to restart"
+            )
+
+        content = artifact.get("content", "")
+        if not content and not artifact.get("schema"):
+            return self._error(f"artifact {a_type}/{name}: chunk {seq} needs content or schema")
+        if len(content) > MAX_CHUNK_CHARS:
+            return self._error(
+                f"artifact {a_type}/{name}: chunk {seq} content is {len(content)} chars; "
+                f"split into chunks of at most {MAX_CHUNK_CHARS} chars"
+            )
+
+        is_last = seq == state.total_chunks - 1
+        if is_last and not artifact.get("final"):
+            return self._error(
+                f"artifact {a_type}/{name}: chunk {seq} is the last of "
+                f"{state.total_chunks}; set final=true on it"
+            )
+        if not is_last and artifact.get("final"):
+            return self._error(
+                f"artifact {a_type}/{name}: final=true on chunk {seq} but "
+                f"total_chunks={state.total_chunks} (final must be seq={state.total_chunks - 1})"
+            )
+
+        if is_last:
+            # The final chunk carries the record metadata; validate it as such.
+            final_error = self._validate_chunk(artifact, final=True)
+            if final_error:
+                return self._error(final_error)
+
+        # ---- state mutations only after every check passed ----
+        if is_restart:
+            self._streams[key] = state
+            self._resend_log.append(f"{a_type}/{name}")
+        elif key not in self._streams:
+            self._streams[key] = state
+        state.chunks.append(content)
+        state.source = artifact.get("source", state.source)
+        if is_last:
+            state.final = True
+            state.meta = {k: v for k, v in artifact.items() if k != "content"}
+            ack = f"stored artifact {name} chunk {seq + 1}/{state.total_chunks}; artifact complete"
+            return self._ok(ack)
+        ack = (
+            f"stored artifact {name} chunk {seq + 1}/{state.total_chunks}; "
+            f"next expected: {len(state.chunks)}"
+        )
+        return self._ok(ack, next_expected=len(state.chunks))
+
+    def _validate_chunk(self, artifact: dict, *, final: bool) -> str | None:
+        completeness = artifact.get("completeness")
+        if completeness is not None and completeness not in COMPLETENESS_LABELS:
+            return (
+                f"completeness must be one of {COMPLETENESS_LABELS}, got {completeness!r}; "
+                f"note the exact separator in 'original · variable unexpanded' (U+00B7)"
+            )
+        level = artifact.get("L")
+        if level is not None and level not in L_LEVELS:
+            return f"L must be one of {L_LEVELS}, got {level!r}"
+        if artifact.get("type") == "tool":
+            schema = artifact.get("schema")
+            if schema is not None and not isinstance(schema, dict):
+                return "artifact.schema must be a JSON object (do not stringify it)"
+        if completeness == "assembled":
+            fe = artifact.get("field_evidence") or []
+            if not fe:
+                return "field_evidence is required when completeness='assembled'"
+            for item in fe:
+                if not isinstance(item, dict) or not item.get("field") or not item.get("snippet"):
+                    return "each field_evidence entry needs non-empty 'field' and 'snippet'"
+        if completeness == "not inspectable" and not artifact.get("reason"):
+            return "reason is required when completeness='not inspectable'"
+        if final:
+            if not completeness:
+                return "the final chunk must carry completeness (and L)"
+            if not level:
+                return "the final chunk must carry L ('undetermined' when facts are insufficient)"
+            if not artifact.get("source"):
+                return "the final chunk must carry the absolute source path"
+        return None
+
+    def _add_reference(self, reference: dict) -> ToolResult:
+        missing = [k for k in ("name", "referenced_by", "relationship") if not reference.get(k)]
+        if missing:
+            return self._error(f"reference missing required fields: {missing}")
+        self._references.append(
+            ExtractedReference(
+                name=reference["name"],
+                referenced_by=reference["referenced_by"],
+                relationship=reference["relationship"],
+            )
+        )
+        return self._ok(
+            f"stored reference: {reference['referenced_by']} -> {reference['name']}",
+            references=len(self._references),
+        )
+
+    def _set_attribution(self, attribution: dict) -> ToolResult:
+        status = attribution.get("status")
+        if status not in ATTRIBUTION_STATUSES:
+            return self._error(
+                f"attribution status must be one of {ATTRIBUTION_STATUSES}, got {status!r}"
+            )
+        self._attribution = Attribution(status=status, note=attribution.get("note", ""))
+        return self._ok(f"attribution set to {status}")
+
+    def _list(self) -> ToolResult:
+        artifacts = []
+        for (a_type, name), state in sorted(self._streams.items()):
+            artifacts.append(
+                {
+                    "type": a_type,
+                    "name": name,
+                    "chunks": f"{len(state.chunks)}/{state.total_chunks}",
+                    "final": state.final,
+                    "completeness": state.meta.get("completeness"),
+                    "L": state.meta.get("L"),
+                }
+            )
+        return ToolResult(
+            content=json.dumps(
+                {
+                    "artifacts": artifacts,
+                    "references": len(self._references),
+                    "attribution": self._attribution.status if self._attribution else None,
+                },
+                ensure_ascii=False,
+            ),
+            success=True,
+        )
+
+    # ------------------------------------------------------------------
+    # CLI-side finalization
+    # ------------------------------------------------------------------
+
+    def finalize(self) -> tuple[list[ExtractedArtifact], list[str]]:
+        """Build validated artifacts; returns (artifacts, incomplete_keys).
+
+        A key is incomplete when its stream never reached ``final=true``.
+        Incomplete keys are excluded from the result and reported to the CLI,
+        which turns them into EXIT_FAILURE per the design (§5.3).
+
+        Pre-registered deterministic candidates (design §5.5) that the agent
+        never covered with an authoritative record are synthesized with
+        ``extraction_method="deterministic"`` and ``L="undetermined"`` — never
+        silently dropped.
+        """
+        artifacts: list[ExtractedArtifact] = []
+        incomplete: list[str] = []
+        for (a_type, name), state in sorted(self._streams.items()):
+            if not state.final:
+                incomplete.append(f"{a_type}/{name}")
+                continue
+            meta = state.meta
+            artifacts.append(
+                ExtractedArtifact(
+                    type=a_type,
+                    name=name,
+                    content="\n".join(state.chunks) if any(state.chunks) else "",
+                    schema=meta.get("schema") or {},
+                    completeness=meta["completeness"],
+                    L=meta["L"],
+                    evidence=meta.get("evidence", ""),
+                    field_evidence=[
+                        FieldEvidence(**item) for item in (meta.get("field_evidence") or [])
+                    ],
+                    source=state.source,
+                    reason=meta.get("reason", ""),
+                )
+            )
+
+        covered = {(a.type, a.name) for a in artifacts}
+        for candidate in self._candidates:
+            key = ("tool", candidate["name"])
+            if key in covered:
+                continue
+            artifacts.append(
+                ExtractedArtifact(
+                    type="tool",
+                    name=candidate["name"],
+                    schema=candidate.get("schema") or {},
+                    completeness="full original",
+                    L="undetermined",
+                    evidence=f"tool registry entry in {candidate.get('source', 'unknown')}",
+                    source=candidate.get("source", ""),
+                    reason="",
+                    extraction_method="deterministic",
+                )
+            )
+        return artifacts, incomplete
+
+    def register_candidates(self, candidates: list[dict]) -> None:
+        """Pre-register deterministic tool candidates (design §5.5).
+
+        Each candidate: ``{"name": str, "schema": dict, "source": str}``. The
+        agent is still required to produce an authoritative record; uncovered
+        candidates are synthesized in ``finalize()``.
+        """
+        self._candidates = list(candidates)
+
+    @property
+    def candidate_count(self) -> int:
+        return len(self._candidates)
+
+    @property
+    def references(self) -> list[ExtractedReference]:
+        return list(self._references)
+
+    @property
+    def attribution(self) -> Attribution | None:
+        return self._attribution
+
+    @property
+    def resend_log(self) -> list[str]:
+        return list(self._resend_log)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _ok(message: str, **extra) -> ToolResult:
+        payload = {"success": True, "message": message, **extra}
+        return ToolResult(content=json.dumps(payload, ensure_ascii=False), success=True)
+
+    @staticmethod
+    def _error(message: str) -> ToolResult:
+        return ToolResult(
+            content=json.dumps({"success": False, "error": message}, ensure_ascii=False),
+            success=False,
+            error=message,
+        )
