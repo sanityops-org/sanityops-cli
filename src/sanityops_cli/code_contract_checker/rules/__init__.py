@@ -1,24 +1,19 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Code Contract inspection rules."""
+"""Code Contract inspection rules (17-item checklist v2)."""
 
 from .qc0_baseline import (
+    CodeBlock,
     check_qc_0_1_syntax_parsability,
     check_qc_0_2_language_declaration,
     check_qc_0_3_structural_completeness,
     extract_code_blocks,
+)
+from .qc0_fence import (
+    check_qc_0_4_fence_integrity,
+    check_qc_0_5_language_content_mismatch,
+)
+from .qc1_imports import (
+    check_qc_1_2_invalid_import,
+    check_qc_1_3_deprecated_api,
 )
 from .qc1_syntax import (
     check_qc_1_1_undefined_name,
@@ -34,15 +29,25 @@ from .qc3_pattern import (
     check_qc_3_2_missing_import,
     check_qc_3_3_hardcoded_demo_value,
 )
+from .qc4_drift import (
+    check_qc_4_1_snippet_artifact_mismatch,
+    check_qc_4_2_snippet_body_drift,
+    extract_snippet_param_names,
+)
 
 __all__ = [
     # QC-0 Baseline
+    "CodeBlock",
     "check_qc_0_1_syntax_parsability",
     "check_qc_0_2_language_declaration",
     "check_qc_0_3_structural_completeness",
+    "check_qc_0_4_fence_integrity",
+    "check_qc_0_5_language_content_mismatch",
     "extract_code_blocks",
     # QC-1 Syntax
     "check_qc_1_1_undefined_name",
+    "check_qc_1_2_invalid_import",
+    "check_qc_1_3_deprecated_api",
     "check_qc_1_4_type_mismatch",
     # QC-2 Resource
     "check_qc_2_1_unclosed_file_handle",
@@ -52,4 +57,8 @@ __all__ = [
     "check_qc_3_1_unused_import",
     "check_qc_3_2_missing_import",
     "check_qc_3_3_hardcoded_demo_value",
+    # QC-4 Drift
+    "check_qc_4_1_snippet_artifact_mismatch",
+    "check_qc_4_2_snippet_body_drift",
+    "extract_snippet_param_names",
 ]
