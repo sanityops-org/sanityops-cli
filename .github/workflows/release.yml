@@ -122,7 +122,6 @@ jobs:
           fi
           pyinstaller --onefile \
             --name sanityops-cli-${{ matrix.platform }}-$ARCH \
-            --collect-data defect_check \
             --collect-data sanityops_cli \
             entry.py
 
@@ -130,7 +129,6 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           pyinstaller --onefile --name sanityops-cli-win-x64 `
-            --collect-data defect_check `
             --collect-data sanityops_cli `
             entry.py
 

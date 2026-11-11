@@ -32,10 +32,22 @@ model:
   base_url: ""                        # Optional: custom endpoint URL
 
 # Agent configuration (optional)
-# Override CLI defaults for timeout and token budget.
+# Override CLI defaults per stage.
 # agent:
-#   timeout: 1800      # seconds (default: 1800, 30min)
-#   token_budget: 200000
+#   max_loops: 80      # Maximum agent loops per stage (default: 80)
+#   timeout: 1800      # seconds per stage (default: 1800, 30min)
+#   token_budget: 200000  # per agent; the inspect stage floors at 300000
+
+# Pipeline settings
+report_language: en      # Report language for the inspection report (default: en)
+attribution: auto        # auto | single | collection (default: auto)
+context_window: 200000   # LLM context window used to derive the injection budget
+
+# Code Contract lint settings
+qc_lint:
+  # External modules the artifacts may import (enables QC-1.2 beyond the
+  # standard library). Leave empty to record QC-1.2 as Not Executed.
+  declared_dependencies: []
 
 # System Prompt file list (supports any plaintext file format)
 prompts:
@@ -49,7 +61,7 @@ tools:
   - file: tools/file_ops.py
   - file: tools/code_tools.ts
 
-# Skills file list (supports any plaintext file format)
+# Skills file list (a single file or a directory scanned for SKILL.md files)
 skills:
   - file: skills/code_review.md
-  - file: skills/code_fix/skill.md
+  - file: skills/code_fix
