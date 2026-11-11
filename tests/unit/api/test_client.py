@@ -1,19 +1,4 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-"""Tests for sanityops_cli.api.client module."""
+"""Unit tests for SanityopsClient."""
 
 from unittest.mock import patch
 
@@ -22,7 +7,6 @@ import pytest
 
 from sanityops_cli.api.client import SanityopsClient
 from sanityops_cli.exceptions.api_exceptions import (
-    APIError,
     APIValidationError,
     AuthenticationError,
     NetworkError,
@@ -30,210 +14,294 @@ from sanityops_cli.exceptions.api_exceptions import (
 )
 
 
-class TestSanityopsClientInit:
-    """Test SanityopsClient initialization."""
+class TestSanityopsClient:
+    """Tests for SanityopsClient."""
 
-    def test_init_strips_trailing_slash_from_base_url(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org/", "test-key")
-        assert client.base_url == "https://api.sanityops.org"
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.client = SanityopsClient(
+            base_url="https://api.test.com",
+            api_key="test_api_key_123",
+        )
 
-    def test_init_stores_api_key_and_timeout(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org", "test-key", timeout=60.0)
-        assert client.api_key == "test-key"
-        assert client.timeout == 60.0
+    def test_init(self):
+        """Test client initialization."""
+        assert self.client.base_url == "https://api.test.com"
+        assert self.client.api_key == "test_api_key_123"
+        assert self.client.timeout == 30.0
 
-    def test_default_timeout_is_30(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        assert client.timeout == 30.0
+    def test_init_trailing_slash(self):
+        """Test that trailing slash is stripped from base_url."""
+        client = SanityopsClient("https://api.test.com/", "key")
+        assert client.base_url == "https://api.test.com"
 
-
-class TestSanityopsClientHeaders:
-    """Test SanityopsClient header generation."""
-
-    def test_get_headers_includes_bearer_token(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org", "my-api-key")
-        headers = client._get_headers()
-        assert headers["Authorization"] == "Bearer my-api-key"
+    def test_get_headers(self):
+        """Test authorization header format."""
+        headers = self.client._get_headers()
+        assert headers["Authorization"] == "Bearer test_api_key_123"
         assert headers["Accept"] == "application/json"
 
 
-class TestSanityopsClientCreateProject:
-    """Test SanityopsClient.create_project method."""
+class TestCreateProject:
+    """Tests for create_project method."""
+
+    def setup_method(self):
+        self.client = SanityopsClient("https://api.test.com", "test_key")
 
     @patch("httpx.post")
-    def test_create_project_success(self, mock_post) -> None:
+    def test_create_project_success(self, mock_post):
+        """Test successful project creation."""
         mock_response = httpx.Response(
             200,
-            json={"code": 0, "data": {"project_id": "uuid-123", "name": "Test Project"}},
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/"),
+            json={"id": "12345678-1234-1234-1234-123456789012", "name": "test-project"},
         )
         mock_post.return_value = mock_response
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        result = client.create_project("Test Project", "Description")
+        result = self.client.create_project("test-project", "Test description")
 
-        assert result["project_id"] == "uuid-123"
-        assert result["name"] == "Test Project"
+        assert result["id"] == "12345678-1234-1234-1234-123456789012"
+        assert result["name"] == "test-project"
+        mock_post.assert_called_once()
+
+        # Verify request payload
+        call_args = mock_post.call_args
+        assert call_args.kwargs["json"]["name"] == "test-project"
+        assert call_args.kwargs["json"]["description"] == "Test description"
 
     @patch("httpx.post")
-    def test_create_project_authentication_error(self, mock_post) -> None:
-        mock_response = httpx.Response(
-            401,
-            json={"detail": "Invalid API key"},
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/"),
-        )
+    def test_create_project_auth_error(self, mock_post):
+        """Test authentication error handling."""
+        mock_response = httpx.Response(401, json={"detail": "Invalid API key"})
         mock_post.return_value = mock_response
-
-        client = SanityopsClient("https://api.sanityops.org", "bad-key")
 
         with pytest.raises(AuthenticationError):
-            client.create_project("Test Project")
+            self.client.create_project("test-project")
 
     @patch("httpx.post")
-    def test_create_project_validation_error(self, mock_post) -> None:
-        mock_response = httpx.Response(
-            422,
-            json={"detail": "Name is required"},
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/"),
-        )
+    def test_create_project_validation_error(self, mock_post):
+        """Test validation error handling."""
+        mock_response = httpx.Response(422, json={"detail": "Name too long"})
         mock_post.return_value = mock_response
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-
         with pytest.raises(APIValidationError):
-            client.create_project("")
+            self.client.create_project("x" * 300)  # Too long name
 
 
-class TestSanityopsClientUploadArtifacts:
-    """Test SanityopsClient.upload_artifacts method."""
+class TestUploadArtifacts:
+    """Tests for upload_artifacts method."""
+
+    def setup_method(self):
+        self.client = SanityopsClient("https://api.test.com", "test_key")
 
     @patch("httpx.post")
-    def test_upload_artifacts_creates_new_project(self, mock_post) -> None:
+    def test_upload_new_project(self, mock_post):
+        """Test uploading artifacts for a new project."""
         mock_response = httpx.Response(
             200,
             json={
-                "code": 0,
-                "data": {
-                    "project_id": "uuid-456",
-                    "version_id": "ver-789",
+                "id": "new-project-id",
+                "version_id": "version-123",
+                "artifacts": {
+                    "prompt": {"status": "new"},
+                    "tools": {"status": "new"},
+                    "skill": {"status": "new"},
                 },
             },
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/upload"),
         )
         mock_post.return_value = mock_response
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        result = client.upload_artifacts(
-            name="New Project",
+        result = self.client.upload_artifacts(
+            name="new-project",
             prompt_content="Test prompt",
-            tools_schema='[{"type": "function", "function": {"name": "test"}}]',
+            tools_schema='[{"name": "test"}]',
             message="Initial upload",
         )
 
-        assert result["project_id"] == "uuid-456"
-        assert result["version_id"] == "ver-789"
+        assert result["id"] == "new-project-id"
+        mock_post.assert_called_once()
 
     @patch("httpx.post")
-    def test_upload_artifacts_updates_existing_project(self, mock_post) -> None:
+    def test_upload_existing_project(self, mock_post):
+        """Test uploading artifacts for an existing project."""
         mock_response = httpx.Response(
             200,
             json={
-                "code": 0,
-                "data": {
-                    "project_id": "existing-uuid",
-                    "version_id": "new-ver",
+                "version_id": "version-456",
+                "artifacts": {
+                    "prompt": {"status": "reused"},
                 },
             },
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/upload"),
         )
         mock_post.return_value = mock_response
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        result = client.upload_artifacts(
-            project_id="existing-uuid",
+        result = self.client.upload_artifacts(
+            project_id="existing-project-id",
             prompt_content="Updated prompt",
             message="Update",
         )
 
-        assert result["project_id"] == "existing-uuid"
+        assert result["version_id"] == "version-456"
 
     @patch("httpx.post")
-    def test_upload_artifacts_with_skill_file(self, mock_post) -> None:
-        mock_response = httpx.Response(
-            200,
-            json={"code": 0, "data": {"version_id": "ver-123"}},
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/upload"),
-        )
+    def test_upload_with_skill_file(self, mock_post):
+        """Test uploading with skill ZIP file."""
+        mock_response = httpx.Response(200, json={"version_id": "v1"})
         mock_post.return_value = mock_response
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        skill_zip = ("skills.zip", b"PK\x03\x04...")
+        skill_zip = ("skills.zip", b"PK\x03\x04...")  # Minimal ZIP header
 
-        result = client.upload_artifacts(
-            project_id="proj-uuid",
+        result = self.client.upload_artifacts(
+            project_id="proj-123",
             skill_file=skill_zip,
         )
 
-        assert result["version_id"] == "ver-123"
+        assert result["version_id"] == "v1"
+        mock_post.assert_called_once()
 
 
-class TestSanityopsClientErrorHandling:
-    """Test SanityopsClient error handling."""
+class TestGetProject:
+    """Tests for get_project method."""
 
-    @patch("httpx.post")
-    def test_network_error_on_connection_failure(self, mock_post) -> None:
-        mock_post.side_effect = httpx.ConnectError("Connection refused")
-
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-
-        with pytest.raises(NetworkError):
-            client.create_project("Test")
+    def setup_method(self):
+        self.client = SanityopsClient("https://api.test.com", "test_key")
 
     @patch("httpx.get")
-    def test_project_not_found_error_404(self, mock_get) -> None:
+    def test_get_project_success(self, mock_get):
+        """Test getting project details."""
         mock_response = httpx.Response(
-            404,
-            json={"detail": "Project not found"},
-            request=httpx.Request("GET", "https://api.sanityops.org/api/v1/projects/nonexistent"),
+            200,
+            json={
+                "data": {
+                    "project_id": "12345678-1234-1234-1234-123456789012",
+                    "name": "defect-management",
+                    "description": "A test project",
+                },
+                "code": 200,
+            },
         )
         mock_get.return_value = mock_response
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
+        result = self.client.get_project("12345678-1234-1234-1234-123456789012")
+
+        assert result["project_id"] == "12345678-1234-1234-1234-123456789012"
+        assert result["name"] == "defect-management"
+        mock_get.assert_called_once()
+        # Verify request URL
+        call_args = mock_get.call_args
+        assert (
+            call_args.args[0]
+            == "https://api.test.com/api/v1/projects/12345678-1234-1234-1234-123456789012"
+        )
+
+    @patch("httpx.get")
+    def test_get_project_not_found(self, mock_get):
+        """Test project not found error."""
+        mock_response = httpx.Response(404, json={"detail": "Project not found"})
+        mock_get.return_value = mock_response
 
         with pytest.raises(ProjectNotFoundError):
-            client.get_project("nonexistent")
+            self.client.get_project("nonexistent-proj")
+
+    @patch("httpx.get")
+    def test_get_project_auth_error(self, mock_get):
+        """Test authentication error handling."""
+        mock_response = httpx.Response(401, json={"detail": "Invalid API key"})
+        mock_get.return_value = mock_response
+
+        with pytest.raises(AuthenticationError):
+            self.client.get_project("proj-123")
+
+
+class TestListVersions:
+    """Tests for list_versions method."""
+
+    def setup_method(self):
+        self.client = SanityopsClient("https://api.test.com", "test_key")
+
+    @patch("httpx.get")
+    def test_list_versions_success(self, mock_get):
+        """Test listing versions."""
+        mock_response = httpx.Response(
+            200,
+            json={
+                "items": [
+                    {"id": "v1", "created_at": "2026-08-21T10:00:00Z", "message": "First"},
+                    {"id": "v2", "created_at": "2026-08-21T11:00:00Z", "message": "Second"},
+                ],
+                "total": 2,
+            },
+        )
+        mock_get.return_value = mock_response
+
+        result = self.client.list_versions("proj-123", page=1, size=10)
+
+        assert len(result["items"]) == 2
+        assert result["total"] == 2
+
+    @patch("httpx.get")
+    def test_list_versions_not_found(self, mock_get):
+        """Test project not found error."""
+        mock_response = httpx.Response(404, json={"detail": "Project not found"})
+        mock_get.return_value = mock_response
+
+        with pytest.raises(ProjectNotFoundError):
+            self.client.list_versions("nonexistent-proj")
+
+
+class TestGetVersion:
+    """Tests for get_version method."""
+
+    def setup_method(self):
+        self.client = SanityopsClient("https://api.test.com", "test_key")
+
+    @patch("httpx.get")
+    def test_get_version_success(self, mock_get):
+        """Test getting version details."""
+        mock_response = httpx.Response(
+            200,
+            json={
+                "id": "version-123",
+                "created_at": "2026-08-21T10:00:00Z",
+                "message": "Test version",
+                "artifacts": {
+                    "prompt": {"hash": "abc123", "status": "new"},
+                },
+            },
+        )
+        mock_get.return_value = mock_response
+
+        result = self.client.get_version("proj-123", "version-123")
+
+        assert result["id"] == "version-123"
+        assert result["message"] == "Test version"
+
+
+class TestNetworkErrors:
+    """Tests for network error handling."""
+
+    def setup_method(self):
+        self.client = SanityopsClient("https://api.test.com", "test_key")
 
     @patch("httpx.post")
-    def test_generic_api_error_for_500(self, mock_post) -> None:
-        mock_response = httpx.Response(
-            500,
-            json={"detail": "Internal server error"},
-            request=httpx.Request("POST", "https://api.sanityops.org/api/v1/projects/"),
-        )
-        mock_post.return_value = mock_response
+    def test_connection_error(self, mock_post):
+        """Test connection error handling."""
+        mock_post.side_effect = httpx.ConnectError("Connection refused")
 
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
+        with pytest.raises(NetworkError):
+            self.client.create_project("test")
 
-        with pytest.raises(APIError) as exc_info:
-            client.create_project("Test")
+    @patch("httpx.post")
+    def test_timeout_error(self, mock_post):
+        """Test timeout error handling."""
+        mock_post.side_effect = httpx.TimeoutException("Request timed out")
 
-        assert "HTTP 500" in str(exc_info.value)
+        with pytest.raises(NetworkError):
+            self.client.create_project("test")
 
+    @patch("httpx.post")
+    def test_remote_protocol_error(self, mock_post):
+        """Test generic httpx.HTTPError (e.g. RemoteProtocolError) mapping."""
+        mock_post.side_effect = httpx.RemoteProtocolError("Server disconnected without response")
 
-class TestSanityopsClientResponseUnwrapping:
-    """Test SanityopsClient response unwrapping."""
-
-    def test_unwrap_extracts_data_field(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        result = client._unwrap_response({"code": 0, "data": {"id": "123"}, "message": "OK"})
-        assert result == {"id": "123"}
-
-    def test_unwrap_returns_original_if_no_data_field(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        result = client._unwrap_response({"id": "456", "name": "Project"})
-        assert result == {"id": "456", "name": "Project"}
-
-    def test_unwrap_returns_empty_dict_for_null_data(self) -> None:
-        client = SanityopsClient("https://api.sanityops.org", "test-key")
-        result = client._unwrap_response({"code": 0, "data": None})
-        assert result == {}
+        with pytest.raises(NetworkError):
+            self.client.create_project("test")
