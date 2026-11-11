@@ -231,10 +231,20 @@ class ConfigResolver:
         config_key: str,
         env_var: str | None = None,
         default: str | None = None,
+        project_config_path: Path | None = None,
     ):
         self.config_key = config_key
         self.env_var = env_var
         self.default = default
+        self.project_config_path = project_config_path
+
+    @staticmethod
+    def _normalize_value(value: object) -> str | None:
+        """Convert a config value to text, treating blank strings as unset."""
+        if value is None:
+            return None
+        text = value if isinstance(value, str) else str(value)
+        return text if text.strip() else None
 
     def resolve(self) -> str | None:
         """Resolve config value following precedence chain.
@@ -244,21 +254,22 @@ class ConfigResolver:
         """
         # 1. Environment variable (highest priority for CI/CD overrides)
         if self.env_var:
-            env_value = os.environ.get(self.env_var)
+            env_value = self._normalize_value(os.environ.get(self.env_var))
             if env_value is not None:
                 return env_value
 
         # 2. Project-level config
-        project_config = _read_yaml_file(get_project_config_path())
-        value = _get_nested_value(project_config, self.config_key)
+        project_path = self.project_config_path or get_project_config_path()
+        project_config = _read_yaml_file(project_path)
+        value = self._normalize_value(_get_nested_value(project_config, self.config_key))
         if value is not None:
-            return str(value) if not isinstance(value, str) else value
+            return value
 
         # 3. Global config
         global_config = _read_yaml_file(get_global_config_path())
-        value = _get_nested_value(global_config, self.config_key)
+        value = self._normalize_value(_get_nested_value(global_config, self.config_key))
         if value is not None:
-            return str(value) if not isinstance(value, str) else value
+            return value
 
         # 4. Default (lowest priority)
         return self.default
@@ -272,17 +283,22 @@ class ConfigResolver:
         result: dict[str, str | None] = {}
 
         # Project-level
-        project_config = _read_yaml_file(get_project_config_path())
-        project_value = _get_nested_value(project_config, self.config_key)
-        result["project"] = str(project_value) if project_value is not None else None
+        project_path = self.project_config_path or get_project_config_path()
+        project_config = _read_yaml_file(project_path)
+        result["project"] = self._normalize_value(
+            _get_nested_value(project_config, self.config_key)
+        )
 
         # Global
         global_config = _read_yaml_file(get_global_config_path())
-        global_value = _get_nested_value(global_config, self.config_key)
-        result["global"] = str(global_value) if global_value is not None else None
+        result["global"] = self._normalize_value(
+            _get_nested_value(global_config, self.config_key)
+        )
 
         # Env
-        result["env"] = os.environ.get(self.env_var) if self.env_var else None
+        result["env"] = (
+            self._normalize_value(os.environ.get(self.env_var)) if self.env_var else None
+        )
 
         # Default
         result["default"] = self.default

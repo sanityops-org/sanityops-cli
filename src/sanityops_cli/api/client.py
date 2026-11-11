@@ -116,6 +116,35 @@ class SanityopsClient:
         else:
             raise APIError(f"API error during {operation} (HTTP {status_code}): {detail}")
 
+
+    def _request_json(
+        self,
+        method: str,
+        url: str,
+        operation: str,
+        *,
+        expected: tuple[int, ...] = (200,),
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Execute a request, map transport failures, and unwrap the JSON body."""
+        kwargs.setdefault("headers", self._get_headers())
+        kwargs.setdefault("timeout", self.timeout)
+        requester = httpx.get if method == "GET" else httpx.post
+
+        try:
+            response = requester(url, **kwargs)
+        except httpx.ConnectError as e:
+            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
+        except httpx.TimeoutException as e:
+            raise NetworkError(f"Request timed out: {e}") from e
+        except httpx.HTTPError as e:
+            raise NetworkError(f"HTTP error during {operation}: {e}") from e
+
+        if response.status_code not in expected:
+            self._handle_error(response, operation)
+
+        return self._unwrap_response(response.json())
+
     # ---------------------------------------------------------------------
     # Project Operations
     # ---------------------------------------------------------------------
@@ -144,22 +173,9 @@ class SanityopsClient:
         if description:
             payload["description"] = description
 
-        try:
-            response = httpx.post(
-                url,
-                json=payload,
-                headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.ConnectError as e:
-            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
-        except httpx.TimeoutException as e:
-            raise NetworkError(f"Request timed out: {e}") from e
-
-        if response.status_code not in (200, 201):
-            self._handle_error(response, "project creation")
-
-        return self._unwrap_response(response.json())
+        return self._request_json(
+            "POST", url, "project creation", expected=(200, 201), json=payload
+        )
 
     def get_project(
         self,
@@ -180,21 +196,7 @@ class SanityopsClient:
         """
         url = f"{self.base_url}/api/v1/projects/{project_id}"
 
-        try:
-            response = httpx.get(
-                url,
-                headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.ConnectError as e:
-            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
-        except httpx.TimeoutException as e:
-            raise NetworkError(f"Request timed out: {e}") from e
-
-        if response.status_code != 200:
-            self._handle_error(response, "getting project")
-
-        return self._unwrap_response(response.json())
+        return self._request_json("GET", url, "getting project")
 
     # ---------------------------------------------------------------------
     # Artifact Upload
@@ -255,23 +257,9 @@ class SanityopsClient:
             filename, content = skill_file
             files = {"skill_file": (filename, content, "application/zip")}
 
-        try:
-            response = httpx.post(
-                url,
-                data=data,
-                files=files,
-                headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.ConnectError as e:
-            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
-        except httpx.TimeoutException as e:
-            raise NetworkError(f"Request timed out: {e}") from e
-
-        if response.status_code not in (200, 201):
-            self._handle_error(response, "artifact upload")
-
-        return self._unwrap_response(response.json())
+        return self._request_json(
+            "POST", url, "artifact upload", expected=(200, 201), data=data, files=files
+        )
 
     # ---------------------------------------------------------------------
     # Version Operations
@@ -301,22 +289,7 @@ class SanityopsClient:
         url = f"{self.base_url}/api/v1/projects/{project_id}/versions"
         params = {"page": page, "size": min(size, 100)}
 
-        try:
-            response = httpx.get(
-                url,
-                params=params,
-                headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.ConnectError as e:
-            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
-        except httpx.TimeoutException as e:
-            raise NetworkError(f"Request timed out: {e}") from e
-
-        if response.status_code != 200:
-            self._handle_error(response, "listing versions")
-
-        return self._unwrap_response(response.json())
+        return self._request_json("GET", url, "listing versions", params=params)
 
     def get_version(
         self,
@@ -339,21 +312,7 @@ class SanityopsClient:
         """
         url = f"{self.base_url}/api/v1/projects/{project_id}/versions/{version_id}"
 
-        try:
-            response = httpx.get(
-                url,
-                headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.ConnectError as e:
-            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
-        except httpx.TimeoutException as e:
-            raise NetworkError(f"Request timed out: {e}") from e
-
-        if response.status_code != 200:
-            self._handle_error(response, "getting version")
-
-        return self._unwrap_response(response.json())
+        return self._request_json("GET", url, "getting version")
 
     def get_project_artifacts(
         self,
@@ -385,19 +344,4 @@ class SanityopsClient:
         if version_id:
             params["version_id"] = version_id
 
-        try:
-            response = httpx.get(
-                url,
-                params=params,
-                headers=self._get_headers(),
-                timeout=self.timeout,
-            )
-        except httpx.ConnectError as e:
-            raise NetworkError(f"Failed to connect to {self.base_url}: {e}") from e
-        except httpx.TimeoutException as e:
-            raise NetworkError(f"Request timed out: {e}") from e
-
-        if response.status_code != 200:
-            self._handle_error(response, "getting project artifacts")
-
-        return self._unwrap_response(response.json())
+        return self._request_json("GET", url, "getting project artifacts", params=params)

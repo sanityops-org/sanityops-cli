@@ -68,7 +68,6 @@ def validate_artifact_inputs(
     skills: list[str],
     tools: list[str],
     prompts: list[str],
-    level: str,
 ) -> None:
     """validate artifact inputs for inspect command"""
     if not skills and not tools and not prompts:
@@ -110,8 +109,5 @@ def validate_artifact_inputs(
             raise ValidationError(f"Tools Schema is not valid JSON: {path_str}") from None
         if not isinstance(parsed, (dict, list)):
             raise ValidationError(f"Tools Schema must be a JSON object or array: {path_str}")
-
-    if level.upper() not in ("L1", "L2", "L3"):
-        raise ValidationError(f"Level must be one of L1/L2/L3, current value: {level}")
 
 
