@@ -1,0 +1,54 @@
+name: Update vendored skills
+
+on:
+  schedule:
+    # Daily at 03:17 UTC.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Update even if the recorded commit is current"
+        type: boolean
+        default: false
+      dry_run:
+        description: "Clone, update, and test without creating a branch or PR"
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [skill-updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    name: Update vendored inspect skills
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --all-extras
+
+      - name: Update vendored skills
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_SKILL_URL: https://github.com/sanityops-org/sanityops-inspect-lite.git
+        run: |
+          FLAGS=""
+          if [ "${{ inputs.force }}" = "true" ]; then FLAGS="$FLAGS --force"; fi
+          if [ "${{ inputs.dry_run }}" = "true" ]; then FLAGS="$FLAGS --dry-run"; fi
+          uv run python scripts/ci_sync_skills.py $FLAGS
