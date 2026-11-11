@@ -1,26 +1,10 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """QC-0 Baseline Compliance rules - entry gate checks."""
 
 from __future__ import annotations
 
 import ast
-import io
 import re
-import tokenize
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from ..models import QCDefect, QCRuleID, Severity
 
@@ -28,17 +12,30 @@ if TYPE_CHECKING:
     from ..models import QCArtifactResult
 
 
-# Language identifier patterns for Markdown code blocks
-# Trailing newline is optional so code blocks at end of file are still matched.
-# [^\n]* accepts languages with non-word characters (c++, c#) and
-# full info strings ("python title"); only the first token is used as
-# the language identifier during normalization.
-# Known limitations (accepted for a lightweight scanner):
-# - Nested fences (``` inside ```) are not supported; the first closing
-#   fence ends the block.
-# - Tilde-delimited fences (~~~) are not matched.
-# - An opening fence with more than three backticks is not matched.
-CODE_BLOCK_PATTERN = re.compile(r"```([^\n]*)\n(.*?)```(?:\n|$)", re.DOTALL)
+# Language identifier patterns for Markdown code blocks. The fence info line
+# is split into a first token (the language, possibly empty for QC-0.2) and a
+# free-form info string (e.g. "```python example"); the closing fence may be
+# longer than the opener and a trailing newline is optional so code blocks at
+# end of file are still matched.
+CODE_BLOCK_PATTERN = re.compile(r"```(\S*)[ \t]*([^\n]*)\n(.*?)```", re.DOTALL)
+
+# Markers that flag a snippet as illustrative (示意) rather than runnable:
+# explicit fence-info/label markers, or a bare ``...`` truncation line inside
+# the block (design §7.1: such snippets are exempt from QC-0.1/QC-0.3).
+ILLUSTRATIVE_MARKER_RE = re.compile(
+    r"\b(example|examples|pseudo|illustrative|示意|示例)\b", re.IGNORECASE
+)
+BARE_ELLIPSIS_RE = re.compile(r"^\s*\.{3}\s*$", re.MULTILINE)
+
+
+class CodeBlock(NamedTuple):
+    """An extracted code block with its location and illustrative flag."""
+
+    code: str
+    language: str
+    line_number: int
+    illustrative: bool = False
+
 
 # Language aliases mapping
 LANGUAGE_ALIASES = {
@@ -251,6 +248,7 @@ PYTHON_STDLIB = frozenset(
         "warnings",
         "xml",
         "xmlrpc",
+        "yaml",
     }
 )
 
@@ -286,7 +284,7 @@ def check_qc_0_1_syntax_parsability(
             location=location,
             evidence=code[:200] if len(code) > 200 else code,
             fix_suggestion=f"Fix syntax error at line {e.lineno}: {e.msg}",
-            line_number=line_offset + (e.lineno or 1),
+            line_number=(line_offset + (e.lineno or 1)) if e.lineno else line_offset + 1,
             artifact_path=artifact_result.artifact_path,
             artifact_type=artifact_result.artifact_type,
             language=language,
@@ -378,12 +376,13 @@ def check_qc_0_3_structural_completeness(
     brackets = {"(": ")", "[": "]", "{": "}"}
     stack: list[str] = []
 
+    import io
+    import tokenize
+
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(code).readline))
     except (tokenize.TokenError, IndentationError, SyntaxError):
-        # Silent skip is acceptable: a snippet that fails to tokenize is
-        # syntactically invalid, and QC-0.1 reports that as a P0 defect,
-        # so there is no useful bracket analysis left to do here.
+        # Code already fails to tokenize - QC-0.1 will catch the syntax error.
         tokens = []
 
     for tok in tokens:
@@ -448,7 +447,7 @@ def extract_code_blocks(
     content: str,
     artifact_result: QCArtifactResult,
     location_prefix: str = "$",
-) -> list[tuple[str, str, int]]:
+) -> list[CodeBlock]:
     """Extract all code blocks from content with their locations.
 
     Args:
@@ -457,16 +456,14 @@ def extract_code_blocks(
         location_prefix: Prefix for location paths.
 
     Returns:
-        List of (code, language, line_number) tuples.
+        List of CodeBlock records (code, language, line_number, illustrative).
     """
-    blocks: list[tuple[str, str, int]] = []
+    blocks: list[CodeBlock] = []
 
     for match in CODE_BLOCK_PATTERN.finditer(content):
-        # The info string may carry extra tokens (e.g. "python title=...").
-        # Only the first whitespace-separated token is the language.
-        info = match.group(1).strip() if match.group(1) else ""
-        lang = info.split()[0] if info else ""
-        code = match.group(2)
+        lang = match.group(1).strip() if match.group(1) else ""
+        info = (match.group(2) or "").strip()
+        code = match.group(3)
 
         # Find the line number of the opening fence
         # Count newlines before the match position
@@ -483,7 +480,14 @@ def extract_code_blocks(
             line_number,
         )
 
-        if normalized_lang:
-            blocks.append((code, normalized_lang, line_number))
+        if not normalized_lang:
+            continue
+
+        # Design §7.1 示意片段豁免: explicit markers in the fence info line,
+        # or a bare ``...`` truncation line inside the block.
+        illustrative = bool(ILLUSTRATIVE_MARKER_RE.search(f"{lang} {info}")) or bool(
+            BARE_ELLIPSIS_RE.search(code)
+        )
+        blocks.append(CodeBlock(code, normalized_lang, line_number, illustrative))
 
     return blocks
