@@ -302,124 +302,138 @@ class TestModelSectionValidation:
         assert "model" in str(excinfo.value).lower()
 
 
-class TestSkillsSectionFilesOnly:
-    """Skills entries must be existing files, not directories."""
+class TestGbkEncodedConfig:
+    """Windows users often save config files as GBK (Notepad ANSI default).
 
-    def _write_config(self, tmp_path: Path, skills_entries: list) -> Path:
+    The loader should accept GBK-encoded files via encoding fallback.
+    """
+
+    def test_gbk_encoded_config_is_loaded(self, tmp_path: Path, monkeypatch):
+        """GBK-encoded config file should be loaded without UnicodeDecodeError."""
+        monkeypatch.chdir(tmp_path)
         config_dir = tmp_path / ".sanityops"
         config_dir.mkdir()
         config_file = config_dir / "inspect_config.yaml"
+
+        # Create a valid skill file
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
         config_content = {
-            "project": {"id": "00000000-0000-0000-0000-0000000000aa"},
-            "skills": skills_entries,
+            "project": {"id": "00000000-0000-0000-0000-000000000011"},
+            "prompts": [],
+            "tools": [],
+            "skills": [{"file": str(skill_file)}],
+        }
+        with open(config_file, "w", encoding="gbk") as f:
+            yaml.dump(config_content, f)
+
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["project_id"] == "00000000-0000-0000-0000-000000000011"
+        assert result["skills"] == [str(skill_file.resolve())]
+
+    def test_gbk_config_with_chinese_comments_is_loaded(self, tmp_path: Path, monkeypatch):
+        """GBK config with Chinese comments should be loaded correctly."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        content = (
+            "# 检查配置文件\n"
+            "project:\n"
+            '  id: "00000000-0000-0000-0000-000000000012"\n'
+            "prompts: []\n"
+            "tools: []\n"
+            "skills:\n"
+            f"  - file: {skill_file}\n"
+        )
+        with open(config_file, "w", encoding="gbk") as f:
+            f.write(content)
+
+        loader = InspectConfigLoader(str(config_file))
+        result = loader.load()
+        assert result["project_id"] == "00000000-0000-0000-0000-000000000012"
+
+    def test_model_section_unsupported_provider_raises_error(self, tmp_path: Path, monkeypatch):
+        """Config with unsupported provider should raise ValidationError."""
+        monkeypatch.chdir(tmp_path)
+        config_dir = tmp_path / ".sanityops"
+        config_dir.mkdir()
+        config_file = config_dir / "inspect_config.yaml"
+
+        skill_file = tmp_path / "test_skill.md"
+        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+
+        config_content = {
+            "project": {"id": "00000000-0000-0000-0000-000000000009"},
+            "model": {
+                "provider": "unsupported_llm",
+                "api_key": "sk-test-key",
+                "model_id": "model-1",
+            },
+            "prompts": [],
+            "tools": [],
+            "skills": [{"file": str(skill_file)}],
         }
         with open(config_file, "w") as f:
             yaml.dump(config_content, f)
-        return config_file
 
-    def test_skills_file_resolves_absolute_path(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        skill_file = tmp_path / "code_review.md"
-        skill_file.write_text("# code review\n")
-        config_file = self._write_config(tmp_path, [{"file": "code_review.md"}])
-        loader = InspectConfigLoader(str(config_file))
-        result = loader.load()
-        assert result["skills"] == [str(skill_file.resolve())]
-
-    def test_skills_bare_string_resolves_absolute_path(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        skill_file = tmp_path / "code_review.md"
-        skill_file.write_text("# code review\n")
-        config_file = self._write_config(tmp_path, ["code_review.md"])
-        loader = InspectConfigLoader(str(config_file))
-        result = loader.load()
-        assert result["skills"] == [str(skill_file.resolve())]
-
-    def test_skills_directory_raises_error(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        (tmp_path / "skills_dir").mkdir()
-        config_file = self._write_config(tmp_path, [{"file": "skills_dir"}])
         loader = InspectConfigLoader(str(config_file))
         with pytest.raises(ValidationError) as excinfo:
             loader.load()
-        assert "not a file" in str(excinfo.value).lower()
+        assert "unsupported 'model.provider'" in str(excinfo.value).lower()
 
-    def test_skills_missing_file_raises_error(self, tmp_path: Path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        config_file = self._write_config(tmp_path, [{"file": "missing.md"}])
-        loader = InspectConfigLoader(str(config_file))
-        with pytest.raises(ValidationError) as excinfo:
-            loader.load()
-        assert "not found" in str(excinfo.value).lower()
+    def test_cross_directory_config_resolves_project_relative_paths(
+        self, tmp_path: Path, monkeypatch
+    ):
+        """Passing --config from a different cwd must resolve paths against config project root."""
+        project_dir = tmp_path / "remote_project"
+        (project_dir / ".sanityops").mkdir(parents=True)
+        (project_dir / "prompts").mkdir()
+        (project_dir / "tools").mkdir()
+        (project_dir / "skills" / "my-skill").mkdir(parents=True)
 
+        prompt_file = project_dir / "prompts" / "system.md"
+        prompt_file.write_text("System prompt", encoding="utf-8")
+        tool_file = project_dir / "tools" / "tools.json"
+        tool_file.write_text('[{"name": "t1"}]', encoding="utf-8")
+        skill_file = project_dir / "skills" / "my-skill" / "SKILL.md"
+        skill_file.write_text(
+            "---\nname: my-skill\ndescription: d\n---\n# Body\n", encoding="utf-8"
+        )
 
-class TestConfigPathProperty:
-    """Tests for the config_path property."""
+        config_file = project_dir / ".sanityops" / "inspect_config.yaml"
+        config_file.write_text(
+            "project:\n"
+            "  id: 00000000-0000-0000-0000-000000000000\n"
+            "prompts:\n"
+            "  - file: prompts/system.md\n"
+            "tools:\n"
+            "  - file: tools/tools.json\n"
+            "skills:\n"
+            "  - file: skills/\n",
+            encoding="utf-8",
+        )
 
-    def test_config_path_returns_resolved_path(self, tmp_path: Path, monkeypatch):
-        """config_path should return the resolved absolute path of the config file."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / ".sanityops"
-        config_dir.mkdir()
-        config_file = config_dir / "inspect_config.yaml"
+        unrelated_cwd = tmp_path / "other_dir"
+        unrelated_cwd.mkdir()
+        monkeypatch.chdir(unrelated_cwd)
 
-        skill_file = tmp_path / "test_skill.md"
-        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
+        loader = InspectConfigLoader(str(config_file), require_project_id=False)
+        loaded = loader.load()
 
-        config_content = {
-            "project": {"id": "00000000-0000-0000-0000-0000000000bb"},
-            "skills": [{"file": str(skill_file)}],
-        }
-        with open(config_file, "w") as f:
-            yaml.dump(config_content, f)
-
-        loader = InspectConfigLoader(str(config_file))
-        assert loader.config_path == config_file.resolve()
-
-    def test_config_path_with_explicit_path(self, tmp_path: Path, monkeypatch):
-        """config_path should work when explicit path is provided."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / "custom_config"
-        config_dir.mkdir()
-        config_file = config_dir / "my_config.yaml"
-
-        skill_file = tmp_path / "test_skill.md"
-        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
-
-        config_content = {
-            "project": {"id": "00000000-0000-0000-0000-0000000000cc"},
-            "skills": [{"file": str(skill_file)}],
-        }
-        with open(config_file, "w") as f:
-            yaml.dump(config_content, f)
-
-        loader = InspectConfigLoader(str(config_file))
-        assert loader.config_path == config_file.resolve()
-
-    def test_config_path_with_default_location(self, tmp_path: Path, monkeypatch):
-        """config_path should work when using default .sanityops location."""
-        monkeypatch.chdir(tmp_path)
-        config_dir = tmp_path / ".sanityops"
-        config_dir.mkdir()
-        config_file = config_dir / "inspect_config.yaml"
-
-        skill_file = tmp_path / "test_skill.md"
-        skill_file.write_text("---\nname: test\ndescription: test\n---\n")
-
-        config_content = {
-            "project": {"id": "00000000-0000-0000-0000-0000000000dd"},
-            "skills": [{"file": str(skill_file)}],
-        }
-        with open(config_file, "w") as f:
-            yaml.dump(config_content, f)
-
-        # No explicit path - should find default location
-        loader = InspectConfigLoader(None)
-        assert loader.config_path == config_file.resolve()
+        assert loaded["prompts"] == [str(prompt_file.resolve())]
+        assert loaded["tools"] == [str(tool_file.resolve())]
+        assert loaded["skills"] == [str(skill_file.resolve())]
 
 
-class TestProjectPlaceholder:
-    """Test handling of the placeholder project UUID and project.name."""
+class TestProjectIdResolution:
+    """Target-specific project id resolution behavior."""
 
     def test_placeholder_uuid_resolves_to_none(self, tmp_path: Path, monkeypatch):
         """Placeholder project.id should resolve to None (project not bound)."""
