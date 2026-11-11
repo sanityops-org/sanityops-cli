@@ -6,15 +6,16 @@ A command-line tool for static defect inspection of AI logical artifacts (System
 
 ## Features
 
-- **Deep inspection** — Runs a comprehensive L3 defect check on every artifact by default
+- **Skill-based two-stage inspection** — an extraction stage segments the documents into inspectable artifacts, then a seven-stage inspection flow checks them against the SanityOps Framework checklists
 - **Multiple artifact types** — Inspect System Prompts, Skills, and Tool Schemas
-- **CI/CD friendly** — Non-interactive runs, configuration via environment variables, dated markdown reports for pipeline artifacts
+- **Code Contract (QC) lint** — a zero-token program check runs before any LLM spend
+- **CI/CD friendly** — Non-interactive runs, configuration via environment variables, dated markdown reports for pipeline artifacts, `--strict` exit gates
 - **Configurable rules** — Customize inspection behavior via YAML configuration
 
 ## Prerequisites
 
 - **Python >= 3.11** — only needed when installing from PyPI or source; the curl/PowerShell installers ship a standalone binary with no Python requirement.
-- **An LLM API key** — artifact analysis and defect checking are LLM-powered. Use Anthropic, OpenAI, or any compatible provider, configured either in the `model:` section of the config file or via `LLM_*` environment variables (see [Environment Variables](#environment-variables)).
+- **An LLM API key** — artifact extraction and inspection are LLM-powered. Use Anthropic, OpenAI, or any compatible provider, configured either in the `model:` section of the config file or via `LLM_*` environment variables (see [Environment Variables](#environment-variables)).
 - **Optional: a Sanityops server API key** — only if you want scanned artifacts uploaded to the Sanityops web dashboard. See [Data Handling](#data-handling) before enabling this.
 
 ## Installation
@@ -94,31 +95,40 @@ tools:
   - file: tools/search_tools.json
 
 skills:
-  - file: skills/code_review.md   # file only, not directories
+  - file: skills/code_review.md   # a file or a directory of SKILL.md files
 ```
 
 ### 3. Run Inspection
 
 ```bash
-# Standard inspection (deep L3 defect check)
+# Standard run: extraction + seven-stage inspection
 sanityops-cli inspect
 
-# Skip defect check, only analyze artifacts
-sanityops-cli inspect --skip-defect-check
+# Skip the extraction stage (inject configured files verbatim, no upload)
+sanityops-cli inspect --skip-extract
 
 # Use custom config file
 sanityops-cli inspect --config path/to/config.yaml
+
+# CI gate: exit 1 on QC gate failure, P0 defects, or missing stages
+sanityops-cli inspect --strict
 ```
 
-> **Data upload notice:** if a Sanityops server API key is configured (`server.api_key` or `SANITYOPS_API_KEY`), `inspect` automatically uploads the scanned artifacts to the Sanityops server after analysis. Without an API key, everything stays on your machine. See [Data Handling](#data-handling).
+> **Data upload notice:** if a Sanityops server API key is configured (`server.api_key` or `SANITYOPS_API_KEY`), `inspect` automatically uploads the extracted artifacts to the Sanityops server after extraction (`--skip-extract` never uploads). Without an API key, everything stays on your machine. See [Data Handling](#data-handling).
 
-`inspect` exits `0` when the run completes — including when defects are found — and non-zero on failure. CI pipelines should therefore gate on the generated report (`.sanityops/results/inspect-*.md`), not on the exit code.
+`inspect` exit codes:
+
+- `0` — run completed (defects, if any, are in the report)
+- `1` — `--strict` and the QC gate failed, Inspect P0 defects were found, or report stages are missing
+- `2` — configuration/manifest errors, extraction failure, or an unparseable inspection summary
+
+Without `--strict`, the run exits `0` even when defects are found; CI pipelines should either pass `--strict` or gate on the generated report (`.sanityops/results/inspect-*.md`).
 
 ## Data Handling
 
 What leaves your machine, and when:
 
-- **Local by default.** Artifact analysis and defect checking run on your machine and send artifact content only to the LLM provider you configure (`model:` section or `LLM_*` environment variables). Without a Sanityops server API key, nothing is uploaded to the Sanityops server.
+- **Local by default.** Artifact extraction and inspection run on your machine and send artifact content only to the LLM provider you configure (`model:` section or `LLM_*` environment variables). Without a Sanityops server API key, nothing is uploaded to the Sanityops server.
 - **Auto-upload is keyed to the server API key.** If `server.api_key` (or `SANITYOPS_API_KEY`) is set, `inspect` uploads the scanned artifacts — System Prompts, Tool Schemas, Skills — to the Sanityops server after analysis, so they appear in the web dashboard. The first such run also creates the project on the server and binds `project.id`.
 - **Server destination.** `server.base_url` defaults to the Sanityops SaaS service (`https://demo.sanityops.org`). Only change it if you run a private deployment:
 
@@ -174,7 +184,7 @@ This ordering ensures CI/CD pipelines can override any project config by injecti
 | `SANITYOPS_BASE_URL` | Override `server.base_url` (default: `https://demo.sanityops.org`) |
 | `SANITYOPS_API_KEY` | Override `server.api_key`; when set, `inspect` auto-uploads artifacts to the server |
 | `LLM_PROVIDER` | LLM provider (e.g., `anthropic`, `openai`) |
-| `LLM_API_KEY` | LLM API key for defect checking |
+| `LLM_API_KEY` | LLM API key for extraction and inspection |
 | `LLM_MODEL_ID` | LLM model ID (e.g., `claude-sonnet-4-20250514`) |
 | `LLM_BASE_URL` | Custom LLM base URL |
 
@@ -182,16 +192,27 @@ This ordering ensures CI/CD pipelines can override any project config by injecti
 
 ### Agent Settings
 
-You can tune the scanner agent behavior in `.sanityops/inspect_config.yaml`:
+You can tune the inspect agents in `.sanityops/inspect_config.yaml`:
 
 ```yaml
 agent:
-  max_loops: 60          # Maximum agent execution loops
-  token_budget: 200000   # Token budget for agent execution
-  timeout: 1800          # Timeout in seconds (default: 1800 = 30min)
+  max_loops: 60          # Maximum agent execution loops per stage
+  token_budget: 200000   # Token budget per agent (inspect stage floors at 300000)
+  timeout: 1800          # Timeout in seconds per stage (default: 1800 = 30min)
+
+# Pipeline settings
+report_language: en        # Report language for extraction IR and inspection report
+attribution: auto          # auto | single | collection — cross-artifact gating
+context_window: 200000     # LLM context window used to derive the injection budget
+qc_lint:
+  declared_dependencies: []  # External modules declared for QC-1.2 import checks
 ```
 
 CLI flags (`--timeout`, `--token-budget`) override these values when explicitly set.
+
+### Inspect Skills
+
+The inspection rules are maintained in the [`sanityops-inspect-lite`](https://github.com/sanityops-org/sanityops-inspect-lite) repository and vendored into this package (`src/sanityops_cli/skills/`). The vendored copy records its upstream commit in `src/sanityops_cli/skills/VERSION.json`; a scheduled GitHub Actions workflow updates it and opens a pull request when upstream changes.
 
 ### Logging
 
