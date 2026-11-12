@@ -33,6 +33,12 @@ from sanityops_cli.logging.logger import Logger
 class LoggingProgressHook:
     """Report agent progress to the console and the log file."""
 
+    #: Consecutive LLM turns without any tool call after which the hook
+    #: blocks the loop. A healthy agent loop calls a tool every turn; a run
+    #: of bare-text turns means the model is ignoring the tool protocol and
+    #: burning the timeout without producing anything auditable.
+    MAX_IDLE_TURNS = 5
+
     def __init__(
         self,
         console: Console,
@@ -56,6 +62,8 @@ class LoggingProgressHook:
         self._started = False
         self._llm_started_at: float | None = None
         self._events = None
+        self._idle_turns = 0
+        self._tool_calls_at_last_llm = 0
 
         # Track tool call start times
         self._tool_start_times: dict[str, float] = {}
@@ -111,6 +119,22 @@ class LoggingProgressHook:
         elif event == events.BEFORE_LLM_CALL:
             iteration = data.get("iteration", self._iteration)
             self._iteration = iteration
+            # A turn with no tool calls since the last LLM response means the
+            # model answered in bare text and the loop will re-prompt with an
+            # unchanged context. Block after MAX_IDLE_TURNS such turns.
+            if self._tool_calls == self._tool_calls_at_last_llm:
+                self._idle_turns += 1
+            else:
+                self._idle_turns = 0
+            self._tool_calls_at_last_llm = self._tool_calls
+            if self._idle_turns >= self.MAX_IDLE_TURNS:
+                if self.logger:
+                    self.logger.error(
+                        "Agent idle: "
+                        f"{self._idle_turns} consecutive LLM turns without any tool call"
+                    )
+                ctx.blocked = True
+                return ctx
             self._on_loop_start()
             self._llm_started_at = perf_counter()
             self._log_llm_start(iteration)

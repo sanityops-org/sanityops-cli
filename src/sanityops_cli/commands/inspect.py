@@ -325,20 +325,26 @@ def _print_error_from_exception(
     # Agent errors (extraction / inspection)
     if category in ("extract", "inspect"):
         titles = {"extract": "Extraction Failed", "inspect": "Inspection Failed"}
-        if "timeout" in exc_msg.lower():
-            _print_user_error(
-                titles[category],
-                "The agent took too long to complete.",
-                hint="Increase --timeout or reduce the artifact set (split inspect_config.yaml)",
-                log_path=log_path,
-            )
-        else:
-            _print_user_error(
-                titles[category],
-                exc_msg,
-                hint="Try again with --verbose for more details, or check LLM connectivity",
-                log_path=log_path,
-            )
+        # Only a genuine agent-loop TIMEOUT termination reads as a timeout;
+        # message substring matching mislabels provider errors whose text
+        # happens to contain "timeout" (e.g. invalid client arguments).
+        is_loop_timeout = "(timeout)" in exc_msg.lower()
+        is_idle_loop = "(hook_blocked)" in exc_msg.lower()
+        _print_user_error(
+            titles[category],
+            "The agent took too long to complete." if is_loop_timeout else exc_msg,
+            hint=(
+                "Increase --timeout or reduce the artifact set (split inspect_config.yaml)"
+                if is_loop_timeout
+                else (
+                    "Check that the configured model reliably emits tool calls "
+                    "(a weak or overloaded endpoint often answers in plain text)"
+                    if is_idle_loop
+                    else "Try again with --verbose for more details, or check LLM connectivity"
+                )
+            ),
+            log_path=log_path,
+        )
         return
 
     # Report errors (non-fatal)

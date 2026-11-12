@@ -46,6 +46,7 @@ from sanityops_cli.agents.extract_agent.tools.tool_registry import (
     extract_tool_candidates,
 )
 from sanityops_cli.agents.progress_hook import LoggingProgressHook
+from sanityops_cli.agents.termination import _termination_message
 from sanityops_cli.inspect_pipeline.context_guard import ArtifactAwareContext
 from sanityops_cli.inspect_pipeline.models import ExtractionMeta, ExtractionResult
 from sanityops_cli.inspect_pipeline.skill_runtime import attach_skill_tools
@@ -177,9 +178,7 @@ class ExtractAgent:
         if result.termination_reason != TerminationReason.END_TURN:
             detail = [e.message for e in result.error_detail]
             raise ExtractionFailedError(
-                f"extraction agent terminated abnormally: "
-                f"{result.termination_reason.value}"
-                + (f"; last error: {detail[-1]}" if detail else ""),
+                _termination_message("extraction", result.termination_reason, detail),
                 detail=detail,
             )
 
