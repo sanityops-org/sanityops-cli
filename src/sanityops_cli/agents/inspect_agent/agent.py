@@ -42,6 +42,7 @@ from sanityops_cli.agents.inspect_agent.prompts import (
 )
 from sanityops_cli.agents.inspect_agent.tools.write_report_tool import WriteReportTool
 from sanityops_cli.agents.progress_hook import LoggingProgressHook
+from sanityops_cli.agents.termination import _termination_message
 from sanityops_cli.inspect_pipeline.context_guard import ArtifactAwareContext
 from sanityops_cli.inspect_pipeline.skill_runtime import attach_skill_tools
 
@@ -189,9 +190,7 @@ class InspectAgent:
                 time_elapsed=result.time_elapsed,
             )
             raise InspectionFailedError(
-                f"inspection agent terminated abnormally: "
-                f"{result.termination_reason.value}"
-                + (f"; last error: {detail[-1]}" if detail else ""),
+                _termination_message("inspection", result.termination_reason, detail),
                 detail=detail,
                 partial=partial,
             )

@@ -301,3 +301,98 @@ class TestContextGuard:
         assert context.estimate_tokens() > plain.estimate_tokens()
         # Cached: second estimate identical (no double serialization drift).
         assert context.estimate_tokens() == context.estimate_tokens()
+
+
+class TestTerminationMessages:
+    def test_idle_loop_produces_hook_blocked_message(self):
+        from sanityops_agent.core.agent import TerminationReason
+
+        from sanityops_cli.agents.extract_agent.agent import (
+            _termination_message,
+        )
+
+        msg = _termination_message(
+            "extraction", TerminationReason.HOOK_BLOCKED, ["conn error"]
+        )
+        assert "hook_blocked" in msg
+        assert "without calling any tool" in msg
+
+    def test_timeout_message_is_specific(self):
+        from sanityops_agent.core.agent import TerminationReason
+
+        from sanityops_cli.agents.extract_agent.agent import _termination_message
+
+        msg = _termination_message("extraction", TerminationReason.TIMEOUT, [])
+        assert "(timeout)" in msg
+
+
+class TestIdleTurnGuard:
+    def test_hook_blocks_after_consecutive_no_tool_turns(self):
+        """AFTER LLM turns without tool calls, BEFORE_LLM_CALL blocks."""
+        import asyncio
+
+        from sanityops_agent.hooks.base import HookContext
+
+        from sanityops_cli.agents.progress_hook import LoggingProgressHook
+
+        class _C:
+            def print(self, *a, **k):
+                pass
+
+        hook = LoggingProgressHook(console=_C(), logger=None, verbose=False)
+        events = hook._get_events()
+
+        async def drive():
+            # First turn: response without tool calls.
+            ctx = HookContext(event=events.BEFORE_LLM_CALL, data={"iteration": 0})
+            await hook.handle(ctx)
+            assert ctx.blocked is False
+            await hook.handle(
+                HookContext(
+                    event=events.AFTER_LLM_CALL,
+                    data={"response": type("R", (), {"usage": {"total_tokens": 1}})()},
+                )
+            )
+            # Turns 2-4 stay unblocked; the 5th consecutive turn blocks.
+            for i in range(1, 4):
+                ctx = HookContext(event=events.BEFORE_LLM_CALL, data={"iteration": i})
+                await hook.handle(ctx)
+                assert ctx.blocked is False, f"blocked too early at turn {i}"
+            ctx = HookContext(event=events.BEFORE_LLM_CALL, data={"iteration": 4})
+            await hook.handle(ctx)
+            assert ctx.blocked is True
+
+        asyncio.run(drive())
+
+    def test_hook_resets_after_tool_calls(self):
+        import asyncio
+
+        from sanityops_agent.hooks.base import HookContext
+
+        from sanityops_cli.agents.progress_hook import LoggingProgressHook
+
+        class _C:
+            def print(self, *a, **k):
+                pass
+
+        hook = LoggingProgressHook(console=_C(), logger=None, verbose=False)
+        events = hook._get_events()
+
+        async def drive():
+            for i in range(6):
+                ctx = HookContext(event=events.BEFORE_LLM_CALL, data={"iteration": i})
+                await hook.handle(ctx)
+                if i < 5:
+                    assert ctx.blocked is False
+                await hook.handle(
+                    HookContext(
+                        event=events.BEFORE_TOOL_EXEC,
+                        data={"tool_name": "read", "tool_input": {}},
+                    )
+                )
+                await hook.handle(
+                    HookContext(event=events.AFTER_TOOL_EXEC, data={"tool_name": "read"})
+                )
+            assert ctx.blocked is False
+
+        asyncio.run(drive())
