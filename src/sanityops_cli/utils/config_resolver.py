@@ -1,35 +1,19 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-"""Generic config resolver with precedence chain: env > project > global > default."""
+"""Generic config resolver with precedence chain: project > global > env > default."""
 
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
+from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
 
 # Default config file locations
-DEFAULT_PROJECT_CONFIG_DIR = ".sanityops"
+DEFAULT_PROJECT_CONFIG_DIR = ".deeplogic"
 DEFAULT_PROJECT_CONFIG_FILE = "inspect_config.yaml"
-GLOBAL_CONFIG_DIR = ".sanityops"
+GLOBAL_CONFIG_DIR = ".deeplogic"
 GLOBAL_CONFIG_FILE = "config"
 
 
@@ -69,76 +53,23 @@ def _read_yaml_file(path: Path) -> dict[str, Any]:
         return {}
 
 
-def _is_global_config_path(path: Path) -> bool:
-    """Check if the path is the global config file path."""
-    return path == get_global_config_path()
-
-
-def _ensure_restricted_permissions(path: Path, is_file: bool = True) -> None:
-    """Ensure restricted permissions for global config paths.
-
-    For directories: 0o700 (owner-only access)
-    For files: 0o600 (owner-only read/write)
-
-    No-op for non-global paths. Best-effort on non-POSIX filesystems.
-    """
-    try:
-        if is_file:
-            path.chmod(0o600)
-        else:
-            path.chmod(0o700)
-    except OSError:
-        pass  # Non-POSIX filesystem (e.g., Windows)
-
-
 def _write_yaml_file(path: Path, data: dict[str, Any]) -> None:
     """Write data to a YAML file with atomic replacement.
 
     Creates parent directories if needed.
-    Uses an unpredictable temp file + rename to prevent corruption on
-    interruption and symlink attacks. The temp file is created with
-    owner-only permissions (0o600) from the start (via O_EXCL), so sensitive
-    values are never written to a world-readable file.
+    Uses temp file + rename to prevent corruption on interruption.
     """
-    is_global = _is_global_config_path(path)
-
-    # Create parent directory
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    # For global config, restrict directory permissions first
-    if is_global:
-        _ensure_restricted_permissions(path.parent, is_file=False)
-
-    # Create an unpredictable temp file in the same directory with restrictive
-    # permissions. mkstemp() creates the file with mode 0o600 by default, meaning
-    # the file is owner-only from creation and symlink attacks are prevented.
-    fd, tmp_name = tempfile.mkstemp(
-        dir=path.parent,
-        prefix=f".{path.name}.tmp-",
-        text=True,
-    )
-    tmp_path = Path(tmp_name)
+    tmp_path = path.with_suffix(".tmp")
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-        # Atomic on POSIX, near-atomic on Windows
-        os.replace(tmp_path, path)
-        # Ensure restrictive permissions on the destination file after atomic
-        # replace. os.replace() may preserve existing destination permissions
-        # if the file already existed with looser permissions.
-        if is_global:
-            _ensure_restricted_permissions(path, is_file=True)
-    except BaseException:
-        # Close fd if os.fdopen() failed before wrapping it (the fd would
-        # otherwise leak). If fdopen succeeded, the file is already closed and
-        # os.close() raises OSError (EBADF), which we swallow.
-        try:
-            os.close(fd)
-        except OSError:
-            pass
+        tmp_path.replace(path)  # Atomic on POSIX, near-atomic on Windows
+    except Exception:
         # Clean up temp file on failure
         if tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
+            tmp_path.unlink()
         raise
 
 
@@ -178,19 +109,15 @@ def _unset_nested_value(data: dict[str, Any], key: str) -> bool:
     """Remove a nested key from a dict using dot-separated key.
 
     Returns True if key was present and removed, False otherwise.
-    Cleans up empty intermediate dicts after removal.
+    Does not remove empty intermediate dicts.
     """
     parts = key.split(".")
     current = data
-
-    # Track path for cleanup of empty parents
-    path_stack: list[tuple[dict[str, Any], str]] = []
 
     # Navigate to parent
     for part in parts[:-1]:
         if not isinstance(current, dict) or part not in current:
             return False
-        path_stack.append((current, part))
         current = current[part]
 
     if not isinstance(current, dict):
@@ -199,30 +126,18 @@ def _unset_nested_value(data: dict[str, Any], key: str) -> bool:
     final_key = parts[-1]
     if final_key in current:
         del current[final_key]
-    else:
-        return False
-
-    # Clean up empty intermediate dicts (from deepest to shallowest)
-    for parent_dict, child_key in reversed(path_stack):
-        child = parent_dict[child_key]
-        if isinstance(child, dict) and not child:
-            del parent_dict[child_key]
-
-    return True
+        return True
+    return False
 
 
 class ConfigResolver:
     """Generic config resolver with precedence chain.
 
-    Precedence: environment variable > project-level > global > default.
-
-    This ordering ensures CI/CD pipelines can override project config by
-    injecting environment variables, while local development uses project-level
-    files as the primary source.
+    Precedence: project-level > global > environment variable > default.
 
     Attributes:
         config_key: Dot-separated config key (e.g., "server.base_url").
-        env_var: Environment variable name (e.g., "SANITYOPS_BASE_URL").
+        env_var: Environment variable name (e.g., "DEEPLOGIC_BASE_URL").
         default: Default value if none of the above provide a value.
     """
 
@@ -239,8 +154,8 @@ class ConfigResolver:
         self.project_config_path = project_config_path
 
     @staticmethod
-    def _normalize_value(value: object) -> str | None:
-        """Convert a config value to text, treating blank strings as unset."""
+    def _normalize_value(value: Any) -> str | None:
+        """Convert config value to string; treat blank strings as unset."""
         if value is None:
             return None
         text = value if isinstance(value, str) else str(value)
@@ -252,26 +167,26 @@ class ConfigResolver:
         Returns:
             The resolved value, or None if not found and no default.
         """
-        # 1. Environment variable (highest priority for CI/CD overrides)
-        if self.env_var:
-            env_value = self._normalize_value(os.environ.get(self.env_var))
-            if env_value is not None:
-                return env_value
-
-        # 2. Project-level config
+        # 1. Project-level config
         project_path = self.project_config_path or get_project_config_path()
         project_config = _read_yaml_file(project_path)
         value = self._normalize_value(_get_nested_value(project_config, self.config_key))
         if value is not None:
             return value
 
-        # 3. Global config
+        # 2. Global config
         global_config = _read_yaml_file(get_global_config_path())
         value = self._normalize_value(_get_nested_value(global_config, self.config_key))
         if value is not None:
             return value
 
-        # 4. Default (lowest priority)
+        # 3. Environment variable
+        if self.env_var:
+            env_value = self._normalize_value(os.environ.get(self.env_var))
+            if env_value is not None:
+                return env_value
+
+        # 4. Default
         return self.default
 
     def resolve_all_sources(self) -> dict[str, str | None]:
@@ -285,15 +200,13 @@ class ConfigResolver:
         # Project-level
         project_path = self.project_config_path or get_project_config_path()
         project_config = _read_yaml_file(project_path)
-        result["project"] = self._normalize_value(
-            _get_nested_value(project_config, self.config_key)
-        )
+        project_value = _get_nested_value(project_config, self.config_key)
+        result["project"] = self._normalize_value(project_value)
 
         # Global
         global_config = _read_yaml_file(get_global_config_path())
-        result["global"] = self._normalize_value(
-            _get_nested_value(global_config, self.config_key)
-        )
+        global_value = _get_nested_value(global_config, self.config_key)
+        result["global"] = self._normalize_value(global_value)
 
         # Env
         result["env"] = (
@@ -332,7 +245,6 @@ class ConfigResolver:
         """Remove a key from the global config file.
 
         Returns True if key was present and removed, False otherwise.
-        If the file becomes empty after removal, it is deleted.
         """
         path = get_global_config_path()
         data = _read_yaml_file(path)
@@ -340,11 +252,7 @@ class ConfigResolver:
             return False
         removed = _unset_nested_value(data, key)
         if removed:
-            if data:
-                _write_yaml_file(path, data)
-            else:
-                # File is now empty; remove it entirely
-                path.unlink(missing_ok=True)
+            _write_yaml_file(path, data)
         return removed
 
     @staticmethod
@@ -352,7 +260,6 @@ class ConfigResolver:
         """Remove a key from the project-level config file.
 
         Returns True if key was present and removed, False otherwise.
-        If the file becomes empty after removal, it is deleted.
         """
         path = get_project_config_path()
         data = _read_yaml_file(path)
@@ -360,11 +267,7 @@ class ConfigResolver:
             return False
         removed = _unset_nested_value(data, key)
         if removed:
-            if data:
-                _write_yaml_file(path, data)
-            else:
-                # File is now empty; remove it entirely
-                path.unlink(missing_ok=True)
+            _write_yaml_file(path, data)
         return removed
 
     @staticmethod

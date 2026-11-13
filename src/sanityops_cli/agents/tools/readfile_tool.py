@@ -1,22 +1,7 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """
 FileReadTool - A comprehensive file reading tool.
 
-Adapted for the sanityops-cli agent framework.
+Adapted for the deeplogic-cli agent framework.
 
 This module provides functionality to read various file types including:
 - Text files (with line numbers and offset/limit support)
@@ -30,7 +15,7 @@ import json
 import os
 from pathlib import Path
 
-from sanityops_agent.tools.base import Tool, ToolResult
+from aidynamic_agent.tools.base import Tool, ToolResult
 
 # =============================================================================
 # Constants
@@ -684,7 +669,7 @@ Large files exceeding the size limit will return an error with instructions to u
             max_tokens: Maximum estimated tokens for text content
             allowed_root: Optional directory boundary to sandbox reads within
         """
-        from sanityops_agent.tools.context import ToolContext
+        from aidynamic_agent.tools.context import ToolContext
 
         super().__init__(context=ToolContext())
         self.max_size_bytes = max_size_bytes

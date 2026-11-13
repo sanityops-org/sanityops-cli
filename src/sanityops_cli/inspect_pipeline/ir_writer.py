@@ -1,39 +1,28 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Two-layer IR rendering (design §2 step ③, §6.2).
 
 One IR markdown per input document, written to
-``.sanityops/results/ir/<run_id>/<basename>.ir.md`` as a pure audit artifact.
-The same serialization feeds the InspectAgent injection payload (§6.2) —
-rendering here is the single source for both.
+``.deeplogic/results/ir/<run-id>/<document>.ir.md`` as a pure audit artifact. The same
+serialization feeds the InspectAgent injection payload (§6.2) — rendering
+here is the single source for both.
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
+import os
 import re
 from collections import Counter
 from datetime import datetime
+from hashlib import sha256
 from pathlib import Path
+from unicodedata import normalize
 
-from sanityops_cli.inspect_pipeline.models import (
+from deeplogic_cli.inspect_pipeline.models import (
     ExtractedArtifact,
     ExtractionResult,
 )
+
+_UNMATCHED_FILENAME = "_unmatched-references.ir.md"
 
 
 def group_by_source(result: ExtractionResult) -> dict[str, list[ExtractedArtifact]]:
@@ -166,11 +155,14 @@ def render_document_ir(
     return "\n".join(lines)
 
 
-def allocate_run_id(results_dir: Path, timestamp: str | None = None) -> str:
+def allocate_run_id(
+    results_dir: Path, timestamp: str | None = None, *, reserve: bool = False
+) -> str:
     """Allocate a collision-free batch ID shared by the IR folder and report.
 
     Normally returns ``YYYYMMDD-HHMMSS``; appends ``-2``, ``-3``, ... when a
-    matching report file or IR batch directory already exists.
+    matching report file or IR batch directory already exists. With
+    ``reserve=True``, create the IR directory atomically to claim the ID.
     """
     results_dir = Path(results_dir)
     ir_root = results_dir / "ir"
@@ -181,47 +173,59 @@ def allocate_run_id(results_dir: Path, timestamp: str | None = None) -> str:
         report_exists = (results_dir / f"inspect-{candidate}.md").exists()
         ir_exists = (ir_root / candidate).exists()
         if not report_exists and not ir_exists:
+            if reserve:
+                try:
+                    (ir_root / candidate).mkdir(parents=True)
+                except FileExistsError:
+                    suffix += 1
+                    continue
             return candidate
         suffix += 1
 
 
-def _resolve_ir_filenames(sources: list[str], *, reserve_unmatched: bool) -> dict[str, str]:
-    """Map each source path to a collision-free ``*.ir.md`` filename."""
-    stems = {source: (Path(source).stem or "document") for source in sources}
-    parents = {
-        source: re.sub(r"[^A-Za-z0-9._-]+", "_", Path(source).parent.name).strip("_")
-        for source in sources
-    }
-    stem_counts = Counter(stems.values())
-    parent_stem_counts = Counter((parents[s], stems[s]) for s in sources)
+def _filename_key(name: str) -> str:
+    """Detect collisions on case-insensitive and Unicode-normalizing filesystems."""
+    return normalize("NFD", name).casefold()
 
-    used: set[str] = {"_unmatched-references.ir.md"} if reserve_unmatched else set()
-    mapping: dict[str, str] = {}
-    for source in sources:
-        stem = stems[source]
-        parent = parents[source]
-        if stem_counts[stem] == 1 and f"{stem}.ir.md" not in used:
-            candidate = f"{stem}.ir.md"
-        elif (
-            parent
-            and parent_stem_counts[(parent, stem)] == 1
-            and f"{parent}__{stem}.ir.md" not in used
+
+def _document_filenames(sources: list[str]) -> dict[str, str]:
+    paths = {source: Path(source) for source in sources}
+    base_names = {source: f"{path.stem or 'document'}.ir.md" for source, path in paths.items()}
+    base_counts = Counter(_filename_key(name) for name in base_names.values())
+    parents = {
+        source: re.sub(r"[^A-Za-z0-9._-]+", "_", path.parent.name).strip("_") or "document"
+        for source, path in paths.items()
+    }
+    qualified_names = {source: f"{parents[source]}__{base}" for source, base in base_names.items()}
+    qualified_counts = Counter(_filename_key(name) for name in qualified_names.values())
+    reserved = _filename_key(_UNMATCHED_FILENAME)
+    used = set(base_counts) | {reserved}
+    names: dict[str, str] = {}
+    for source, path in paths.items():
+        base = base_names[source]
+        key = _filename_key(base)
+        if key != reserved and base_counts[key] == 1 and len(os.fsencode(base)) <= 255:
+            names[source] = base
+            continue
+
+        name = qualified_names[source]
+        qualified_key = _filename_key(name)
+        if (
+            qualified_key in used
+            or qualified_counts[qualified_key] > 1
+            or len(os.fsencode(name)) > 255
         ):
-            candidate = f"{parent}__{stem}.ir.md"
-        else:
-            digest = hashlib.sha256(source.encode()).hexdigest()[:8]
-            prefix = f"{parent}__{stem}" if parent else stem
-            candidate = f"{prefix}_{digest}.ir.md"
-            attempts = 0
-            while candidate in used:
-                attempts += 1
-                if attempts > 1000:
-                    raise RuntimeError(f"Could not allocate unique IR filename for {source}")
-                digest = hashlib.sha256(f"{source}:{len(used)}:{attempts}".encode()).hexdigest()[:8]
-                candidate = f"{prefix}_{digest}.ir.md"
-        used.add(candidate)
-        mapping[source] = candidate
-    return mapping
+            digest = sha256(os.fsencode(source)).hexdigest()[:12]
+            stem = (path.stem or "document")[:40]
+            prefix = f"{parents[source][:40]}__{stem}"
+            name = f"{prefix}_{digest}.ir.md"
+            index = 2
+            while _filename_key(name) in used:
+                name = f"{prefix}_{digest}-{index}.ir.md"
+                index += 1
+        names[source] = name
+        used.add(_filename_key(name))
+    return names
 
 
 def write_ir_files(
@@ -241,10 +245,10 @@ def write_ir_files(
     """
     grouped = group_by_source(result)
     routed, unmatched = _reference_routing(result)
+    filenames = _document_filenames(list(grouped))
 
     target_dir = Path(ir_dir) / run_id if run_id else Path(ir_dir)
     target_dir.mkdir(parents=True, exist_ok=True)
-    filenames = _resolve_ir_filenames(list(grouped), reserve_unmatched=bool(unmatched))
 
     written: list[Path] = []
     for source, artifacts in grouped.items():
@@ -256,7 +260,7 @@ def write_ir_files(
         written.append(path)
 
     if unmatched:
-        path = target_dir / "_unmatched-references.ir.md"
+        path = target_dir / _UNMATCHED_FILENAME
         path.write_text(
             render_document_ir("(unmatched references)", [], unmatched),
             encoding="utf-8",

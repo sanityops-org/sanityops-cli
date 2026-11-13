@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Full report persistence (design §8).
 
 Assembles the final markdown from the report tool's section parts in fixed
@@ -26,9 +11,13 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from sanityops_cli.agents.inspect_agent.tools.write_report_tool import (
+from deeplogic_cli.agents.inspect_agent.tools.write_report_tool import (
     SECTION_ORDER,
     STAGE_SECTIONS,
+)
+from deeplogic_cli.inspect_pipeline.report_parser import (
+    ParsedSummary,
+    format_counts,
 )
 
 
@@ -37,6 +26,8 @@ def assemble_report(
     missing_stages: list[str],
     tail_block: str | None,
     meta: dict[str, str] | None = None,
+    *,
+    summary: ParsedSummary | None = None,
 ) -> str:
     """Fixed-order assembly + NOT RECEIVED placeholders + tail JSON."""
     chunks: list[str] = []
@@ -59,10 +50,27 @@ def assemble_report(
         if section not in SECTION_ORDER and parts:
             chunks.append("\n\n".join(parts))
 
-    if tail_block:
+    if summary is not None:
+        chunks.append(_render_summary(summary, tail_block))
+    elif tail_block:
         chunks.append(tail_block)
 
     return "\n\n".join(chunks) + "\n"
+
+
+def _render_summary(summary: ParsedSummary, tail_block: str | None) -> str:
+    count_label = "Recorded findings" if summary.counts_partial else "Finding counts"
+    lines = [
+        "## CLI inspection summary",
+        "",
+        f"- Status: {summary.status}",
+        f"- {count_label}: {format_counts(summary.counts)}",
+        *(f"- Stage {stage}: {summary.stage_status(stage)}" for stage in STAGE_SECTIONS),
+        *(f"- Warning: {warning}" for warning in summary.warnings),
+    ]
+    if tail_block:
+        lines.extend(["", "### Agent summary (raw)", "", "```json", tail_block, "```"])
+    return "\n".join(lines)
 
 
 def save_inspection_report(
@@ -72,6 +80,7 @@ def save_inspection_report(
     output_dir: Path,
     *,
     meta: dict[str, str] | None = None,
+    summary: ParsedSummary | None = None,
     timestamp: str | None = None,
 ) -> Path:
     """Write ``inspect-<ts>.md``; returns the path (best-effort)."""
@@ -81,7 +90,7 @@ def save_inspection_report(
     path = output_dir / filename
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        assemble_report(section_parts, missing_stages, tail_block, meta),
+        assemble_report(section_parts, missing_stages, tail_block, meta, summary=summary),
         encoding="utf-8",
     )
     return path

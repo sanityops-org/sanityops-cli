@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Root-scoped file reading for the ExtractAgent.
 
 The inspected documents are untrusted input; the containment boundary lives
@@ -23,11 +8,12 @@ symlink escapes therefore fail closed.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
-from sanityops_agent.tools.base import Tool, ToolResult
+from aidynamic_agent.tools.base import Tool, ToolResult
 
-from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
+from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
 
 #: Refuse to read anything larger than this (artifacts are config-declared
 #: documents; anything bigger is almost certainly a mistake or a binary).
@@ -66,11 +52,16 @@ class ScopedReadFileTool(Tool):
     tags = ["extract", "reader"]
 
     def __init__(
-        self, allowed_roots: list[Path], max_size_bytes: int = DEFAULT_MAX_SIZE_BYTES
+        self,
+        allowed_roots: list[Path],
+        max_size_bytes: int = DEFAULT_MAX_SIZE_BYTES,
+        *,
+        content_transform: Callable[[Path, str], str] | None = None,
     ) -> None:
         super().__init__()
         self.allowed_roots = [Path(root).resolve() for root in allowed_roots]
         self.max_size_bytes = max_size_bytes
+        self._content_transform = content_transform
 
     async def execute(self, **kwargs) -> ToolResult:  # noqa: ANN003
         file_path = kwargs.get("file_path")
@@ -95,6 +86,8 @@ class ScopedReadFileTool(Tool):
         text = read_file_with_encoding_fallback(resolved)
         if text is None:
             return self._error(f"unreadable file (no supported encoding): {resolved}")
+        if self._content_transform is not None:
+            text = self._content_transform(resolved, text)
 
         lines = text.splitlines()
         total = len(lines)

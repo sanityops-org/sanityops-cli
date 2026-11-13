@@ -1,21 +1,6 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """ExtractAgent — skill-driven artifact extraction (design §5).
 
-A thin wrapper around the sanityops-agent loop (same pattern as the other
+A thin wrapper around the aidynamic-agent loop (same pattern as the other
 CLI agents). The agent loads the vendored ``pre-inspect-extract`` skill on
 its first step and reports artifacts through ``store_artifacts``; this class
 only assembles the tool registry, injects the compaction-safe context, and
@@ -27,29 +12,31 @@ from __future__ import annotations
 from pathlib import Path
 
 import anyio
-from sanityops_agent.agents import AgentFactory
-from sanityops_agent.core.agent import AgentConfig, TerminationReason
-from sanityops_agent.core.context import CompactConfig
-from sanityops_agent.core.message import Message, Role
-from sanityops_agent.hooks.base import HookExecutor
-from sanityops_agent.tools.registry import ToolRegistry
+from aidynamic_agent.agents import AgentFactory
+from aidynamic_agent.core.agent import AgentConfig, TerminationReason
+from aidynamic_agent.core.message import Message, Role
+from aidynamic_agent.hooks.base import HookExecutor
+from aidynamic_agent.tools.registry import ToolRegistry
 
-from sanityops_cli.agents.extract_agent.prompts import (
+from deeplogic_cli.agents.extract_agent.prompts import (
     build_system_appendix,
     build_task_message,
 )
-from sanityops_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
-from sanityops_cli.agents.extract_agent.tools.store_artifacts_tool import (
+from deeplogic_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
+from deeplogic_cli.agents.extract_agent.tools.store_artifacts_tool import (
     StoreArtifactsTool,
 )
-from sanityops_cli.agents.extract_agent.tools.tool_registry import (
+from deeplogic_cli.agents.extract_agent.tools.tool_registry import (
     extract_tool_candidates,
 )
-from sanityops_cli.agents.progress_hook import LoggingProgressHook
-from sanityops_cli.agents.termination import _termination_message
-from sanityops_cli.inspect_pipeline.context_guard import ArtifactAwareContext
-from sanityops_cli.inspect_pipeline.models import ExtractionMeta, ExtractionResult
-from sanityops_cli.inspect_pipeline.skill_runtime import attach_skill_tools
+from deeplogic_cli.agents.progress_hook import LoggingProgressHook
+from deeplogic_cli.inspect_pipeline.context_guard import (
+    ArtifactAwareContext,
+    ContextLimitedProvider,
+)
+from deeplogic_cli.inspect_pipeline.models import ExtractionMeta, ExtractionResult
+from deeplogic_cli.inspect_pipeline.skill_runtime import attach_skill_tools
+from deeplogic_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW
 
 #: Hard cap on manifest size before the agent even starts (design §6.6).
 MAX_MANIFEST_FILES = 100
@@ -69,13 +56,21 @@ class ExtractionFailedError(RuntimeError):
 class IncompleteExtractionError(ExtractionFailedError):
     """Chunk streams that never reached final=true (design §5.3)."""
 
-    def __init__(self, incomplete_keys: list[str]) -> None:
+    def __init__(
+        self,
+        incomplete_keys: list[str],
+        *,
+        recovered_keys: list[str] | None = None,
+        resends: int = 0,
+    ) -> None:
         listing = "\n".join(f"  - {key}" for key in incomplete_keys)
         super().__init__(
             f"{len(incomplete_keys)} artifact record(s) are incomplete "
             f"(chunk stream never finished):\n{listing}"
         )
         self.incomplete_keys = incomplete_keys
+        self.recovered_keys = recovered_keys or []
+        self.resends = resends
 
 
 class ExtractAgent:
@@ -89,9 +84,10 @@ class ExtractAgent:
         max_loops: int = DEFAULT_MAX_LOOPS,
         timeout: int = 1800,
         token_budget: int = 200_000,
+        context_window: int = DEFAULT_CONTEXT_WINDOW,
         verbose: bool = False,
         console=None,
-        logger=None,
+        log_manager=None,
         report_language: str = "en",
     ) -> None:
         self.provider = provider
@@ -99,9 +95,10 @@ class ExtractAgent:
         self.max_loops = max_loops
         self.timeout = timeout
         self.token_budget = token_budget
+        self.context_window = context_window
         self.verbose = verbose
         self.console = console
-        self.logger = logger
+        self.log_manager = log_manager
         self.report_language = report_language
 
     async def extract(
@@ -119,11 +116,10 @@ class ExtractAgent:
                 f"split the inspect config into multiple runs"
             )
 
-        store = StoreArtifactsTool()
+        allowed_roots = self._allowed_roots(manifest, project_root)
+        store = StoreArtifactsTool(allowed_roots=allowed_roots)
         candidates, unresolved_tools = extract_tool_candidates(tools)
         store.register_candidates(candidates)
-
-        allowed_roots = self._allowed_roots(manifest, project_root)
         registry = ToolRegistry()
         registry.register(ScopedReadFileTool(allowed_roots=allowed_roots))
         registry.register(store)
@@ -140,15 +136,19 @@ class ExtractAgent:
         )
 
         hook_executor = HookExecutor()
-        if self.verbose or self.logger:
-            hook_executor.register(
-                LoggingProgressHook(
-                    self.console, logger=self.logger, verbose=self.verbose
-                )
-            )
+        progress_hook = LoggingProgressHook(
+            self.console,
+            log_manager=self.log_manager,
+            verbose=self.verbose,
+            token_budget=self.token_budget,
+            stage="Extraction",
+        )
+        if self.verbose or self.log_manager:
+            hook_executor.register(progress_hook)
 
+        context = ArtifactAwareContext(self.context_window)
         factory = AgentFactory(
-            provider=self.provider,
+            provider=ContextLimitedProvider(self.provider, context),
             config=config,
             tool_registry=registry,
             hook_executor=hook_executor,
@@ -161,30 +161,32 @@ class ExtractAgent:
         # because the framework skips it for pre-assigned contexts. Use the
         # agent's own config: the factory enhanced it with the Available
         # Skills manifest, which the plain appendix lacks.
-        agent.context = ArtifactAwareContext(
-            compact_config=CompactConfig(
-                trigger_token_threshold=int(self.token_budget * 0.8),
-                preserve_recent_count=5,
-            )
-        )
+        agent.context = context
         if agent.config.system_prompt:
             await agent.context.add_message(
                 Message.from_text(Role.SYSTEM, agent.config.system_prompt)
             )
 
         task = build_task_message(manifest, candidates)
-        result = await agent.run(task)
+        try:
+            result = await agent.run(task)
+        finally:
+            progress_hook.stop_waiting()
 
         if result.termination_reason != TerminationReason.END_TURN:
             detail = [e.message for e in result.error_detail]
             raise ExtractionFailedError(
-                _termination_message("extraction", result.termination_reason, detail),
+                f"extraction agent terminated abnormally: "
+                f"{result.termination_reason.value}"
+                + (f"; last error: {detail[-1]}" if detail else ""),
                 detail=detail,
             )
 
         artifacts, incomplete = store.finalize()
         if incomplete:
-            raise IncompleteExtractionError(incomplete)
+            raise IncompleteExtractionError(
+                incomplete, recovered_keys=store.recovered_keys, resends=len(store.resend_log)
+            )
 
         return ExtractionResult(
             artifacts=artifacts,
@@ -192,10 +194,11 @@ class ExtractAgent:
             attribution=store.attribution,
             meta=ExtractionMeta(
                 loops_used=result.loops_used,
-                tokens_used=result.tokens_used,
+                tokens_used=max(result.tokens_used, progress_hook.tokens_used),
                 time_elapsed=result.time_elapsed,
                 deterministic_candidates=len(candidates),
                 resends=store.resend_log,
+                recovered_keys=store.recovered_keys,
             ),
         )
 

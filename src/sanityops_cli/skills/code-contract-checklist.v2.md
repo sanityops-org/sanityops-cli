@@ -52,7 +52,7 @@ title: Code Contract Inspection Checklist (QC, v2 统一引擎版)
 
 ### 3.2 hybrid 项的模型确认部分
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「关键词匹配是模糊信号」等描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **skill 端：本节即完整判定要点，无程序初筛前置。**“程序仅检…／程序仅做…”描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为“已筛过”，也不得据此判 N/A。
 
 | ID | model_prompt（确认要点） |
 |---|---|

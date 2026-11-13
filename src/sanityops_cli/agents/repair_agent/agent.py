@@ -1,17 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Repair agent: generate repaired artifact content from a local defect report."""
 
 from pathlib import Path
@@ -20,20 +6,22 @@ from typing import TYPE_CHECKING
 import anyio
 from rich.console import Console
 
-from sanityops_cli.exceptions.base_exceptions import ValidationError
+from deeplogic_cli.exceptions.base_exceptions import ValidationError
 
 if TYPE_CHECKING:
-    from sanityops_cli.logging.logger import Logger
+    from deeplogic_cli.logging import LogManager
 
 # ============================================================================
 # RepairAgent Class
 # ============================================================================
 
+console = Console()
+
 
 class RepairAgent:
     """Runs an LLM agent that rewrites defective artifacts using the report.
 
-    Mirrors ScannerAgent: builds a sanityops_agent parent agent with a tool
+    Mirrors ScannerAgent: builds an aidynamic_agent parent agent with a tool
     registry (read + store_repair), feeds it the inspection report plus the
     artifact paths, and collects repairs via the shared-memory
     StoreRepairsTool.
@@ -43,13 +31,13 @@ class RepairAgent:
         self,
         provider,
         max_loops: int = 30,
-        timeout: int = 300,
-        token_budget: int | None = None,
-        llm_retries: int = 3,
+        timeout: int = 1800,
+        token_budget: int = 100000,
+        llm_retries: int = 2,
         retry_delay: float = 65.0,
         verbose: bool = False,
         console: Console | None = None,
-        logger: "Logger | None" = None,
+        log_manager: "LogManager | None" = None,
     ):
         self.provider = provider
         self.max_loops = max_loops
@@ -57,7 +45,7 @@ class RepairAgent:
         self.token_budget = token_budget
         self.verbose = verbose
         self.console = console or Console()
-        self.logger = logger
+        self.log_manager = log_manager
         # Rate-limit resilience: the server-side LLM proxy may cap requests
         # far below what one repair run needs (e.g. rpm_limit=1). The SDK's
         # own retry backs off only 1-2s, so we retry the whole run here with
@@ -100,14 +88,16 @@ class RepairAgent:
         project_root: str,
     ) -> list[dict]:
         """Single repair attempt (see repair() for the retry wrapper)."""
-        from sanityops_agent.agents import AgentFactory
-        from sanityops_agent.core.agent import AgentConfig, TerminationReason
-        from sanityops_agent.hooks.base import HookExecutor
-        from sanityops_agent.tools import ToolRegistry
+        from aidynamic_agent.agents import AgentFactory
+        from aidynamic_agent.core.agent import AgentConfig, TerminationReason
+        from aidynamic_agent.hooks.base import HookExecutor
+        from aidynamic_agent.tools import ToolRegistry
 
-        from sanityops_cli.agents.repair_agent.prompts import REPAIR_AGENT_PROMPT
-        from sanityops_cli.agents.repair_agent.tools.store_repairs_tool import StoreRepairsTool
-        from sanityops_cli.agents.tools.readfile_tool import FileReadTool
+        from deeplogic_cli.agents.repair_agent.prompts import REPAIR_AGENT_PROMPT
+        from deeplogic_cli.agents.repair_agent.tools.store_repairs_tool import (
+            StoreRepairsTool,
+        )
+        from deeplogic_cli.agents.tools.readfile_tool import FileReadTool
 
         report = Path(report_path).resolve()
         if not report.is_file():
@@ -120,11 +110,8 @@ class RepairAgent:
             raise ValidationError("No artifacts configured to repair")
 
         for p in all_paths:
-            path = Path(p)
-            if not path.is_absolute():
-                raise ValidationError(f"Artifact path must be absolute: {p}")
-            if not path.exists():
-                raise ValidationError(f"Artifact path does not exist: {p}")
+            if not Path(p).is_absolute() or not Path(p).exists():
+                raise ValidationError(f"Artifact path invalid: {p}")
 
         # Deliberately NO TaskTool: repair must follow the artifact list
         # exactly, not spawn sub-agents to explore the project. Registering it
@@ -146,21 +133,23 @@ class RepairAgent:
             artifact_list="\n".join(artifact_lines),
         )
 
-        config_kwargs = {
-            "max_loops": self.max_loops,
-            "total_timeout": self.timeout,
-            "system_prompt": system_prompt,
-        }
-        if self.token_budget:
-            config_kwargs["token_budget"] = self.token_budget
-
-        config = AgentConfig(**config_kwargs)
+        config = AgentConfig(
+            max_loops=self.max_loops,
+            total_timeout=self.timeout,
+            token_budget=self.token_budget,
+            system_prompt=system_prompt,
+        )
 
         hook_executor = HookExecutor()
-        if self.verbose and self.logger:
-            from sanityops_cli.agents.progress_hook import LoggingProgressHook
+        if self.verbose or self.log_manager:
+            from deeplogic_cli.agents.progress_hook import LoggingProgressHook
+
             hook_executor.register(
-                LoggingProgressHook(self.console, logger=self.logger, verbose=self.verbose)
+                LoggingProgressHook(
+                    self.console,
+                    log_manager=self.log_manager,
+                    verbose=self.verbose,
+                )
             )
 
         factory = AgentFactory(
@@ -182,8 +171,8 @@ class RepairAgent:
         repairs = StoreRepairsTool.get_repairs()
         if result.termination_reason != TerminationReason.END_TURN:
             # Any termination after repairs were already stored is a partial
-            # success: return collected repairs with a warning instead of
-            # discarding them (budget/loop exhaustion or a mid-run LLM error).
+            # success: return what was collected with a warning instead of
+            # discarding it (budget/loop exhaustion or a mid-run LLM error).
             if repairs:
                 if self.verbose:
                     self.console.print(
@@ -216,7 +205,7 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
 
     The LLM proxy (litellm) surfaces these as 429 with `throttling_error`, or
     as 5xx wrappers whose message still mentions the rate limit. Matching on
-    the text markers keeps this working across provider SDKs.
+    the text keeps this working across provider SDKs.
     """
     text = str(exc).lower()
     markers = (
@@ -225,6 +214,7 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
         "ratelimiterror",
         "throttling_error",
         "too many requests",
+        "访问量过大",
         "no deployments available",
     )
     return any(marker in text for marker in markers)

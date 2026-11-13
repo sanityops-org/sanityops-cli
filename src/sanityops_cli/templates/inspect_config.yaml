@@ -1,59 +1,66 @@
 # ============================================================================
-# Sanityops CLI - Inspect Configuration Template
+# deeplogic CLI - Inspect Configuration Template
 # ============================================================================
 # Usage:
-#   1. Run: sanityops-cli init
+#   1. Run: deeplogic-cli init
 #   2. Fill in model configuration below (required)
-#   3. Connect to the Sanityops service:
-#      sanityops-cli config server.base_url "<your-server-url>"
-#      sanityops-cli config server.api_key
+#   3. (Optional) Bind to a project:
+#      - Create new: deeplogic-cli project create <name>
+#      - Or bind existing: deeplogic-cli project bind <project-id>
 #   4. Configure artifact paths below
-#   5. Run: sanityops-cli inspect
-#      (A project is created automatically on first upload and the
-#      project id/name are written back to this file.)
+#   5. Run: deeplogic-cli inspect
+#   6. Push to server: deeplogic-cli project push -m "message"
 # ============================================================================
 
 # Project metadata
-# id: Left as a placeholder. A real project id is assigned automatically
-#     on first inspect upload (project auto-created), or set it manually.
-# name: Project display name (optional, filled automatically on first upload)
+# id: Filled by 'project create' or 'project bind' (required for push)
+# name: Project display name (optional, set by 'project create')
 project:
   id: "00000000-0000-0000-0000-000000000000"
   name: ""
 
-# Model configuration
-# Fill in the fields below, or remove this section entirely to configure
-# via LLM_* environment variables instead:
-#   LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_ID, LLM_BASE_URL
+# Model configuration (required unless configured via LLM_* environment variables)
+# Configure your LLM provider and credentials here.
+# Alternatively, you can use environment variables:
+#   LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_ID, LLM_BASE_URL, LLM_ENABLE_THINKING
 model:
-  provider: anthropic                 # Required: anthropic, openai, azure, etc.
+  provider: anthropic                 # Required: anthropic, openai, dashscope
   api_key: ""                         # Required: your API key (keep this file out of git)
   model_id: claude-sonnet-4-20250514  # Required: model identifier
   base_url: ""                        # Optional: custom endpoint URL
+  # Optional: input limit per model request in tokens, checked using a local estimate.
+  # Adjust to match your model endpoint (e.g., 200000 for Claude, 1000000 for 1M-context models).
+  context_window: 200000
+  # Optional: enable model thinking/reasoning mode (default: true).
+  # Set to false to disable thinking; falls back automatically if the endpoint rejects it.
+  enable_thinking: true
 
-# Agent configuration (optional)
-# Override CLI defaults per stage.
-# agent:
-#   max_loops: 80      # Maximum agent loops per stage (default: 80)
-#   timeout: 1800      # seconds per stage (default: 1800, 30min)
-#   token_budget: 200000  # per agent; the inspect stage floors at 300000
+# Logging configuration
+# Controls execution logging for debugging and audit purposes.
+# Default: <config-file-dir>/logs (auto-created, no need to configure).
+# Uncomment 'directory' below to override the default location.
+logging:
+  enabled: true
+  level: INFO
+  # directory: ./logs
+  retention_days: 30
+  redact_api_keys: true
 
-# Pipeline settings
-report_language: en      # Report language for the inspection report (default: en)
-attribution: auto        # auto | single | collection (default: auto)
-context_window: 200000   # LLM context window used to derive the injection budget
+# Defect check configuration (optional)
+# Controls defect-check behavior and execution flags.
+defect_check:
+  # force_permission: false       # Force run QD-PM even if Gate-0 preconditions fail (cli: --force-pm)
+  # concurrency: 2                # Max concurrent LLM calls (recommended: 2-3 for local/private GPU, 5 for cloud)
+  # request_timeout: 120          # Per-request LLM timeout in seconds (default: 120s)
 
-# Code Contract lint settings
-qc_lint:
-  # External modules the artifacts may import (enables QC-1.2 beyond the
-  # standard library). Leave empty to record QC-1.2 as Not Executed.
-  declared_dependencies: []
-
-# System Prompt file list (supports any plaintext file format)
+# ============================================================================
+# System Prompt 文件配置
+# 【核心约束】智能体合规检测规范：每个 Agent 仅支持配置【单一】System Prompt！
+# 系统在单工件（QDP）、跨工件（Cross）及权限（QD-PM）检查中，均以该核心 System Prompt 作为唯一判定基线。
+# 请仅配置 1 个主 Prompt 文件（若配置多个，系统将仅取首个生效）。
+# ============================================================================
 prompts:
   - file: prompts/system_prompt.md
-  - file: prompts/fallback_prompt.py
-  - file: prompts/summary_prompt.ts
 
 # Tools Schema file list (supports any plaintext file format)
 tools:
@@ -61,7 +68,8 @@ tools:
   - file: tools/file_ops.py
   - file: tools/code_tools.ts
 
-# Skills file list (a single file or a directory scanned for SKILL.md files)
+# Skills file list (file or directory)
 skills:
   - file: skills/code_review.md
-  - file: skills/code_fix
+  - file: skills/code_fix/skill.md
+  - file: skills/

@@ -1,17 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Render Code Contract inspection results to terminal."""
 
 from __future__ import annotations
@@ -22,7 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from .models import (
-    GateResult,
+    DefectStatus,
     QCArtifactResult,
     QCDefect,
     QCInspectionResult,
@@ -46,8 +32,8 @@ class QCRenderer:
         Args:
             result: The QC inspection result to render.
         """
-        self._render_summary(result)
         self._render_artifact_groups(result)
+        self._render_summary(result)
         self._render_footer(result)
 
     def _render_summary(self, result: QCInspectionResult) -> None:
@@ -60,13 +46,14 @@ class QCRenderer:
         table.add_column("Metric", style="bold")
         table.add_column("Value")
 
+        p0, p1, p2 = result.p0_count, result.p1_count, result.p2_count
         table.add_row("Total artifacts", str(result.total_artifacts))
-        table.add_row("Total defects", str(result.total_defects))
+        table.add_row("Total defects", str(p0 + p1 + p2))
 
-        severity_str = f"P0: {result.p0_count}   P1: {result.p1_count}   P2: {result.p2_count}"
+        severity_str = f"P0: {p0}   P1: {p1}   P2: {p2}"
         table.add_row("Severity", severity_str)
 
-        gate_style = "red bold" if result.gate_result == GateResult.FAIL else "green bold"
+        gate_style = "red bold" if result.gate_result == "FAIL" else "green bold"
         table.add_row("QC Gate", f"[{gate_style}]{result.gate_result}[/]")
 
         table.add_row("Inspection time", f"{result.inspection_time_seconds:.2f}s")
@@ -80,22 +67,12 @@ class QCRenderer:
         Args:
             result: The QC inspection result.
         """
-        # Skills
-        for artifact in result.skills:
-            if artifact.defects:
-                self._render_artifact_panel(artifact, "Skill")
+        for artifact in result.all_artifacts:
+            defects = [d for d in artifact.defects if d.status != DefectStatus.NOT_EXECUTED]
+            if defects:
+                self._render_artifact_panel(artifact, defects)
 
-        # Tools
-        for artifact in result.tools:
-            if artifact.defects:
-                self._render_artifact_panel(artifact, "Tool")
-
-        # Prompts
-        for artifact in result.prompts:
-            if artifact.defects:
-                self._render_artifact_panel(artifact, "Prompt")
-
-    def _render_artifact_panel(self, artifact: QCArtifactResult, type_label: str) -> None:
+    def _render_artifact_panel(self, artifact: QCArtifactResult, defects: list[QCDefect]) -> None:
         """Render a single artifact's defects in a panel.
 
         Args:
@@ -104,10 +81,10 @@ class QCRenderer:
         """
         lines: list[str] = []
 
-        for defect in artifact.defects:
+        for defect in defects:
             lines.append(self._format_defect(defect))
 
-        title = f"{type_label} {artifact.artifact_name}"
+        title = f"{artifact.artifact_type.capitalize()} {artifact.artifact_name}"
         self.console.print(
             Panel(
                 "\n".join(lines),
@@ -165,19 +142,11 @@ class QCRenderer:
         Args:
             result: The QC inspection result.
         """
-        if result.gate_result == GateResult.FAIL:
+        if result.gate_result == "FAIL":
             self.console.print(
                 Panel(
                     "[red bold]QC Gate: FAIL[/]\n\n"
                     "P0 defects found. Consider fixing them to improve artifact quality.",
                     border_style="red",
-                )
-            )
-        else:
-            self.console.print(
-                Panel(
-                    "[green bold]QC Gate: PASS[/]\n\n"
-                    "No blocking defects found. Proceeding to LLM analysis.",
-                    border_style="green",
                 )
             )

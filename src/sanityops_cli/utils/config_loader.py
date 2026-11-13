@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Inspect config loader - load and validate inspect_config.yaml"""
 
 import re
@@ -21,17 +6,14 @@ from typing import Any
 
 import yaml
 
-from sanityops_cli.exceptions.base_exceptions import ValidationError
+from deeplogic_cli.exceptions.base_exceptions import ValidationError
 
 # Reuse excluded directories from validators
-from sanityops_cli.utils.validators import EXCLUDED_DIRS
+from deeplogic_cli.utils.validators import EXCLUDED_DIRS
 
 # Default config file location
-DEFAULT_CONFIG_DIR = ".sanityops"
+DEFAULT_CONFIG_DIR = ".deeplogic"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
-
-# Sentinel project.id meaning "not yet bound".
-PROJECT_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
 
 # UUID validation regex (compiled once at module load for efficiency)
 _UUID_RE = re.compile(
@@ -91,7 +73,7 @@ def read_file_with_encoding_fallback(path: Path) -> str | None:
 class InspectConfigLoader:
     """Load and validate inspect_config.yaml, resolve all artifact paths to absolute."""
 
-    def __init__(self, config_path: str | None = None, require_project_id: bool = False):
+    def __init__(self, config_path: str | None = None, require_project_id: bool = True):
         """Initialize the config loader.
 
         Args:
@@ -144,7 +126,7 @@ class InspectConfigLoader:
 
         # project_id may be None/placeholder if not bound
         project_id = self._config.get("project", {}).get("id")
-        if project_id == PROJECT_ID_PLACEHOLDER:
+        if project_id == "00000000-0000-0000-0000-000000000000":
             project_id = None
 
         return {
@@ -159,7 +141,7 @@ class InspectConfigLoader:
     # ------------------------------------------------------------------
 
     def _resolve_config_path(self, config_path: str | None) -> Path:
-        """Resolve config file path: explicit -> .sanityops/inspect_config.yaml -> error."""
+        """Resolve config file path: explicit -> .deeplogic/inspect_config.yaml -> error."""
         if config_path:
             p = Path(config_path).expanduser()
             if not p.exists():
@@ -175,7 +157,7 @@ class InspectConfigLoader:
 
         raise ValidationError(
             f"Config file not found. Provide --config <path>, "
-            f"or create one at .sanityops/{DEFAULT_CONFIG_FILE}"
+            f"or create one at .deeplogic/{DEFAULT_CONFIG_FILE}"
         )
 
     # ------------------------------------------------------------------
@@ -219,15 +201,15 @@ class InspectConfigLoader:
             if not _UUID_RE.match(str(project_id)):
                 raise ValidationError(f"'project.id' is not a valid UUID: {project_id}")
             # Check it's not the placeholder UUID
-            if str(project_id) == PROJECT_ID_PLACEHOLDER:
+            if str(project_id) == "00000000-0000-0000-0000-000000000000":
                 raise ValidationError(
                     "'project.id' is still a placeholder. "
-                    "Set a real project id in the config file."
+                    "Run 'deeplogic-cli project create <name>' or 'deeplogic-cli project bind <id>'"
                 )
         else:
             # When not requiring project_id, just check the format if it's set
             project_id = project.get("id")
-            if project_id and str(project_id) != PROJECT_ID_PLACEHOLDER:
+            if project_id and str(project_id) != "00000000-0000-0000-0000-000000000000":
                 if not _UUID_RE.match(str(project_id)):
                     raise ValidationError(f"'project.id' is not a valid UUID: {project_id}")
 
@@ -240,8 +222,13 @@ class InspectConfigLoader:
         Rules:
         - If 'model' key absent: OK (no validation)
         - If 'model' present but not a dict: ValidationError
-        - Required fields: provider, api_key, model_id (non-empty strings)
-        - Optional: base_url (string, may be empty)
+        - Optional: context_window (positive integer when non-null)
+        - Optional: enable_thinking (boolean when non-null)
+        - Credential fields (provider, api_key, model_id, base_url):
+          If any credential key is present in 'model', provider/api_key/model_id
+          must all be non-empty strings. If only non-credential fields such as
+          'context_window' or 'enable_thinking' are specified, credentials fall
+          back to env vars.
         """
         model = self._config.get("model")
         if model is None:
@@ -249,6 +236,19 @@ class InspectConfigLoader:
 
         if not isinstance(model, dict):
             raise ValidationError("'model' section must be a mapping (dict)")
+
+        if "context_window" in model and model.get("context_window") is not None:
+            cw = model.get("context_window")
+            if isinstance(cw, bool) or not isinstance(cw, int) or cw <= 0:
+                raise ValidationError("'model.context_window' must be a positive integer")
+
+        if "enable_thinking" in model and model.get("enable_thinking") is not None:
+            if not isinstance(model.get("enable_thinking"), bool):
+                raise ValidationError("'model.enable_thinking' must be a boolean")
+
+        credential_fields = ("provider", "api_key", "model_id", "base_url")
+        if not any(field in model for field in credential_fields):
+            return
 
         # Required fields - must be non-empty strings
         required_fields = ["provider", "api_key", "model_id"]
@@ -442,26 +442,3 @@ class InspectConfigLoader:
             raise ValidationError(
                 f"[{label}] entry #{index} must be a string or object with 'file' key"
             )
-
-
-def read_project_config(config_path: Path) -> dict[str, Any]:
-    """Read the project config file, returning {} when it is missing."""
-    if not config_path.exists():
-        return {}
-    content = read_file_with_encoding_fallback(config_path)
-    if content is None:
-        return {}
-    try:
-        data = yaml.safe_load(content)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
-
-def write_project_config(data: dict[str, Any], config_path: Path) -> None:
-    """Write the project config file, preserving unrelated top-level keys."""
-    config_path.parent.mkdir(parents=True, exist_ok=True)
-    existing = read_project_config(config_path)
-    merged = {**existing, **data}
-    with open(config_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(merged, f, default_flow_style=False, sort_keys=False, allow_unicode=True)

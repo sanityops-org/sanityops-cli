@@ -1,57 +1,134 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-"""Compaction trigger fix for artifact-heavy agent runs (design §5.4).
-
-The framework's ``AgentContext.estimate_tokens()`` counts text, thinking,
-and tool-result content as chars/4 — it cannot see ``ToolUseBlock.tool_input``.
-The ExtractAgent's payloads live exactly there (store_artifacts arguments),
-so large artifact deliveries are invisible to the compaction trigger and the
-context grows unbounded until the provider rejects the request with
-``ContextWindowExceededError`` (recoverable=False, kills the whole run).
-
-``ArtifactAwareContext`` extends the estimate with the serialized size of
-every tool-use input, cached per ``tool_call_id`` (tool inputs are immutable
-once emitted, so each block is serialized exactly once).
-"""
+"""Limit each model request independently of the Agent's cumulative usage."""
 
 from __future__ import annotations
 
 import json
+import logging
+from collections.abc import AsyncIterator
+from dataclasses import asdict
+from typing import Any
 
-from sanityops_agent.core.context import AgentContext, CompactConfig
-from sanityops_agent.core.message import ToolUseBlock
+from aidynamic_agent.core.context import AgentContext, CompactConfig
+from aidynamic_agent.core.message import Message, StreamChunk, ToolDefinition, ToolUseBlock
+from aidynamic_agent.llm.base import LLMProvider, LLMResponse
+from aidynamic_agent.llm.exceptions import ContextWindowExceededError, LLMError
+
+from deeplogic_cli.inspect_pipeline.token_estimator import (
+    DEFAULT_CONTEXT_WINDOW,
+    estimate_tokens,
+    usage_breakdown,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class ArtifactAwareContext(AgentContext):
-    """AgentContext whose token estimate includes tool-call input payloads."""
+    """Estimate request size for the SDK compaction trigger and input limit."""
 
-    def __init__(self, compact_config: CompactConfig | None = None) -> None:
-        super().__init__(compact_config=compact_config or CompactConfig())
-        self._tool_input_sizes: dict[str, int] = {}
+    def __init__(self, context_window: int = DEFAULT_CONTEXT_WINDOW) -> None:
+        super().__init__(
+            compact_config=CompactConfig(trigger_token_threshold=max(1, context_window * 4 // 5))
+        )
+        self.context_window = context_window
+        self.tool_schema_tokens = 0
+        self._tool_input_sizes: dict[tuple[str, int], int] = {}
 
     def estimate_tokens(self) -> int:
-        base = super().estimate_tokens()
-        extra = 0
-        for msg in self.messages:
-            for block in msg.content:
-                if not isinstance(block, ToolUseBlock):
-                    continue
-                size = self._tool_input_sizes.get(block.tool_call_id)
-                if size is None:
-                    size = len(json.dumps(block.tool_input, ensure_ascii=False, default=str)) // 4
-                    self._tool_input_sizes[block.tool_call_id] = size
-                extra += size
-        return base + extra
+        return self.estimate_request(self.messages)
+
+    def estimate_request(self, messages: list[Message]) -> int:
+        tokens = self.tool_schema_tokens
+        for message in messages:
+            tokens += 4  # approximate message framing
+            for block in message.content:
+                tokens += 4  # approximate content block framing
+                for field in (
+                    "text",
+                    "thinking",
+                    "tool_result_content",
+                    "tool_call_id",
+                    "tool_name",
+                ):
+                    tokens += estimate_tokens(getattr(block, field, "") or "")
+                if isinstance(block, ToolUseBlock):
+                    key = (block.tool_call_id, id(block.tool_input))
+                    size = self._tool_input_sizes.get(key)
+                    if size is None:
+                        size = _estimate_json(block.tool_input)
+                        self._tool_input_sizes[key] = size
+                    tokens += size
+        return tokens
+
+
+def _estimate_json(value: object) -> int:
+    return estimate_tokens(json.dumps(value, ensure_ascii=False, default=str))
+
+
+class ContextLimitedProvider(LLMProvider):
+    """Guard SDK requests and supply the total used by its cumulative budget."""
+
+    def __init__(self, provider: LLMProvider, context: ArtifactAwareContext) -> None:
+        super().__init__(api_key=provider.api_key, base_url=provider.base_url, model=provider.model)
+        self._provider = provider
+        self._context = context
+
+    async def _check_input(
+        self, messages: list[Message], tools: list[ToolDefinition] | None
+    ) -> None:
+        context = self._context
+        context.tool_schema_tokens = (
+            _estimate_json([asdict(tool) for tool in tools]) if tools else 0
+        )
+        estimated = context.estimate_request(messages)
+        if estimated <= context.context_window:
+            return
+        # The SDK also compacts after executing tools. Check again here so
+        # the initial request and turns without tools are covered as well.
+        if messages is context.messages:
+            await context.compact_if_needed()
+            estimated = context.estimate_tokens()
+        if estimated > context.context_window:
+            raise ContextWindowExceededError(
+                f"Estimated model input of {estimated:,} tokens exceeds "
+                f"context_window={context.context_window:,} after SDK compaction."
+            )
+
+    def _can_fallback_from_disable_thinking(self, exc: LLMError) -> bool:
+        return type(exc) is LLMError and getattr(self._provider, "enable_thinking", True) is False
+
+    async def create(
+        self, messages: list[Message], tools: list[ToolDefinition] | None = None, **kwargs
+    ) -> LLMResponse:
+        await self._check_input(messages, tools)
+        try:
+            response = await self._provider.create(messages, tools=tools, **kwargs)
+        except LLMError as exc:
+            if not self._can_fallback_from_disable_thinking(exc):
+                raise
+            logger.warning(
+                "Provider rejected disable-thinking request (%s); retrying with default thinking.",
+                exc,
+            )
+            provider: Any = self._provider
+            provider.enable_thinking = True
+            try:
+                response = await self._provider.create(messages, tools=tools, **kwargs)
+            except Exception:
+                provider.enable_thinking = False
+                raise
+        if response.usage and not response.usage.get("total_tokens"):
+            response.usage = {
+                **response.usage,
+                "total_tokens": usage_breakdown(response.usage)["total"],
+            }
+        return response
+
+    async def stream(
+        self, messages: list[Message], tools: list[ToolDefinition] | None = None, **kwargs
+    ) -> AsyncIterator[StreamChunk]:
+        await self._check_input(messages, tools)
+        async for chunk in self._provider.stream(messages, tools=tools, **kwargs):
+            yield chunk
+
+    async def close(self) -> None:
+        await self._provider.close()

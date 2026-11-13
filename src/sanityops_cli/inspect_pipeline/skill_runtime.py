@@ -1,21 +1,6 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Runtime for the vendored inspect skills.
 
-Vendored skills live inside the wheel (``src/sanityops_cli/skills/``). They must
+Vendored skills live inside the wheel (``src/deeplogic_cli/skills/``). They must
 be materialized to a real filesystem directory before ``SkillManager`` can scan
 them (PyInstaller/zipimport have no scannable paths), then wired into a
 ``ToolRegistry`` via ``SkillTool`` for on-demand lazy loading by the agents.
@@ -27,33 +12,34 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 from importlib import resources
 from pathlib import Path
 
-from sanityops_agent.managers.skill import SkillManager
-from sanityops_agent.tools.base import ToolResult
-from sanityops_agent.tools.builtins.skill import SkillTool
-from sanityops_agent.tools.registry import ToolRegistry
+from aidynamic_agent.managers.skill import SkillManager
+from aidynamic_agent.tools.base import ToolResult
+from aidynamic_agent.tools.builtins.skill import SkillTool
+from aidynamic_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-EXPECTED_SKILLS = ("sanityops-inspect-lite", "pre-inspect-extract")
+EXPECTED_SKILLS = ("deeplogic-inspect-lite", "pre-inspect-extract")
 CHECKLIST_NAME = "code-contract-checklist.v2.md"
 
 
 def default_cache_root() -> Path:
-    override = os.environ.get("SANITYOPS_SKILL_CACHE")
+    override = os.environ.get("DEEPLOGIC_SKILL_CACHE")
     if override:
         return Path(override)
-    return Path.home() / ".cache" / "sanityops-cli" / "skills"
+    return Path.home() / ".cache" / "deeplogic-cli" / "skills"
 
 
 def packaged_skills_dir() -> Path:
     """Filesystem path of the packaged ``skills/`` directory."""
     try:
-        traverse = resources.as_file(resources.files("sanityops_cli").joinpath("skills"))
+        traverse = resources.as_file(resources.files("deeplogic_cli").joinpath("skills"))
         path = traverse.__enter__()
         traverse.__exit__(None, None, None)  # copy out below; path needn't outlive
         if path.is_dir():
@@ -182,7 +168,94 @@ class CliSkillTool(SkillTool):
                 success=False,
                 error=f"Skill not found: {name}",
             )
-        return ToolResult(content=_rewrite_hint_for_cli(text))
+        return ToolResult(content=_rewrite_skill_for_cli(name, text))
+
+
+_CLI_HEADER_SECTION = """7. **报告头（每份报告和每份阶段报告均强制）**——恰好包含以下溯源事实：
+   - CLI 提供的报告头数据（见系统契约附录中的 `header_data`，如 `cli`、`framework`、`model`、`date`、`project`）；
+   - 复核说明：`Extraction and inspection were performed in separate agent contexts without an independent human or second-engine verifier.`（跳过提取时省略提取部分）；
+   - 规范基线：`DeepLogic Framework v1.1 (2026-10 release)`；
+   - 每个工件集的保真度层级：`full` / `incomplete` / `summary`（逐对象）——为 `incomplete` 或 `summary` 时说明未执行的规则族。
+
+   不得为节省 token 省略报告头。"""
+
+
+def _rewrite_skill_for_cli(name: str, text: str) -> str:
+    """Adapt skill load text for the CLI runtime without mutating vendored files."""
+    rewritten = _rewrite_hint_for_cli(text)
+    if name == "deeplogic-inspect-lite":
+        rewritten = _rewrite_inspect_skill_for_cli(rewritten)
+    return rewritten
+
+
+def _rewrite_inspect_skill_for_cli(text: str) -> str:
+    """Strip standalone-skill disclaimers, lite tags, and CLI upgrade prompts."""
+    text = re.sub(
+        r"由宿主模型执行，并使用 `references/` 中的浓缩检查清单。零依赖：无 CLI、无脚本、无网络调用。",
+        "由 `deeplogic-cli` 静态检查流水线执行，使用 `references/` 中的检查清单。",
+        text,
+    )
+    text = re.sub(
+        r"^- 官方 `deeplogic-cli` 或任何 SaaS：[^\n]*\n",
+        "",
+        text,
+        flags=re.MULTILINE,
+    )
+    text = re.sub(
+        r"，并将每个判定标记为\s*\*\*“provisional \(lite\)”\*\*",
+        "",
+        text,
+    )
+    text = text.replace("保持零依赖姿态（无脚本、无额外工具）。", "")
+    text = text.replace("宿主模型", "检查模型")
+    text = text.replace(
+        "本 Skill 没有程序引擎，因此仅形式化自检（ID 存在、P 合法、证据非空、格式正确）",
+        "形式化自检（ID 存在、P 合法、证据非空、格式正确）",
+    )
+    text = re.sub(
+        r"以及升级指引（通过 `deeplogic-cli` 执行完整检查——见 https?://[^\s）]+）",
+        "",
+        text,
+    )
+    text = re.sub(
+        r"^6\. \*\*无分数\*\*——[^\n]*",
+        "6. **无分数**——本检查不计算数值分数，也不将发现映射到 AI 应用等级。输出仅为“检查项 → 严重度（P）→ 证据”。",
+        text,
+        flags=re.MULTILINE,
+    )
+    text = re.sub(
+        r"7\. \*\*报告头（每份报告和每份阶段报告均强制）\*\*[\s\S]*?不得为节省 token 省略报告头[^\n]*",
+        _CLI_HEADER_SECTION,
+        text,
+    )
+    text = re.sub(
+        r"——本 Skill 不要求实现 CLI（`deeplogic-org/deeplogic-cli`，Apache 2\.0）",
+        "",
+        text,
+    )
+    text = re.sub(
+        r"\n## 10\. 延伸阅读与升级\n[\s\S]*?(?=\n## 附录 A)",
+        "",
+        text,
+    )
+    return text
+
+
+def rewrite_reference_for_cli(path: Path, text: str) -> str:
+    """Strip lite-only output markers when reading vendored reference checklists."""
+    if path.name != "relevance-map.v2.md":
+        return text
+    text = text.replace('并标 "provisional (lite)"', "")
+    text = text.replace(' "provisional (lite)"', "")
+    text = text.replace('"provisional (lite)"', "")
+    text = text.replace(
+        "**Recommended Validation — NOT run by this lite inspector**",
+        "**Recommended Validation — Not Executed in Static Inspect**",
+    )
+    text = text.replace("lite 从不运行 Quality 子集", "静态检查不运行运行时 Quality 子集")
+    text = text.replace("**lite inspector v1 出范围**", "**当前静态检查范围外**")
+    text = text.replace("出 lite 范围", "范围说明")
+    return text
 
 
 def _rewrite_hint_for_cli(text: str) -> str:

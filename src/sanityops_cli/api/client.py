@@ -1,19 +1,4 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-"""HTTP client for sanityops SaaS API."""
+"""HTTP client for deeplogic SaaS API."""
 
 from __future__ import annotations
 
@@ -22,23 +7,25 @@ from typing import Any
 
 import httpx
 
-from sanityops_cli.exceptions.api_exceptions import (
+from deeplogic_cli.exceptions.api_exceptions import (
     APIError,
-    APIValidationError,
     AuthenticationError,
     NetworkError,
     ProjectNotFoundError,
 )
+from deeplogic_cli.exceptions.api_exceptions import (
+    ValidationError as APIValidationError,
+)
 
 
-class SanityopsClient:
-    """HTTP client for sanityops SaaS API.
+class DeeplogicClient:
+    """HTTP client for deeplogic SaaS API.
 
     Handles authentication, request formatting, and error handling for all
-    sanityops API operations.
+    deeplogic API operations.
 
     Attributes:
-        base_url: The base URL for the API (e.g., "https://api.sanityops.org").
+        base_url: The base URL for the API (e.g., "https://api.deeplogic.com").
         api_key: The API key for Bearer token authentication.
         timeout: Request timeout in seconds.
     """
@@ -46,7 +33,8 @@ class SanityopsClient:
     def __init__(
         self,
         base_url: str,
-        api_key: str,
+        api_key: str = "",
+        token: str | None = None,
         timeout: float = 30.0,
     ):
         """Initialize the API client.
@@ -54,16 +42,23 @@ class SanityopsClient:
         Args:
             base_url: Base URL for the API (without trailing slash).
             api_key: API key for authentication (will be prefixed with "Bearer").
+            token: JWT access token (optional). When provided, it takes precedence
+                over api_key for defect-check / repair calls.
             timeout: Request timeout in seconds.
         """
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
+        self.token = token
         self.timeout = timeout
 
     def _get_headers(self) -> dict[str, str]:
-        """Get common headers for API requests."""
+        """Get common headers for API requests.
+
+        A JWT token takes precedence over the API key; both are sent as Bearer.
+        """
+        credential = self.token or self.api_key
         return {
-            "Authorization": f"Bearer {self.api_key}",
+            "Authorization": f"Bearer {credential}",
             "Accept": "application/json",
         }
 
@@ -116,17 +111,14 @@ class SanityopsClient:
         else:
             raise APIError(f"API error during {operation} (HTTP {status_code}): {detail}")
 
-
     def _request_json(
         self,
         method: str,
         url: str,
         operation: str,
-        *,
-        expected: tuple[int, ...] = (200,),
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Execute a request, map transport failures, and unwrap the JSON body."""
+        """Execute an HTTP request, map transport failures to NetworkError, and unwrap JSON."""
         kwargs.setdefault("headers", self._get_headers())
         kwargs.setdefault("timeout", self.timeout)
         requester = httpx.get if method == "GET" else httpx.post
@@ -140,7 +132,7 @@ class SanityopsClient:
         except httpx.HTTPError as e:
             raise NetworkError(f"HTTP error during {operation}: {e}") from e
 
-        if response.status_code not in expected:
+        if response.status_code != 200:
             self._handle_error(response, operation)
 
         return self._unwrap_response(response.json())
@@ -161,7 +153,7 @@ class SanityopsClient:
             description: Optional project description.
 
         Returns:
-            API response with project details including 'project_id'.
+            API response with project details including 'id'.
 
         Raises:
             AuthenticationError: If API key is invalid.
@@ -173,9 +165,7 @@ class SanityopsClient:
         if description:
             payload["description"] = description
 
-        return self._request_json(
-            "POST", url, "project creation", expected=(200, 201), json=payload
-        )
+        return self._request_json("POST", url, "project creation", json=payload)
 
     def get_project(
         self,
@@ -195,7 +185,6 @@ class SanityopsClient:
             NetworkError: If connection fails.
         """
         url = f"{self.base_url}/api/v1/projects/{project_id}"
-
         return self._request_json("GET", url, "getting project")
 
     # ---------------------------------------------------------------------
@@ -258,7 +247,11 @@ class SanityopsClient:
             files = {"skill_file": (filename, content, "application/zip")}
 
         return self._request_json(
-            "POST", url, "artifact upload", expected=(200, 201), data=data, files=files
+            "POST",
+            url,
+            "artifact upload",
+            data=data,
+            files=files,
         )
 
     # ---------------------------------------------------------------------
@@ -288,7 +281,6 @@ class SanityopsClient:
         """
         url = f"{self.base_url}/api/v1/projects/{project_id}/versions"
         params = {"page": page, "size": min(size, 100)}
-
         return self._request_json("GET", url, "listing versions", params=params)
 
     def get_version(
@@ -311,7 +303,6 @@ class SanityopsClient:
             NetworkError: If connection fails.
         """
         url = f"{self.base_url}/api/v1/projects/{project_id}/versions/{version_id}"
-
         return self._request_json("GET", url, "getting version")
 
     def get_project_artifacts(
@@ -343,5 +334,129 @@ class SanityopsClient:
         params = {}
         if version_id:
             params["version_id"] = version_id
-
         return self._request_json("GET", url, "getting project artifacts", params=params)
+
+    # ---------------------------------------------------------------------
+    # Defect Check Operations (require JWT token)
+    # ---------------------------------------------------------------------
+
+    def run_defect_check(
+        self,
+        project_id: str,
+        level: str = "L1",
+        version_id: str | None = None,
+        enable_cross_check: bool = False,
+    ) -> dict[str, Any]:
+        """Trigger a server-side defect check for a project.
+
+        Args:
+            project_id: Project UUID.
+            level: Check level L1/L2/L3.
+            version_id: Optional project version UUID.
+            enable_cross_check: Whether to run CROSS checks.
+
+        Returns:
+            API response with task_id / status.
+
+        Raises:
+            AuthenticationError: If the JWT token is invalid.
+            APIError: For other HTTP errors.
+        """
+        url = f"{self.base_url}/api/v1/projects/{project_id}/defect-check/run"
+        payload: dict[str, Any] = {"level": level}
+        if version_id:
+            payload["version_id"] = version_id
+        if enable_cross_check:
+            payload["enable_cross_check"] = True
+        return self._request_json("POST", url, "running defect check", json=payload)
+
+    def get_defect_check_records(self, project_id: str) -> dict[str, Any]:
+        """List defect check records for a project (newest first)."""
+        url = f"{self.base_url}/api/v1/projects/{project_id}/defect-check/records"
+        return self._request_json("GET", url, "listing defect check records")
+
+    def get_defect_check_progress(
+        self,
+        project_id: str,
+        result_id: str,
+    ) -> dict[str, Any]:
+        """Get progress of a running defect check."""
+        url = (
+            f"{self.base_url}/api/v1/projects/{project_id}"
+            f"/defect-check/records/{result_id}/progress"
+        )
+        return self._request_json("GET", url, "getting defect check progress")
+
+    def get_defect_check_result(
+        self,
+        project_id: str,
+        result_id: str,
+    ) -> dict[str, Any]:
+        """Get full defect check result detail for one record."""
+        url = f"{self.base_url}/api/v1/projects/{project_id}/defect-check/results/{result_id}"
+        return self._request_json("GET", url, "getting defect check result")
+
+    def generate_repaired_skill(
+        self,
+        project_id: str,
+        result_id: str,
+        skill_id: str,
+        language: str = "zh",
+        regenerate: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a complete repaired SKILL.md from all QDS defects."""
+        url = (
+            f"{self.base_url}/api/v1/projects/{project_id}"
+            f"/defect-check/results/{result_id}/skills/{skill_id}/repaired-skill"
+        )
+        return self._post_repair(url, language, regenerate)
+
+    def generate_repaired_tool(
+        self,
+        project_id: str,
+        result_id: str,
+        tool_index: int,
+        language: str = "zh",
+        regenerate: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a complete repaired Tool JSON from all QDT defects."""
+        url = (
+            f"{self.base_url}/api/v1/projects/{project_id}"
+            f"/defect-check/results/{result_id}/tools/{tool_index}/repaired-tool"
+        )
+        return self._post_repair(url, language, regenerate)
+
+    def generate_repaired_prompt(
+        self,
+        project_id: str,
+        result_id: str,
+        language: str = "zh",
+        regenerate: bool = False,
+    ) -> dict[str, Any]:
+        """Generate a complete repaired Prompt from all QDP defects."""
+        url = (
+            f"{self.base_url}/api/v1/projects/{project_id}"
+            f"/defect-check/results/{result_id}/prompt/repaired-prompt"
+        )
+        return self._post_repair(url, language, regenerate)
+
+    def _post_repair(
+        self,
+        url: str,
+        language: str = "zh",
+        regenerate: bool = False,
+    ) -> dict[str, Any]:
+        """Shared POST handler for the /repaired-* endpoints.
+
+        Repair generation invokes the LLM and may exceed the default 30s
+        timeout, so we use a longer 360s upstream timeout (the frontend uses
+        6 minutes for this same call).
+        """
+        payload: dict[str, Any] = {"language": language, "regenerate": regenerate}
+        return self._request_json(
+            "POST",
+            url,
+            "generating repaired artifact",
+            json=payload,
+            timeout=360.0,
+        )

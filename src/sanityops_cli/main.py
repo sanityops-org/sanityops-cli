@@ -1,19 +1,4 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-"""Sanityops CLI Entrance — Typer Application"""
+"""deeplogic CLI Entrance — Typer Application"""
 
 import sys
 
@@ -30,19 +15,20 @@ for _stream in (sys.stdout, sys.stderr):
 import typer  # noqa: E402 - must come after stdout reconfiguration
 from rich.console import Console  # noqa: E402
 
-from sanityops_cli import __version__  # noqa: E402
-from sanityops_cli.commands.config import config_app  # noqa: E402
-from sanityops_cli.commands.init import init_config  # noqa: E402
-from sanityops_cli.commands.inspect import inspect_app  # noqa: E402
-from sanityops_cli.exceptions.base_exceptions import ValidationError  # noqa: E402
-from sanityops_cli.help_panel import (  # noqa: E402
+from deeplogic_cli import __version__  # noqa: E402
+from deeplogic_cli.commands.config import config_app  # noqa: E402
+from deeplogic_cli.commands.init import init_config  # noqa: E402
+from deeplogic_cli.commands.inspect import inspect_app  # noqa: E402
+from deeplogic_cli.commands.project import project_app  # noqa: E402,F401 - retained for future use
+from deeplogic_cli.exceptions.base_exceptions import ValidationError  # noqa: E402
+from deeplogic_cli.help_panel import (  # noqa: E402
     get_advanced_usage_panel,
     get_getting_started_panel,
 )
 
 app = typer.Typer(
-    name="Sanityops-cli",
-    help="Sanityops CLI Tool — A cli tool for sanityops",
+    name="deeplogic-cli",
+    help="deeplogic CLI Tool — A cli tool for deeplogic",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -50,9 +36,7 @@ app = typer.Typer(
 
 def version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"sanityops-cli v{__version__}")
-        typer.echo("Copyright (C) 2026 zipsonken / Sanity AI Labs")
-        typer.echo("License: Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0)")
+        typer.echo(f"deeplogic-cli version {__version__}")
         raise typer.Exit()
 
 
@@ -67,39 +51,49 @@ def callback(
         callback=version_callback,
     ),
 ):
-    """Sanityops CLI callback."""
+    """deeplogic CLI callback."""
 
-app.add_typer(inspect_app, name="inspect", help="Static defect inspection of logical artifacts (System Prompts, Skills, Tool Schemas), suitable for local development or CI/CD integration")
+
+app.add_typer(
+    inspect_app,
+    name="inspect",
+    help="Static defect inspection of logical artifacts (System Prompts, Skills, Tool Schemas), suitable for local development or CI/CD integration",
+)
 app.add_typer(
     config_app,
     name="config",
-    help="Get and set sanityops configuration (server base URL, API key, etc.)",
+    help="Get and set deeplogic configuration (server base URL, API key, etc.)",
+)
+# Project command group (hidden from --help, see README for details)
+app.add_typer(
+    project_app,
+    name="project",
+    help="Project binding (see README for details)",
+    hidden=True,
 )
 app.command("init")(init_config)
 
 
 def main():
-    """Entrance function for the Sanityops CLI application."""
-    # Show panels only when --help is the sole flag or there are no args.
-    # This narrow trigger avoids showing panels on usage errors (-h, --bogus).
-    #
-    # Note: --version/-V doesn't need explicit handling here because:
-    # - `--version` won't match the exact `["--help"]` check
-    # - Single-arg `--version` has len > 1, so is_no_args_help is False
-    # - It falls through to the normal app() path, which prints version and exits.
-    is_only_help = sys.argv[1:] == ["--help"]
+    """Entrance function for the deeplogic CLI application."""
+    # Check if --help is requested for the main app only (no subcommand)
+    # This means: --help present, no subcommand (first arg after flags would be a command)
+    is_help = "--help" in sys.argv or "-h" in sys.argv
+    is_version = "--version" in sys.argv or "-V" in sys.argv
+    # No subcommand if: only flags, or only the app name
+    has_subcommand = any(arg and not arg.startswith("-") for arg in sys.argv[1:])
+    # Also show panel when no args (no_args_is_help=True will show help)
     is_no_args_help = len(sys.argv) == 1
 
-    if is_only_help or is_no_args_help:
+    if (is_help or is_no_args_help) and not is_version and not has_subcommand:
         # Use a custom console to capture and extend help output
         console = Console()
         try:
             app()
         except SystemExit as e:
-            # Swallow the help exit so the panels can be printed after it.
-            # --help exits 0; no_args_is_help triggers Typer's help which
-            # exits 2 (Click's UsageError code). We catch both and continue
-            # to print panels, resulting in exit 0 for both cases.
+            # Intercept successful exits and help exits. no_args_is_help exits
+            # with code 2 (click's UsageError code), so accept 0 and 2 here;
+            # re-raise anything else (real usage errors keep failing).
             if e.code not in (0, 2):
                 raise
         # Print the Getting Started and Advanced Usage panels

@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Prompts for the ExtractAgent.
 
 The system prompt is deliberately thin (~3KB): the extraction rules live in
@@ -22,9 +7,9 @@ tool. This appendix only carries the CLI-side delivery contract.
 
 from __future__ import annotations
 
-SYSTEM_APPENDIX_TEMPLATE = """# CLI Contract Appendix — sanityops-cli inspect (extraction stage)
+SYSTEM_APPENDIX_TEMPLATE = """# CLI Contract Appendix — deeplogic-cli inspect (extraction stage)
 
-You are the extraction agent of `sanityops-cli inspect`. Your sole job: read
+You are the extraction agent of `deeplogic-cli inspect`. Your sole job: read
 every manifest file and report the Logic Artifacts it contains through the
 `store_artifacts` tool. You do not inspect, judge quality, or rewrite
 anything — extraction only.
@@ -48,8 +33,24 @@ cannot be audited and will be discarded.
   and the absolute `source` path (plus `evidence`/`field_evidence`/`reason`
   as the completeness label requires). Keep each chunk's content under
   ~6000 characters.
+- **Tool records** labeled `full original`, `original · variable unexpanded`,
+  or `assembled` must include the actual, non-empty JSON object in `schema`
+  on the final chunk, even when earlier chunks carry source code in `content`.
+  If the source does not provide enough information to derive a schema, use
+  `completeness="not inspectable"`, `L="undetermined"`, and a specific `reason`.
+- **Whole-file artifacts** (the artifact is the entire file, e.g. a full prompt
+  or SKILL.md): do NOT copy the text. Send one `add_artifact` with
+  `content_from_source=true`, `total_chunks=1`, `final=true`, the metadata and
+  the absolute `source` — the tool fills `content` from the file. Use chunking
+  only when the file holds several artifacts or you must deliver a rewritten
+  excerpt.
+- Chunk example (2 chunks): chunk 0 =
+  `{{"type":"prompt","name":"x","content":"<part 1>","seq":0,"total_chunks":2}}`;
+  chunk 1 = `{{"type":"prompt","name":"x","content":"<part 2>","seq":1,
+  "total_chunks":2,"final":true,"completeness":"full original","L":"AC-L2",
+  "source":"/abs/path"}}`. `artifact` must be a JSON object, never a string.
 - Enum values are validated on arrival. On a validation error, read the
-  error (it lists the allowed values), fix, and re-send that chunk. To
+  error, fix, and re-send the same `seq` before moving to another artifact. To
   rewrite a finished record, restart from `seq=0` — the last complete
   stream wins.
 - Record cross-artifact references with `add_reference` as you see them.

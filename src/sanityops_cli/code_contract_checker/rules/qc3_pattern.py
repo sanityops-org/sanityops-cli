@@ -1,17 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """QC-3 Code Pattern rules."""
 
 from __future__ import annotations
@@ -25,12 +11,11 @@ from ..models import QCDefect, QCRuleID, Severity
 if TYPE_CHECKING:
     from ..models import QCArtifactResult
 
-from .qc0_baseline import PYTHON_STDLIB
 
 # Weak credential patterns
 WEAK_CREDENTIAL_PATTERNS = [
-    (re.compile(r'password\s*=\s*["\'](\d{4,6})["\']'), "short numeric password"),
-    (re.compile(r'password\s*=\s*["\']123{2,}["\']'), "repeated digits"),
+    (re.compile(r'password\s*=\s*["\'](\d{4,6})["\']'), "sequential digits"),
+    (re.compile(r'password\s*=\s*["\']123{2,}["\']'), "sequential digits"),
     (re.compile(r'password\s*=\s*["\'](password|passwd|pwd)["\']', re.I), "common password"),
     (re.compile(r'api_key\s*=\s*["\']xxx["\']'), "placeholder value"),
     (re.compile(r'api_key\s*=\s*["\']your[_-]?api[_-]?key["\']', re.I), "placeholder value"),
@@ -170,8 +155,8 @@ def check_qc_3_2_missing_import(
                         if isinstance(elt, ast.Name):
                             self.local_names.add(elt.id)
 
-        def _collect_function_signature(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-            """Record all parameter names of the function as local names."""
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            # Function parameters
             for arg in node.args.args:
                 self.local_names.add(arg.arg)
             for arg in node.args.posonlyargs:
@@ -182,16 +167,10 @@ def check_qc_3_2_missing_import(
                 self.local_names.add(node.args.vararg.arg)
             if node.args.kwarg:
                 self.local_names.add(node.args.kwarg.arg)
-
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            self._collect_function_signature(node)
             self.generic_visit(node)
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            # Same handling as the sync visitor; the union-typed helper
-            # makes the shared signature explicit.
-            self._collect_function_signature(node)
-            self.generic_visit(node)
+            self.visit_FunctionDef(node)  # type: ignore
 
         def visit_Assign(self, node: ast.Assign) -> None:
             self._collect_assignment_targets(node.targets)
@@ -269,9 +248,39 @@ def check_qc_3_2_missing_import(
     collector = ModuleUsageCollector()
     collector.visit(tree)
 
+    # Common stdlib modules that should be imported
+    stdlib_modules = {
+        "os",
+        "sys",
+        "re",
+        "json",
+        "yaml",
+        "datetime",
+        "time",
+        "pathlib",
+        "collections",
+        "itertools",
+        "functools",
+        "typing",
+        "dataclasses",
+        "io",
+        "csv",
+        "math",
+        "random",
+        "logging",
+        "subprocess",
+        "http",
+        "urllib",
+        "socket",
+        "asyncio",
+        "tempfile",
+        "shutil",
+        "glob",
+    }
+
     for name, line in collector.potential_modules.items():
         # Check if this looks like a module usage
-        if name in PYTHON_STDLIB:
+        if name in stdlib_modules:
             defect = QCDefect(
                 rule_id=QCRuleID.QC_3_2,
                 name="Missing Import",
@@ -312,11 +321,6 @@ def check_qc_3_3_hardcoded_demo_value(
     lines = code.split("\n")
 
     for i, line in enumerate(lines):
-        # Skip comment-only lines to avoid flagging documentation examples
-        # like "# password = 'password'".
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            continue
         for pattern, pattern_type in WEAK_CREDENTIAL_PATTERNS:
             match = pattern.search(line)
             if match:

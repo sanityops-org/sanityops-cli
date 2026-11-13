@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Auto-detect LLM configuration for the local inspection agents."""
 
 from __future__ import annotations
@@ -21,11 +6,11 @@ from pathlib import Path
 
 import yaml
 
-from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
+from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
 
-# Import ProviderConfig with safe fallback for sanityops-agent packaging quirks.
+# Import ProviderConfig with safe fallback for deeplogic-agent packaging quirks.
 try:
-    from sanityops_agent.config import ProviderConfig
+    from aidynamic_agent.config import ProviderConfig
 except ModuleNotFoundError:
     import importlib
 
@@ -36,15 +21,15 @@ except ModuleNotFoundError:
         else:
             raise ModuleNotFoundError(
                 "Module 'config' does not provide ProviderConfig. "
-                "Ensure sanityops-agent is installed properly."
+                "Ensure aidynamic-agent is installed properly."
             )
     except Exception as _e:
         raise ModuleNotFoundError(
-            f"Failed to import ProviderConfig from sanityops_agent.config: {_e}"
+            f"Failed to import ProviderConfig from aidynamic_agent.config: {_e}"
         ) from _e
 
 # Default config file location
-DEFAULT_CONFIG_DIR = ".sanityops"
+DEFAULT_CONFIG_DIR = ".deeplogic"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
 
@@ -138,7 +123,7 @@ def resolve_llm_config(config_path: str | None = None) -> dict[str, str]:
 
     Args:
         config_path: Optional path to config file. If None, looks for
-            .sanityops/inspect_config.yaml in current working directory.
+            .deeplogic/inspect_config.yaml in current working directory.
 
     Returns:
         dict with keys: llm_provider, llm_api_key, llm_model_id, llm_base_url
@@ -150,7 +135,7 @@ def resolve_llm_config(config_path: str | None = None) -> dict[str, str]:
 
     # Fall back to ProviderConfig (env vars)
     #
-    # NOTE: sanityops-agent >= 0.3.3 renames ProviderConfig's provider field from
+    # NOTE: aidynamic-agent >= 0.3.3 renames ProviderConfig's provider field from
     # `LLM_PROVIDER` to `PROVIDER` (env_prefix="LLM_" keeps the env var name).
     # Use getattr to stay compatible across versions. str() coerces the value to a
     # string so mypy sees a str, not Any | None.
