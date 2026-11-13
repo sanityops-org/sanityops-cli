@@ -85,11 +85,11 @@ title: Skill Inspection Checklist (QD-S, v2 统一引擎版)
 | QD-S-5.1 | 操作数据未区分 read/modify/delete 作用域 | 判数据操作是否混淆读/改/删 |
 | QD-S-5.2 | 不可逆操作（删/覆写/外泄/支付）无确认门 | 判不可逆操作是否缺 require_user_confirmation_for 确认门 |
 | QD-S-5.3 | 未声明是否禁止生产、允许哪些环境 | 判缺环境边界声明（禁止 production / 允许环境清单） |
-| QD-S-5.4 | 调用其他 Skill 未声明允许/禁止下游范围 | 判链式调用是否缺 allowed_downstream_skills / 范围声明 |
+| QD-S-5.4 | 调用其他 Skill 未声明允许/禁止下游范围 | 判链式调用是否缺 allowed_后续_skills / 范围声明 |
 
 ### 3.2 hybrid 项的模型确认部分
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅检…／程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **skill 端：本节即完整判定要点，无程序初筛前置。**“程序仅检…／程序仅做…”描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为“已筛过”，也不得据此判 N/A。
 
 | ID | model_prompt（确认要点） |
 |---|---|

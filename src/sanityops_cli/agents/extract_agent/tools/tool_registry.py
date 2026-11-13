@@ -1,21 +1,8 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Deterministic pre-extraction for structured tool registries (design §5.5).
 
-Candidates are plain dicts handed to ``StoreArtifactsTool.register_candidates``. JSON/YAML files whose item
+Ported from the former ``scanner_agent.tool_registry`` with the Finding
+model dependency removed: candidates are plain dicts handed to
+``StoreArtifactsTool.register_candidates``. JSON/YAML files whose item
 boundaries are part of the file format must not be inferred by a model.
 """
 
@@ -118,7 +105,17 @@ def _tool_items(data: Any) -> list[dict[str, Any]] | None:
 def _looks_like_tool(item: dict[str, Any]) -> bool:
     """Avoid treating an arbitrary YAML mapping as a tool definition."""
     return any(
-        key in item for key in ("name", "function", "input_schema", "parameters", "module", "class")
+        key in item
+        for key in (
+            "name",
+            "function",
+            "input_schema",
+            "inputSchema",
+            "parameters",
+            "properties",
+            "module",
+            "class",
+        )
     )
 
 
@@ -135,13 +132,36 @@ def _normalize_tool_item(item: dict[str, Any]) -> tuple[str, dict[str, Any]] | N
         return None
 
     schema: dict[str, Any] = dict(payload)
-    parameters = payload.get("parameters")
+
+    # 1. Prefer non-empty explicit parameter containers
+    parameters: Any = None
+    for key in ("parameters", "inputSchema", "input_schema"):
+        val = payload.get(key)
+        if isinstance(val, dict) and val:
+            parameters = val
+            break
+
+    # 2. Check flat schema where properties is defined at root
+    if parameters is None and "properties" in payload and isinstance(payload["properties"], dict):
+        parameters = {
+            k: v for k, v in payload.items() if k not in ("name", "description", "function")
+        }
+        if "type" not in parameters:
+            parameters["type"] = "object"
+
+    # 3. Explicit container even if empty
     if parameters is None:
-        parameters = payload.get("input_schema")
+        for key in ("parameters", "inputSchema", "input_schema"):
+            val = payload.get(key)
+            if isinstance(val, dict):
+                parameters = val
+                break
+
     if parameters is None:
         parameters = {}
     if not isinstance(parameters, dict):
         return None
+
     schema["parameters"] = parameters
     schema.setdefault("description", "")
     if not isinstance(schema.get("description"), str):

@@ -54,8 +54,8 @@ title: Permission Proportionality Checklist (QD-PM, v2 统一引擎版)
 | QD-PM-3.4 | High-risk and irreversible operations not separated from routine operations | model | has_irreversible_op | P0（R1 固定） | ✓ |
 | QD-PM-3.5 | Permission granularity coarser than responsibility baseline differentiation | model | baseline_has_conditional_authz | P1(OR-L2) → P0(条件保护 OR-L3) | ✓ |
 | QD-PM-3.6 | Granularity too fine causes equivalent coarse permission Combination Bypass | model | has_multiple_permissions | P2 / P1 / P0（按组合等效 OR-L，R3） | ✓ |
-| QD-PM-4.1 | Upstream permission constraint not inherited downstream | model | has_invocation_chain | P2 / P1 / P0（按丢失约束保护的 OR-L） | ✓ |
-| QD-PM-4.2 | Downstream declared power exceeds upstream authorization | model | has_invocation_chain | 按超出部分 OR-L | ✓ |
+| QD-PM-4.1 | 前序权限约束未在后续继承 | model | has_invocation_chain | P2 / P1 / P0（按丢失约束保护的 OR-L） | ✓ |
+| QD-PM-4.2 | 后续声明权力超过前序授权 | model | has_invocation_chain | 按超出部分 OR-L | ✓ |
 | QD-PM-4.3 | Permission not narrowed when delegating task | model | has_delegation | P1(OR-L2) → P0(传递集含 OR-L3) | ✓ |
 | QD-PM-4.4 | Privilege escalation exists in delegation chain | model | has_delegation | P1(OR-L1) → P0(OR-L2 R4 / OR-L3) | ✓ |
 | QD-PM-4.5 | Delegation chain untraceable | model | has_delegation | P1 → P0(链端可达 OR-L3) | ✓ |
@@ -110,8 +110,8 @@ title: Permission Proportionality Checklist (QD-PM, v2 统一引擎版)
 | QD-PM-3.4 | 不可逆操作（删/转账/外发/生产部署）与常规操作共用同一授权路径，未单独识别并绑定确认/审批；3.4 是 6.3 的前提 | 判不可逆操作是否与常规操作分离；固定 P0 |
 | QD-PM-3.5 | 责任基线已区分场景/条件（如"经客户确认后方可改地址"），权限未跟随拆分，条件失去载体对象——等效于无条件超权 | 仅当责任基线含条件授权声明时适用；条件保护操作 OR-L3→P0 |
 | QD-PM-3.6 | 权限拆得过细，Agent 无法用单一权限完成常规职责，被迫组合多个权限，组合结果等效于未授予的粗权限——粒度细化非单调有益 | 按组合等效效应 OR-L 计；与 1.6 同判对象反成因，同命中时 1.6 立案、本项标 INHERITED |
-| QD-PM-4.1 | Prompt/Skill 声明的权限约束（禁止项、条件、范围限制）在下游 Skill/Tool 声明与参数设计中无对应载体——跨层约束消失 | 判上游约束是否在下游有载体；区别于 2.8（2.8 层内声明与参数不符，本项跨层消失）；按丢失约束保护的 OR-L 计 |
-| QD-PM-4.2 | Tool 可执行操作超出 Skill 声明范围，或 Skill 能力超出 Prompt 授权 | 判下游是否越上游；若 Cross 已同址判定则 INHERITED（Cross 未命中时本域独立立案） |
+| QD-PM-4.1 | Prompt/Skill 声明的权限约束（禁止项、条件、范围限制）在下游 Skill/Tool 声明与参数设计中无对应载体——跨层约束消失 | 判前序约束是否在下游有载体；区别于 2.8（2.8 层内声明与参数不符，本项跨层消失）；按丢失约束保护的 OR-L 计 |
+| QD-PM-4.2 | Tool 可执行操作超出 Skill 声明范围，或 Skill 能力超出 Prompt 授权 | 判下游是否越前序；若 Cross 已同址判定则 INHERITED（Cross 未命中时本域独立立案） |
 | QD-PM-4.3 | 主 Agent 委托任务时传递完整权限集，而非该任务所需最小子集；收窄基准是**被委托任务**而非主 Agent 责任基线 | 判委托传递集是否超任务切片所需；传递集含 OR-L3→P0 |
 | QD-PM-4.4 | Sub-Agent/被调用 Agent 持有主 Agent 没有的权限，委托成为绕行通道；最严重传播形态，使主 Agent 所有收窄结论失效 | 判委托链是否造成越权；OR-L2 按 R4 升 P0 |
 | QD-PM-4.5 | 未声明委托时须传递的来源标识与链路信息，最终操作无法回溯发起者与授权依据 | 只查声明，不查日志系统实现；链端可达 OR-L3→P0 |
@@ -131,7 +131,7 @@ title: Permission Proportionality Checklist (QD-PM, v2 统一引擎版)
 
 ### 3.2 hybrid 项的模型确认部分（9 项）
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅检…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **skill 端：本节即完整判定要点，无程序初筛前置。**“程序仅检…／程序仅做…”描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为“已筛过”，也不得据此判 N/A。
 
 | ID | model_prompt（确认要点） |
 |---|---|
@@ -195,12 +195,12 @@ title: Permission Proportionality Checklist (QD-PM, v2 统一引擎版)
 G0-4 未通过时，Permission 阶段**只**输出：
 
 ```text
-Subset: Inspect Permission Governance Specification (QD-PM)
-Execution Status: Not Executed
-Unsatisfied Conditions: <G0-IDs>
-Blocking Reasons:
-  <G0-ID> — <specific reason>
-Remediation Actions: Fix above upstream items, then re-run Gate-0
+子集：Inspect Permission Governance Specification（QD-PM）
+执行状态：Not Executed
+未满足条件：<G0-IDs>
+阻塞原因：
+  <G0-ID> — <具体原因>
+修复动作：修复上述前序项，然后重新运行 Gate-0
 ```
 
 禁止输出：缺陷清单、得分、分组部分结论或任何推测性判定。**层级表述红线**：不得写 "Permission determined as ERROR" 或 "Permission status BLOCKED"；正确表述是该阶段 **"Not Executed"**（整体评估状态可由 Core 另行聚合）。

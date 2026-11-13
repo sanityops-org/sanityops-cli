@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Artifact packer — prepare artifacts for upload.
 
 This module handles:
@@ -51,10 +36,32 @@ def _read_text_utf8_gbk(path: Path) -> str:
 
 
 def _extract_tool_parameters(schema: dict[str, Any]) -> Any:
-    """Extract parameters supporting parameters, inputSchema, and input_schema."""
+    """Extract parameters supporting parameters, inputSchema, input_schema, and flat schemas."""
+    if not isinstance(schema, dict):
+        return {}
+
+    # 1. Prefer non-empty explicit parameter containers
+    for key in ("parameters", "inputSchema", "input_schema"):
+        val = schema.get(key)
+        if isinstance(val, dict) and val:
+            return val
+
+    # 2. Check flat schema where properties is defined at root (e.g. {"name": "...", "properties": {...}})
+    if "properties" in schema and isinstance(schema["properties"], dict):
+        flat = {k: v for k, v in schema.items() if k not in ("name", "description", "function")}
+        if "type" not in flat:
+            flat["type"] = "object"
+        return flat
+
+    # 3. Explicit container even if empty (e.g. tool with no arguments: parameters={})
     for key in ("parameters", "inputSchema", "input_schema"):
         if key in schema and schema[key] is not None:
             return schema[key]
+
+    # 4. Pure object schema without explicit container (e.g. {"type": "object"})
+    if schema.get("type") == "object":
+        return {k: v for k, v in schema.items() if k not in ("name", "description", "function")}
+
     return {}
 
 
@@ -85,9 +92,8 @@ def _normalize_tool_definition(
     normalized = dict(payload)
     if normalized.get("type") == "function":
         normalized.pop("type", None)
-    if "parameters" not in normalized and (
-        "inputSchema" in normalized or "input_schema" in normalized
-    ):
+    has_alternate = "inputSchema" in normalized or "input_schema" in normalized
+    if has_alternate and not normalized.get("parameters"):
         normalized["parameters"] = _extract_tool_parameters(normalized)
     normalized.pop("inputSchema", None)
     normalized.pop("input_schema", None)
@@ -166,10 +172,20 @@ def pack_extracted(result: ExtractionResult) -> dict[str, Any]:
 
     tools_by_name: dict[str, dict[str, Any]] = {}
     for artifact in inspectable:
-        if artifact.type != "tool" or not artifact.schema_object:
+        if artifact.type != "tool":
+            continue
+        schema_obj = artifact.schema_object
+        if not schema_obj and artifact.content:
+            try:
+                parsed = json.loads(artifact.content.strip())
+                if isinstance(parsed, dict):
+                    schema_obj = parsed
+            except Exception:
+                pass
+        if not schema_obj:
             continue
         normalized = _normalize_tool_definition(
-            artifact.schema_object,
+            schema_obj,
             strict_neutral=True,
             fallback_name=artifact.name,
         )

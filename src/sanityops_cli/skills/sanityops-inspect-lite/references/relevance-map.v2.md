@@ -108,7 +108,7 @@ title: Relevance Map (v2 统一引擎版)
 | QD-P-2.7.2 | Counter-Example Coverage (rec.) | AC-L1~3 | AS-01, AS-05 | D2 | Conditional |
 | QD-P-2.7.3 | Boundary-Case Examples Missing (rec.) | AC-L1~3 | AS-01, AS-05 | D2 | Conditional |
 
-> 注：推荐项（无 P 级）统一 `Conditional`。已弃用/删除/合并规则不映射：`QD-P-2.5.5`（弃用）、`QD-P-2.1.1`（删除，注入点并入 2.5.6）、`QD-P-2.3.3`（编号空位）、`QD-P-2.1.4`（并入 1.4.1）。
+> 注：推荐项（无 P 级）统一 `Conditional`。已弃用/删除/合并规则不映射：`QD-P-2.5.5`（弃用）、`QD-P-1.4.2`（删除）、`QD-P-2.3.3`（编号空位）、`QD-P-2.1.4`（并入 1.4.1）。
 
 ### A.2 Skill（QD-S-*）
 

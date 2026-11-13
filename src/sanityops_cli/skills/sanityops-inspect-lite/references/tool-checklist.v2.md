@@ -72,7 +72,7 @@ title: Tool Schema Checklist (v2 统一引擎版)
 
 ### 3.2 hybrid 项的模型确认部分
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅检…／程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **skill 端：本节即完整判定要点，无程序初筛前置。**“程序仅检…／程序仅做…”描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为“已筛过”，也不得据此判 N/A。
 
 | ID | model_prompt（确认要点） |
 |---|---|
@@ -143,4 +143,3 @@ title: Tool Schema Checklist (v2 统一引擎版)
 - 全局权重规则（`_meta.md`）：`P0 : P1 : P2 = 5 : 3 : 1`，按项最高严重度扣一次。
 - `计入打分` 列 = `✓` 的项进入静态分母（20/25/25）；`✗`（5.x change-check）与 tombstone 不计入。
 - skill / CLI 不激活打分，但 `score_weight` 信息在索引表「计入打分」列保留，供 platform 使用。
-

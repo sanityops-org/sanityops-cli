@@ -24,7 +24,7 @@ title: 统一 Checklist 共享元文档（_meta）
 | `examples` | 正/反例（挂起，待补） | ✓ | ✓ | ✓ |
 | `cross_refs` | 同源去重/合并/转移关系 | ✓ | ✓ | ✓ |
 
-> **skill 消费边界（硬）**：skill 端不读取 `check_engine`、不解析 §4 的 `program-check` 块、不执行 `program_rule`。域文件中「程序仅检…／程序仅做…／程序引擎只 parse…」等措辞描述的是 CLI / platform 的初筛路径，**不构成 skill 的判定前置**：skill 必须按 §3 的判定要点完成全量语义推理，不得因"程序已筛过"而降低判定强度，也不得把"程序初筛未命中"当作 N/A 依据。
+> **skill 消费边界（硬）**：skill 端不读取 `check_engine`、不解析 §4 的 `program-check` 块、不执行 `program_rule`。域文件中“程序仅检…／程序仅做…／程序引擎只 parse…”等措辞描述的是 CLI / platform 的初筛路径，**不构成 skill 的判定前置**：skill 必须按 §3 的判定要点完成全量语义推理，不得因“程序已筛过”而降低判定强度，也不得把“程序初筛未命中”当作 N/A 依据。
 
 ## 2. check_engine 三值与映射
 
@@ -45,7 +45,7 @@ title: 统一 Checklist 共享元文档（_meta）
   - `on_absent` → N/A（结构事实不存在，必写依据）
   - `on_unknown` → judge（无法判定，默认查）
 - **N/A 纪律**：N/A 是"结构不适用"的出口，**不是缺失**；必须写明依据。
-- **判定主体（谁判结构事实）**：skill 端结构事实由宿主模型全量语义判定（skill 不消费 `check_engine` / `program_rule`，见 §1）；CLI / platform 端由程序初筛 + 模型确认。无论哪端，结构事实的判定依据都必须可追溯——尤其"事实不存在"（`on_absent → N/A`）必须记录搜索范围与未命中的依据，依据不足时标 `uncertain` 而非 N/A。条件项的事实来源（如 `has_pii` / `has_side_effect_op` / `is_regulated_domain`）由同一判定主体确定，且"触发→P0"的事实命中必须写依据。
+- **判定主体（谁判结构事实）**：skill 端结构事实由宿主模型全量语义判定（skill 不消费 `check_engine` / `program_rule`，见 §1）；CLI / platform 端由程序初筛 + 模型确认。无论哪端，结构事实的判定依据都必须可追溯——尤其“事实不存在”（`on_absent → N/A`）必须记录搜索范围与未命中的依据，依据不足时标 `uncertain` 而非 N/A。条件项的事实来源（如 `has_pii` / `has_side_effect_op` / `is_regulated_domain`）由同一判定主体确定，且“触发→P0”的事实命中必须写依据。
 
 ## 4. severity 表达约定
 

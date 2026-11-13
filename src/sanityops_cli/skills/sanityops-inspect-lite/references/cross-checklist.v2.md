@@ -11,7 +11,7 @@ title: Cross-Artifact Consistency Checklist (v2 统一引擎版)
 ## 1. 域内说明
 
 - **双 L 维度**：本域 severity 由 **AC-L**（决定 default P 取值）与 **OR-L**（升级：OR-L3 → P0/P1）共同决定。哪些项适用由 `applicability.fact` 决定，**不由 AC-L**（原 tier-scoped 规格的 L1=7 / L2=20 / L3=29 范围仅作历史参考，不再决定"考不考"）。索引表 severity 列标 **AC-L1/L2/L3 的 default 取值**（`∅` = 该 L 下原规范不分配 P，参考级展示）；OR-L3 升级与实例升级见下方表格。
-- **非阻塞模式**（源 §How to Use）：上游单工件 P0 不阻断本清单执行，聚合 P0 而非 halt。开始前确认 Prompt/Skill/Tool 版本号、时间戳、来源一致，不一致先问用户。
+- **非阻塞模式**（源 §How to Use）：前序单工件 P0 不阻断本清单执行，聚合 P0 而不停止流程。开始前确认 Prompt/Skill/Tool 版本号、时间戳、来源一致，不一致先问用户。
 - **仅检跨工件关系**（六组：QD-PS / QD-PT / QD-ST / QD-SS / QD-TT / QD-CYC），不复检 QD-P/QS/QD-T 的单工件内部缺陷。
 - **每项证据须引双方工件位置**（三级定位：关系→工件→字段）。
 - **N/A 纪律**：N/A 必写依据（如"无 Tool Schema""Agent 仅 1 个 Skill"）；无依据的 N/A 视为未检，按默认级计失败。
@@ -100,7 +100,7 @@ title: Cross-Artifact Consistency Checklist (v2 统一引擎版)
 
 ### 3.2 hybrid 项的模型确认部分
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **skill 端：本节即完整判定要点，无程序初筛前置。**“程序仅检…／程序仅做…”描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为“已筛过”，也不得据此判 N/A。
 
 | ID | model_prompt（确认要点） |
 |---|---|

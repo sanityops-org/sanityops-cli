@@ -1,25 +1,4 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
-"""Tail-JSON parsing with the fail-closed ladder (design §6.4).
-
-Never fail open: whatever the agent emitted, the CLI ends up with a
-``ParsedSummary`` whose counts are either the (cross-validated) tail JSON
-values, a CLI recomputation from the report sections, or a hard ``failed``
-status that maps to exit 2.
-"""
+"""Resolve the CLI summary from report findings, with legacy fallbacks."""
 
 from __future__ import annotations
 
@@ -29,6 +8,7 @@ from dataclasses import dataclass, field
 
 TAIL_START = "<!-- inspect-summary -->"
 TAIL_END = "<!-- /inspect-summary -->"
+STAGE_SECTIONS = tuple("ABCDEFG")
 
 #: Severity → sort rank.
 SEVERITY_RANK = {"P0": 0, "P1": 1, "P2": 2}
@@ -53,13 +33,14 @@ MODULE_STAGE = {
 #: Module vocabulary from the contract appendix.
 KNOWN_MODULES = set(MODULE_STAGE)
 
-_MAX_FINDINGS = 20
 _MAX_DESCRIPTION = 120
 
 #: Best-effort line pattern when the tail JSON is missing: a severity next to
 #: a module/rule id in a report section line.
-_SECTION_FINDING_RE = re.compile(
-    r"\b(P0|P1|P2)\b[^|:\n]*?\b(?P<module>QD-[A-Z]{1,2}|QC|EX|AS-FM)\b" r"(?P<rest>[^\n]*)"
+_MODULE_PATTERN = "|".join(re.escape(module) for module in sorted(KNOWN_MODULES))
+_SECTION_FINDING_RE = re.compile(rf"\b(P0|P1|P2)\b[^:\n]*?\b(?P<module>{_MODULE_PATTERN})(?![A-Z])")
+_SKIPPED_STAGE_RE = re.compile(
+    r"^(?:Stage [A-G]\s*[:—-]\s*)?(?:not executed\b|skipped\b|未执行)", re.IGNORECASE
 )
 
 
@@ -67,19 +48,29 @@ _SECTION_FINDING_RE = re.compile(
 class ParsedSummary:
     """Fail-closed summary of one inspection run."""
 
-    status: str  # "completed" | "failed"
+    status: str  # "completed" | "partial" | "failed"
     counts: dict = field(default_factory=dict)
     findings: list[dict] = field(default_factory=list)
     stages: dict[str, str] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
-    source: str = "none"  # "tail" | "sections" | "none"
+    source: str = "none"  # "parts" | "tail" | "sections" | "none"
     #: Stages the report tool recorded as never emitted (CLI-recorded reality,
     #: §6.3) — drives the strict stage-completeness gate (design §9).
     missing_stages: list[str] = field(default_factory=list)
+    counts_partial: bool = False
+    unstructured_stages: list[str] = field(default_factory=list)
 
     @property
     def inspect_p0(self) -> int:
         return int(self.counts.get("inspect", {}).get("p0", 0))
+
+    def stage_status(self, stage: str) -> str:
+        if stage in self.missing_stages:
+            return "not received"
+        status = self.stages.get(stage, "status unavailable")
+        if stage in self.unstructured_stages:
+            return f"{status} (findings incomplete)"
+        return status
 
 
 def extract_tail_block(tail_text: str) -> str | None:
@@ -99,26 +90,115 @@ def parse_summary(
     tail_text: str,
     section_parts: dict[str, list[str]],
     missing_stages: list[str] | None = None,
+    *,
+    part_findings: list[dict] | None = None,
+    unstructured_stages: list[str] | None = None,
 ) -> ParsedSummary:
-    """Apply the fail-closed ladder and return the summary."""
+    """Count structured report parts, legacy tail findings, or scanned Markdown."""
     missing_stages = missing_stages or []
+    unstructured_stages = unstructured_stages or []
+    warnings: list[str] = []
     tail_raw = extract_tail_block(tail_text)
-
+    tail: dict = {}
     if tail_raw is not None:
-        warnings: list[str] = []
         try:
-            tail = json.loads(tail_raw)
-        except json.JSONDecodeError as exc:
-            tail = None
-            warnings.append(f"summary block malformed ({exc}); recomputing from sections")
-        if tail is not None:
-            return _from_tail(tail, section_parts, missing_stages)
-        return _from_sections(section_parts, missing_stages, warnings)
+            decoded = json.loads(tail_raw)
+            if not isinstance(decoded, dict):
+                raise ValueError("expected a JSON object")
+            tail = decoded
+        except ValueError as exc:
+            warnings.append(f"summary block malformed ({exc})")
+    else:
+        warnings.append("summary block missing")
 
-    return _from_sections(
-        section_parts,
-        missing_stages,
-        ["summary block missing; recomputing from sections"],
+    legacy_findings = tail.get("findings")
+    warning_count = len(warnings)
+    if part_findings is not None:
+        source = "parts"
+        findings = _normalize_findings(part_findings, warnings)
+    elif isinstance(legacy_findings, list):
+        source = "tail"
+        findings = _normalize_findings(legacy_findings, warnings)
+    elif section_parts:
+        source = "sections"
+        warnings.append("structured findings unavailable; counts estimated from report sections")
+        findings = _findings_from_sections(section_parts)
+    else:
+        source = "none"
+        findings = []
+
+    counts = counts_from_findings(findings)
+    counts_partial = bool(
+        missing_stages
+        or unstructured_stages
+        or source in {"sections", "none"}
+        or len(warnings) > warning_count
+    )
+    counts_partial |= tail.get("counts_partial") is True
+    declared = tail.get("counts")
+    if isinstance(declared, dict) and declared and declared != counts:
+        warnings.append(
+            f"counts inconsistent: agent declared {format_counts(declared)} · "
+            f"recorded findings {format_counts(counts)}"
+        )
+        counts_partial |= source != "parts"
+    if unstructured_stages:
+        warnings.append(
+            f"structured findings missing from report parts in stages {', '.join(unstructured_stages)}"
+        )
+
+    claimed_status = tail.get("status", "completed")
+    status = "completed"
+    if source == "none" or claimed_status == "failed":
+        status = "failed"
+    elif missing_stages or unstructured_stages or claimed_status != "completed":
+        status = "partial"
+    if claimed_status not in ("completed", "partial"):
+        warnings.append(f"agent reported status={claimed_status}")
+
+    stages = _stage_statuses(section_parts, tail.get("stages"), missing_stages)
+    return ParsedSummary(
+        status=status,
+        counts=counts,
+        findings=findings,
+        stages=stages,
+        warnings=warnings,
+        source=source,
+        missing_stages=missing_stages,
+        counts_partial=counts_partial,
+        unstructured_stages=unstructured_stages,
+    )
+
+
+def _stage_statuses(
+    section_parts: dict[str, list[str]], claimed: object, missing_stages: list[str]
+) -> dict[str, str]:
+    stages = {
+        stage: str(claimed[stage])
+        for stage in STAGE_SECTIONS
+        if isinstance(claimed, dict) and isinstance(claimed.get(stage), str)
+    }
+    for stage in STAGE_SECTIONS:
+        if stage in missing_stages:
+            stages[stage] = "NOT RECEIVED — agent did not emit this stage"
+        elif stage not in stages and (parts := section_parts.get(stage)):
+            lines = [line.strip(" #*\t") for line in parts[0].splitlines() if line.strip()]
+            skipped = next((line for line in lines[:2] if _SKIPPED_STAGE_RE.match(line)), "")
+            stages[stage] = skipped or "received (status unavailable)"
+    return stages
+
+
+def format_severities(bucket: object) -> str:
+    values = bucket if isinstance(bucket, dict) else {}
+    return "  ".join(
+        f"{severity}: {values.get(severity.lower(), '?')}" for severity in SEVERITY_RANK
+    )
+
+
+def format_counts(counts: dict) -> str:
+    return (
+        f"Inspect {format_severities(counts.get('inspect'))} / "
+        f"Explicit {format_severities(counts.get('risk_explicit'))}"
     )
 
 
@@ -129,7 +209,7 @@ def _empty_counts() -> dict:
     }
 
 
-def _counts_from_findings(findings: list[dict]) -> dict:
+def counts_from_findings(findings: list[dict]) -> dict:
     counts = _empty_counts()
     for finding in findings:
         severity = str(finding.get("severity", "")).upper()
@@ -160,75 +240,10 @@ def _normalize_findings(findings: list, warnings: list[str]) -> list[dict]:
             warnings.append(f"dropping finding with unknown severity: {entry['severity']!r}")
             continue
         normalized.append(entry)
-    if len(normalized) > _MAX_FINDINGS:
-        warnings.append(
-            f"tail findings exceed {_MAX_FINDINGS}; keeping the first "
-            f"{_MAX_FINDINGS} (severity order not guaranteed)"
-        )
-        normalized = normalized[:_MAX_FINDINGS]
     return normalized
 
 
-def _from_tail(
-    tail: dict, section_parts: dict[str, list[str]], missing_stages: list[str]
-) -> ParsedSummary:
-    warnings: list[str] = []
-    findings = _normalize_findings(tail.get("findings") or [], warnings)
-
-    recomputed = _counts_from_findings(findings)
-    declared = tail.get("counts") or {}
-    counts = recomputed
-    if declared and declared != recomputed:
-        warnings.append("tail counts inconsistent with findings[]; using findings-derived counts")
-
-    status = str(tail.get("status", "completed"))
-    stages = dict(tail.get("stages") or {})
-    # CLI-recorded stage reality overrides the agent's claims (§6.3).
-    for stage in missing_stages:
-        stages[stage] = "NOT RECEIVED — agent did not emit this stage"
-
-    if status != "completed":
-        warnings.append(f"agent reported status={status}")
-
-    return ParsedSummary(
-        status=status,
-        counts=counts,
-        findings=findings,
-        stages=stages,
-        warnings=warnings,
-        source="tail",
-        missing_stages=missing_stages,
-    )
-
-
-def _from_sections(
-    section_parts: dict[str, list[str]],
-    missing_stages: list[str],
-    warnings: list[str],
-) -> ParsedSummary:
-    findings = _findings_from_sections(section_parts, warnings)
-    counts = _counts_from_findings(findings)
-    stages = {
-        stage: "executed"
-        for stage in ("A", "B", "C", "D", "E", "F", "G")
-        if stage not in missing_stages
-    }
-    for stage in missing_stages:
-        stages[stage] = "NOT RECEIVED — agent did not emit this stage"
-
-    has_sections = bool(section_parts)
-    return ParsedSummary(
-        status="completed" if has_sections else "failed",
-        counts=counts,
-        findings=findings,
-        stages=stages,
-        warnings=warnings,
-        source="sections" if has_sections else "none",
-        missing_stages=missing_stages,
-    )
-
-
-def _findings_from_sections(section_parts: dict[str, list[str]], warnings: list[str]) -> list[dict]:
+def _findings_from_sections(section_parts: dict[str, list[str]]) -> list[dict]:
     """Best-effort severity/module scan over the section markdown."""
     findings: list[dict] = []
     for section in sorted(section_parts):
@@ -250,9 +265,6 @@ def _findings_from_sections(section_parts: dict[str, list[str]], warnings: list[
                         "description": re.sub(r"[*_`|]", "", line)[:_MAX_DESCRIPTION],
                     }
                 )
-                if len(findings) >= _MAX_FINDINGS:
-                    warnings.append("section scan capped at 20 findings")
-                    return findings
     return findings
 
 

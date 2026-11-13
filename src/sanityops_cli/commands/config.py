@@ -1,29 +1,13 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """config command — Get and set sanityops configuration.
 
 Config keys use dot notation, e.g. ``server.base_url``. They correspond to
 the sanityops SaaS backend (NOT the LLM model config, which lives under
-``model.*``). Precedence: environment variable > project-level > global > default.
+``model.*``). Precedence: project-level > global > env var > default.
 """
 
 from __future__ import annotations
 
 import getpass
-import os
 import sys
 from typing import Any
 
@@ -42,8 +26,6 @@ config_app = typer.Typer(
     name="config",
     help="Get and set sanityops configuration (server base URL, API key, etc.)",
     no_args_is_help=False,  # We handle help ourselves to add usage panel
-    add_help_option=False,  # We handle --help ourselves to add usage panel
-    context_settings={"allow_interspersed_args": True},
 )
 
 # Registry of known config keys: metadata for reading defaults / masking.
@@ -59,6 +41,11 @@ CONFIG_SCHEMA: dict[str, dict[str, Any]] = {
         "default": None,
         "sensitive": True,
     },
+    "server.token": {
+        "env": "SANITYOPS_TOKEN",
+        "default": None,
+        "sensitive": True,
+    },
 }
 
 
@@ -67,22 +54,19 @@ def _is_sensitive_key(key: str) -> bool:
     return bool(CONFIG_SCHEMA.get(key, {}).get("sensitive"))
 
 
-def _mask_sensitive_value(value: Any) -> str:
+def _mask_sensitive_value(value: str | None) -> str:
     """Mask a sensitive value for display: first 3 + '***' + last 4 chars.
 
-    Short values (< 8 chars) are fully masked.
-    Non-string values are converted to string first.
-    This function is called from _display_value which handles None before calling.
+    Short values (< 8 chars) are fully masked. None -> '(not set)'.
     """
-    # Defensive: handle non-string values from manually-edited YAML
-    if not isinstance(value, str):
-        value = str(value)
+    if value is None:
+        return "(not set)"
     if len(value) <= 7:
         return "***"
     return f"{value[:3]}***{value[-4:]}"
 
 
-def _display_value(key: str, value: Any) -> str:
+def _display_value(key: str, value: str | None) -> str:
     """Return the value as it should be shown, masking sensitive keys."""
     if value is None:
         return ""
@@ -103,21 +87,75 @@ def _flatten_config(data: dict[str, Any], prefix: str = "") -> list[tuple[str, A
     return result
 
 
+@config_app.callback(invoke_without_command=True)
+def config_callback(
+    ctx: typer.Context,
+    help_flag: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        is_eager=True,
+        callback=lambda v: None,  # Placeholder, real handling in function body
+    ),
+    key: str = typer.Argument(None, help="Config key, e.g. server.base_url"),
+    value: str = typer.Argument(None, help="Config value (omit to read)"),
+    list_all: bool = typer.Option(False, "--list", "-l", help="List all config values"),
+    unset: str = typer.Option(None, "--unset", help="Remove a config key"),
+    global_config: bool = typer.Option(
+        False,
+        "--global",
+        help="Operate on global config (default behavior)",
+    ),
+    local_config: bool = typer.Option(
+        False,
+        "--local",
+        help="Operate on project-level config",
+    ),
+) -> None:
+    """Get, set, or list sanityops configuration values."""
+    # Hide the unused --global flag from linters while keeping it documented.
+    del global_config
+    del help_flag  # Handled by Typer's built-in help
+
+    if list_all:
+        _list_config()
+        return
+
+    if unset:
+        _unset_config(unset, local=local_config)
+        return
+
+    if not key:
+        # Show help with additional usage documentation
+        console.print(ctx.get_help())
+        console.print(_get_config_usage_panel())
+        raise typer.Exit()
+
+    use_local = local_config  # --local overrides; default is global
+
+    if value is None:
+        # Interactive masked input for sensitive keys on a TTY.
+        if _is_sensitive_key(key) and sys.stdin.isatty():
+            entered = getpass.getpass(f"Enter {key}: ")
+            _write_config(key, entered, local=use_local)
+        else:
+            _read_config(key)
+    else:
+        _write_config(key, value, local=use_local)
+
+
 def _get_config_usage_panel():
     """Build the advanced usage panel for config --help."""
     from rich.panel import Panel
     from rich.text import Text
 
-    usage_text = f"""\
+    usage_text = """\
 Configuration Priority:
-  Environment Variable > Project-level (.sanityops/inspect_config.yaml)
-  > Global (~/.sanityops/config) > Default
-
-  This ordering ensures CI/CD pipelines can override project config by
-  injecting environment variables (e.g., SANITYOPS_BASE_URL).
+  Project-level (.sanityops/inspect_config.yaml) > Global (~/.sanityops/config)
+  > Environment Variables > Default
 
 Available Keys:
-  server.base_url  Sanityops SaaS backend URL (default: {DEFAULT_SERVER_BASE_URL})
+  server.base_url  Sanityops SaaS backend URL (default: http://112.94.11.111:16666)
   server.api_key   API key for authentication (sensitive, masked on display)
 
 Environment Variables:
@@ -145,78 +183,6 @@ Examples:
         border_style="cyan",
         padding=(0, 1),
     )
-
-
-def _help_callback(help_requested: bool) -> None:
-    """Custom help callback placeholder - actual handling in callback body."""
-    # This is a placeholder to enable -h flag; the actual help display is in config_callback
-    pass
-
-
-@config_app.callback(invoke_without_command=True)
-def config_callback(
-    ctx: typer.Context,
-    help_flag: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        is_eager=True,
-        callback=_help_callback,
-        help="Show this message and exit",
-    ),
-    key: str = typer.Argument(None, help="Config key, e.g. server.base_url"),
-    value: str = typer.Argument(None, help="Config value (omit to read)"),
-    list_all: bool = typer.Option(False, "--list", "-l", help="List all config values"),
-    unset: str = typer.Option(None, "--unset", help="Remove a config key"),
-    global_config: bool = typer.Option(
-        False,
-        "--global",
-        help="Operate on global config (default behavior)",
-    ),
-    local_config: bool = typer.Option(
-        False,
-        "--local",
-        help="Operate on project-level config",
-    ),
-) -> None:
-    """Get, set, or list sanityops configuration values."""
-    # --global and --local are mutually exclusive scope selectors.
-    # --global is the default (and is explicit); --local targets project config.
-    if global_config and local_config:
-        console.print("[red]Error: --global and --local are mutually exclusive[/red]")
-        raise typer.Exit(code=EXIT_FAILURE)
-
-    use_local = local_config  # --local overrides; default is global
-
-    # Handle --help/-h
-    if help_flag:
-        console.print(ctx.get_help())
-        console.print(_get_config_usage_panel())
-        raise typer.Exit()
-
-    if list_all:
-        _list_config()
-        return
-
-    if unset:
-        _unset_config(unset, local=use_local)
-        return
-
-    if not key:
-        # Show help with additional usage documentation
-        console.print(ctx.get_help())
-        console.print(_get_config_usage_panel())
-        raise typer.Exit()
-
-    if value is None:
-        # Interactive masked input for sensitive keys on a TTY.
-        if _is_sensitive_key(key) and sys.stdin.isatty():
-            entered = getpass.getpass(f"Enter {key}: ")
-            _write_config(key, entered, local=use_local)
-        else:
-            _read_config(key)
-    else:
-        _write_config(key, value, local=use_local)
 
 
 def _read_config(key: str) -> None:
@@ -293,22 +259,26 @@ def _list_config() -> None:
         global_val, project_val = items[key]
         table.add_row(
             key,
-            _display_value(key, global_val),
-            _display_value(key, project_val),
+            _display_value(key, str(global_val) if global_val is not None else None),
+            _display_value(key, str(project_val) if project_val is not None else None),
         )
 
     console.print(table)
 
     # Report which known env vars are set.
-    env_set: list[tuple[str, str]] = []
-    for config_key, schema in CONFIG_SCHEMA.items():
-        env_name = schema.get("env")
-        if not env_name:
-            continue
-        os_val = os.environ.get(env_name)
-        if os_val:
-            env_set.append((env_name, _display_value(config_key, os_val)))
-
+    env_set = [
+        (env_name, _display_value(key, os_val))
+        for key, env_name, os_val in (
+            (
+                k,
+                v["env"],
+                __import__("os").environ.get(v["env"]),
+            )
+            for k, v in CONFIG_SCHEMA.items()
+            if v.get("env")
+        )
+        if os_val
+    ]
     if env_set:
         console.print("\n[dim]Environment variables set:[/dim]")
         for env_name, val in env_set:
