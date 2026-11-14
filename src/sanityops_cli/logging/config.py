@@ -1,4 +1,4 @@
-"""Log configuration for deeplogic-cli.
+"""Log configuration for sanityops-cli.
 
 Handles loading and merging of logging configuration from:
 1. inspect_config.yaml (file)
@@ -17,7 +17,7 @@ import yaml
 
 @dataclass
 class LogConfig:
-    """Configuration for deeplogic-cli logging.
+    """Configuration for sanityops-cli logging.
 
     Attributes:
         enabled: Whether logging is enabled globally.
@@ -29,7 +29,7 @@ class LogConfig:
 
     enabled: bool = True
     level: str = "INFO"
-    directory: Path = field(default_factory=lambda: Path(".deeplogic/logs"))
+    directory: Path = field(default_factory=lambda: Path(".sanityops/logs"))
     retention_days: int = 30
     redact_api_keys: bool = True
 
@@ -97,7 +97,7 @@ class LogConfig:
         return cls(
             enabled=data.get("enabled", True),
             level=data.get("level", "INFO"),
-            directory=directory if directory else Path(".deeplogic/logs"),
+            directory=directory if directory else Path(".sanityops/logs"),
             retention_days=data.get("retention_days", 30),
             redact_api_keys=data.get("redact_api_keys", True),
         )
@@ -129,7 +129,7 @@ def load_log_config(config_path: Path | None = None) -> LogConfig:
     """
     if config_path is None:
         # Default location
-        config_path = Path.cwd() / ".deeplogic" / "inspect_config.yaml"
+        config_path = Path.cwd() / ".sanityops" / "inspect_config.yaml"
 
     # Default log directory is always relative to config file
     default_log_dir = config_path.parent / "logs"

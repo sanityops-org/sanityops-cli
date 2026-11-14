@@ -13,7 +13,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from deeplogic_cli.inspect_pipeline.report_parser import (
+from sanityops_cli.inspect_pipeline.report_parser import (
     KNOWN_MODULES,
     SEVERITY_RANK,
     STAGE_SECTIONS,

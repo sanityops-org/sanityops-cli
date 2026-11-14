@@ -24,10 +24,10 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from aidynamic_agent.tools.base import Tool, ToolResult
 from pydantic import ValidationError
+from sanityops_agent.tools.base import Tool, ToolResult
 
-from deeplogic_cli.inspect_pipeline.models import (
+from sanityops_cli.inspect_pipeline.models import (
     ARTIFACT_TYPES,
     ATTRIBUTION_STATUSES,
     COMPLETENESS_LABELS,
@@ -435,7 +435,7 @@ class StoreArtifactsTool(Tool):
 
     def _load_source_content(self, artifact: dict) -> str | ToolResult:
         """Read the artifact text from its `source` file (whole-file artifacts)."""
-        from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
+        from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
 
         source = artifact.get("source")
         if not source:

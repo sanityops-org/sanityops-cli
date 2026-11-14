@@ -1,7 +1,7 @@
-"""config command — Get and set deeplogic configuration.
+"""config command — Get and set sanityops configuration.
 
 Config keys use dot notation, e.g. ``server.base_url``. They correspond to
-the deeplogic SaaS backend (NOT the LLM model config, which lives under
+the sanityops SaaS backend (NOT the LLM model config, which lives under
 ``model.*``). Precedence: project-level > global > env var > default.
 """
 
@@ -15,16 +15,16 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from deeplogic_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
-from deeplogic_cli.constants.exit_codes import EXIT_FAILURE
-from deeplogic_cli.utils.config_resolver import ConfigResolver
+from sanityops_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
+from sanityops_cli.constants.exit_codes import EXIT_FAILURE
+from sanityops_cli.utils.config_resolver import ConfigResolver
 
 console = Console()
 
 # Create a Typer app for config subcommand
 config_app = typer.Typer(
     name="config",
-    help="Get and set deeplogic configuration (server base URL, API key, etc.)",
+    help="Get and set sanityops configuration (server base URL, API key, etc.)",
     no_args_is_help=False,  # We handle help ourselves to add usage panel
 )
 
@@ -32,17 +32,17 @@ config_app = typer.Typer(
 # New config keys can be added here without touching resolve logic.
 CONFIG_SCHEMA: dict[str, dict[str, Any]] = {
     "server.base_url": {
-        "env": "DEEPLOGIC_BASE_URL",
+        "env": "SANITYOPS_BASE_URL",
         "default": DEFAULT_SERVER_BASE_URL,
         "sensitive": False,
     },
     "server.api_key": {
-        "env": "DEEPLOGIC_API_KEY",
+        "env": "SANITYOPS_API_KEY",
         "default": None,
         "sensitive": True,
     },
     "server.token": {
-        "env": "DEEPLOGIC_TOKEN",
+        "env": "SANITYOPS_TOKEN",
         "default": None,
         "sensitive": True,
     },
@@ -112,7 +112,7 @@ def config_callback(
         help="Operate on project-level config",
     ),
 ) -> None:
-    """Get, set, or list deeplogic configuration values."""
+    """Get, set, or list sanityops configuration values."""
     # Hide the unused --global flag from linters while keeping it documented.
     del global_config
     del help_flag  # Handled by Typer's built-in help
@@ -151,16 +151,16 @@ def _get_config_usage_panel():
 
     usage_text = """\
 Configuration Priority:
-  Project-level (.deeplogic/inspect_config.yaml) > Global (~/.deeplogic/config)
+  Project-level (.sanityops/inspect_config.yaml) > Global (~/.sanityops/config)
   > Environment Variables > Default
 
 Available Keys:
-  server.base_url  Deeplogic SaaS backend URL (default: http://112.94.11.111:16666)
+  server.base_url  Sanityops SaaS backend URL (default: http://112.94.11.111:16666)
   server.api_key   API key for authentication (sensitive, masked on display)
 
 Environment Variables:
-  DEEPLOGIC_BASE_URL  Override server.base_url
-  DEEPLOGIC_API_KEY   Override server.api_key
+  SANITYOPS_BASE_URL  Override server.base_url
+  SANITYOPS_API_KEY   Override server.api_key
 
 Commands:
   config <key>                      Read a config value
@@ -170,12 +170,12 @@ Commands:
   config --unset <key>              Remove a config key
 
 Examples:
-  deeplogic-cli config server.base_url               # Read value
-  deeplogic-cli config server.base_url https://...   # Set global
-  deeplogic-cli config server.base_url https://... --local  # Set project-level
-  deeplogic-cli config server.api_key                # Prompt (masked input)
-  deeplogic-cli config --list                         # List all values
-  deeplogic-cli config --unset server.base_url        # Remove key\
+  sanityops-cli config server.base_url               # Read value
+  sanityops-cli config server.base_url https://...   # Set global
+  sanityops-cli config server.base_url https://... --local  # Set project-level
+  sanityops-cli config server.api_key                # Prompt (masked input)
+  sanityops-cli config --list                         # List all values
+  sanityops-cli config --unset server.base_url        # Remove key\
 """
     return Panel(
         Text(usage_text, justify="left"),
@@ -237,11 +237,11 @@ def _list_config() -> None:
 
     if not global_config and not project_config:
         console.print("[yellow]No configuration found[/yellow]")
-        console.print("\n  Run: deeplogic-cli config server.base_url <url>")
-        console.print("  Run: deeplogic-cli config server.api_key <key>")
+        console.print("\n  Run: sanityops-cli config server.base_url <url>")
+        console.print("  Run: sanityops-cli config server.api_key <key>")
         return
 
-    table = Table(title="[bold]Deeplogic Configuration[/]", border_style="blue")
+    table = Table(title="[bold]Sanityops Configuration[/]", border_style="blue")
     table.add_column("Key", style="cyan", no_wrap=True)
     table.add_column("Global", style="white")
     table.add_column("Project", style="green")

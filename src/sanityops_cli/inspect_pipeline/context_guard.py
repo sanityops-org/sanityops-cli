@@ -8,12 +8,12 @@ from collections.abc import AsyncIterator
 from dataclasses import asdict
 from typing import Any
 
-from aidynamic_agent.core.context import AgentContext, CompactConfig
-from aidynamic_agent.core.message import Message, StreamChunk, ToolDefinition, ToolUseBlock
-from aidynamic_agent.llm.base import LLMProvider, LLMResponse
-from aidynamic_agent.llm.exceptions import ContextWindowExceededError, LLMError
+from sanityops_agent.core.context import AgentContext, CompactConfig
+from sanityops_agent.core.message import Message, StreamChunk, ToolDefinition, ToolUseBlock
+from sanityops_agent.llm.base import LLMProvider, LLMResponse
+from sanityops_agent.llm.exceptions import ContextWindowExceededError, LLMError
 
-from deeplogic_cli.inspect_pipeline.token_estimator import (
+from sanityops_cli.inspect_pipeline.token_estimator import (
     DEFAULT_CONTEXT_WINDOW,
     estimate_tokens,
     usage_breakdown,

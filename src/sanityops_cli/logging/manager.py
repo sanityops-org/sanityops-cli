@@ -1,4 +1,4 @@
-"""Log Manager - unified logging interface for deeplogic-cli.
+"""Log Manager - unified logging interface for sanityops-cli.
 
 Manages log sessions and provides a simple API for logging throughout the CLI.
 """
@@ -10,11 +10,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from deeplogic_cli.logging.config import LogConfig
+from sanityops_cli.logging.config import LogConfig
 
 
 class LogManager:
-    """Unified log manager for deeplogic-cli commands.
+    """Unified log manager for sanityops-cli commands.
 
     Provides a single interface for logging operations.
 
@@ -115,7 +115,7 @@ class LogManager:
             return
 
         # Create logger
-        self._logger = logging.getLogger(f"deeplogic_cli.{self.command}.{self._session_id}")
+        self._logger = logging.getLogger(f"sanityops_cli.{self.command}.{self._session_id}")
         self._logger.setLevel(self.LEVEL_MAP.get(self.config.effective_level, logging.INFO))
 
         # Remove existing handlers

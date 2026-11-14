@@ -12,31 +12,31 @@ from __future__ import annotations
 from pathlib import Path
 
 import anyio
-from aidynamic_agent.agents import AgentFactory
-from aidynamic_agent.core.agent import AgentConfig, TerminationReason
-from aidynamic_agent.core.message import Message, Role
-from aidynamic_agent.hooks.base import HookExecutor
-from aidynamic_agent.tools.registry import ToolRegistry
+from sanityops_agent.agents import AgentFactory
+from sanityops_agent.core.agent import AgentConfig, TerminationReason
+from sanityops_agent.core.message import Message, Role
+from sanityops_agent.hooks.base import HookExecutor
+from sanityops_agent.tools.registry import ToolRegistry
 
-from deeplogic_cli.agents.extract_agent.prompts import (
+from sanityops_cli.agents.extract_agent.prompts import (
     build_system_appendix,
     build_task_message,
 )
-from deeplogic_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
-from deeplogic_cli.agents.extract_agent.tools.store_artifacts_tool import (
+from sanityops_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
+from sanityops_cli.agents.extract_agent.tools.store_artifacts_tool import (
     StoreArtifactsTool,
 )
-from deeplogic_cli.agents.extract_agent.tools.tool_registry import (
+from sanityops_cli.agents.extract_agent.tools.tool_registry import (
     extract_tool_candidates,
 )
-from deeplogic_cli.agents.progress_hook import LoggingProgressHook
-from deeplogic_cli.inspect_pipeline.context_guard import (
+from sanityops_cli.agents.progress_hook import LoggingProgressHook
+from sanityops_cli.inspect_pipeline.context_guard import (
     ArtifactAwareContext,
     ContextLimitedProvider,
 )
-from deeplogic_cli.inspect_pipeline.models import ExtractionMeta, ExtractionResult
-from deeplogic_cli.inspect_pipeline.skill_runtime import attach_skill_tools
-from deeplogic_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW
+from sanityops_cli.inspect_pipeline.models import ExtractionMeta, ExtractionResult
+from sanityops_cli.inspect_pipeline.skill_runtime import attach_skill_tools
+from sanityops_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW
 
 #: Hard cap on manifest size before the agent even starts (design §6.6).
 MAX_MANIFEST_FILES = 100

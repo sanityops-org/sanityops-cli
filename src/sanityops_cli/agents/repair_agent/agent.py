@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING
 import anyio
 from rich.console import Console
 
-from deeplogic_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.exceptions.base_exceptions import ValidationError
 
 if TYPE_CHECKING:
-    from deeplogic_cli.logging import LogManager
+    from sanityops_cli.logging import LogManager
 
 # ============================================================================
 # RepairAgent Class
@@ -21,7 +21,7 @@ console = Console()
 class RepairAgent:
     """Runs an LLM agent that rewrites defective artifacts using the report.
 
-    Mirrors ScannerAgent: builds an aidynamic_agent parent agent with a tool
+    Mirrors ScannerAgent: builds an sanityops_agent parent agent with a tool
     registry (read + store_repair), feeds it the inspection report plus the
     artifact paths, and collects repairs via the shared-memory
     StoreRepairsTool.
@@ -88,16 +88,16 @@ class RepairAgent:
         project_root: str,
     ) -> list[dict]:
         """Single repair attempt (see repair() for the retry wrapper)."""
-        from aidynamic_agent.agents import AgentFactory
-        from aidynamic_agent.core.agent import AgentConfig, TerminationReason
-        from aidynamic_agent.hooks.base import HookExecutor
-        from aidynamic_agent.tools import ToolRegistry
+        from sanityops_agent.agents import AgentFactory
+        from sanityops_agent.core.agent import AgentConfig, TerminationReason
+        from sanityops_agent.hooks.base import HookExecutor
+        from sanityops_agent.tools import ToolRegistry
 
-        from deeplogic_cli.agents.repair_agent.prompts import REPAIR_AGENT_PROMPT
-        from deeplogic_cli.agents.repair_agent.tools.store_repairs_tool import (
+        from sanityops_cli.agents.repair_agent.prompts import REPAIR_AGENT_PROMPT
+        from sanityops_cli.agents.repair_agent.tools.store_repairs_tool import (
             StoreRepairsTool,
         )
-        from deeplogic_cli.agents.tools.readfile_tool import FileReadTool
+        from sanityops_cli.agents.tools.readfile_tool import FileReadTool
 
         report = Path(report_path).resolve()
         if not report.is_file():
@@ -142,7 +142,7 @@ class RepairAgent:
 
         hook_executor = HookExecutor()
         if self.verbose or self.log_manager:
-            from deeplogic_cli.agents.progress_hook import LoggingProgressHook
+            from sanityops_cli.agents.progress_hook import LoggingProgressHook
 
             hook_executor.register(
                 LoggingProgressHook(

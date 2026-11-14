@@ -1,4 +1,4 @@
-"""deeplogic CLI Entrance — Typer Application"""
+"""sanityops CLI Entrance — Typer Application"""
 
 import sys
 
@@ -15,20 +15,20 @@ for _stream in (sys.stdout, sys.stderr):
 import typer  # noqa: E402 - must come after stdout reconfiguration
 from rich.console import Console  # noqa: E402
 
-from deeplogic_cli import __version__  # noqa: E402
-from deeplogic_cli.commands.config import config_app  # noqa: E402
-from deeplogic_cli.commands.init import init_config  # noqa: E402
-from deeplogic_cli.commands.inspect import inspect_app  # noqa: E402
-from deeplogic_cli.commands.project import project_app  # noqa: E402,F401 - retained for future use
-from deeplogic_cli.exceptions.base_exceptions import ValidationError  # noqa: E402
-from deeplogic_cli.help_panel import (  # noqa: E402
+from sanityops_cli import __version__  # noqa: E402
+from sanityops_cli.commands.config import config_app  # noqa: E402
+from sanityops_cli.commands.init import init_config  # noqa: E402
+from sanityops_cli.commands.inspect import inspect_app  # noqa: E402
+from sanityops_cli.commands.project import project_app  # noqa: E402,F401 - retained for future use
+from sanityops_cli.exceptions.base_exceptions import ValidationError  # noqa: E402
+from sanityops_cli.help_panel import (  # noqa: E402
     get_advanced_usage_panel,
     get_getting_started_panel,
 )
 
 app = typer.Typer(
-    name="deeplogic-cli",
-    help="deeplogic CLI Tool — A cli tool for deeplogic",
+    name="sanityops-cli",
+    help="sanityops CLI Tool — A cli tool for sanityops",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -36,7 +36,7 @@ app = typer.Typer(
 
 def version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"deeplogic-cli version {__version__}")
+        typer.echo(f"sanityops-cli version {__version__}")
         raise typer.Exit()
 
 
@@ -51,7 +51,7 @@ def callback(
         callback=version_callback,
     ),
 ):
-    """deeplogic CLI callback."""
+    """sanityops CLI callback."""
 
 
 app.add_typer(
@@ -62,7 +62,7 @@ app.add_typer(
 app.add_typer(
     config_app,
     name="config",
-    help="Get and set deeplogic configuration (server base URL, API key, etc.)",
+    help="Get and set sanityops configuration (server base URL, API key, etc.)",
 )
 # Project command group (hidden from --help, see README for details)
 app.add_typer(
@@ -75,7 +75,7 @@ app.command("init")(init_config)
 
 
 def main():
-    """Entrance function for the deeplogic CLI application."""
+    """Entrance function for the sanityops CLI application."""
     # Check if --help is requested for the main app only (no subcommand)
     # This means: --help present, no subcommand (first arg after flags would be a command)
     is_help = "--help" in sys.argv or "-h" in sys.argv

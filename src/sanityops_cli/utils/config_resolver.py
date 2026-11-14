@@ -8,12 +8,12 @@ from typing import Any
 
 import yaml
 
-from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
+from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
 
 # Default config file locations
-DEFAULT_PROJECT_CONFIG_DIR = ".deeplogic"
+DEFAULT_PROJECT_CONFIG_DIR = ".sanityops"
 DEFAULT_PROJECT_CONFIG_FILE = "inspect_config.yaml"
-GLOBAL_CONFIG_DIR = ".deeplogic"
+GLOBAL_CONFIG_DIR = ".sanityops"
 GLOBAL_CONFIG_FILE = "config"
 
 
@@ -137,7 +137,7 @@ class ConfigResolver:
 
     Attributes:
         config_key: Dot-separated config key (e.g., "server.base_url").
-        env_var: Environment variable name (e.g., "DEEPLOGIC_BASE_URL").
+        env_var: Environment variable name (e.g., "SANITYOPS_BASE_URL").
         default: Default value if none of the above provide a value.
     """
 

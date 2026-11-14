@@ -1,3 +1,3 @@
-from deeplogic_cli.main import main
+from sanityops_cli.main import main
 
 main()

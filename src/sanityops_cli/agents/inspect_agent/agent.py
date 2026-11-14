@@ -1,7 +1,7 @@
 """InspectAgent — skill-driven seven-stage inspection (design §6).
 
 Same wrapper pattern as ExtractAgent: the agent loads the vendored
-``deeplogic-inspect-lite`` skill on demand (SKILL.md first, then only the
+``sanityops-inspect-lite`` skill on demand (SKILL.md first, then only the
 domain checklists the artifact set needs), applies the checks, and reports
 incrementally through ``write_report``. The CLI renders the assembled
 markdown and parses the tail JSON with a fail-closed ladder.
@@ -13,28 +13,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import anyio
-from aidynamic_agent.agents import AgentFactory
-from aidynamic_agent.core.agent import AgentConfig, TerminationReason
-from aidynamic_agent.core.message import Message, Role
-from aidynamic_agent.hooks.base import HookExecutor
-from aidynamic_agent.tools.registry import ToolRegistry
+from sanityops_agent.agents import AgentFactory
+from sanityops_agent.core.agent import AgentConfig, TerminationReason
+from sanityops_agent.core.message import Message, Role
+from sanityops_agent.hooks.base import HookExecutor
+from sanityops_agent.tools.registry import ToolRegistry
 
-from deeplogic_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
-from deeplogic_cli.agents.inspect_agent.prompts import (
+from sanityops_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
+from sanityops_cli.agents.inspect_agent.prompts import (
     build_system_appendix,
     build_task_message,
 )
-from deeplogic_cli.agents.inspect_agent.tools.write_report_tool import WriteReportTool
-from deeplogic_cli.agents.progress_hook import LoggingProgressHook
-from deeplogic_cli.inspect_pipeline.context_guard import (
+from sanityops_cli.agents.inspect_agent.tools.write_report_tool import WriteReportTool
+from sanityops_cli.agents.progress_hook import LoggingProgressHook
+from sanityops_cli.inspect_pipeline.context_guard import (
     ArtifactAwareContext,
     ContextLimitedProvider,
 )
-from deeplogic_cli.inspect_pipeline.skill_runtime import (
+from sanityops_cli.inspect_pipeline.skill_runtime import (
     attach_skill_tools,
     rewrite_reference_for_cli,
 )
-from deeplogic_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW
+from sanityops_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW
 
 #: Minimum cumulative usage budget for the inspection stage.
 MIN_TOKEN_BUDGET = 300_000

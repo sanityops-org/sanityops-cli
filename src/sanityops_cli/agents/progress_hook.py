@@ -16,10 +16,10 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Console
 from rich.text import Text
 
-from deeplogic_cli.inspect_pipeline.token_estimator import usage_breakdown
+from sanityops_cli.inspect_pipeline.token_estimator import usage_breakdown
 
 if TYPE_CHECKING:
-    from deeplogic_cli.logging import LogManager
+    from sanityops_cli.logging import LogManager
 
 LLM_WAIT_UPDATE_SECONDS = 30
 
@@ -64,7 +64,7 @@ class LoggingProgressHook:
     def _get_events(self):
         """Lazy import of HookEvent."""
         if self._events is None:
-            from aidynamic_agent.hooks.base import HookEvent
+            from sanityops_agent.hooks.base import HookEvent
 
             self._events = HookEvent
         return self._events

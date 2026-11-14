@@ -1,7 +1,7 @@
 """Prompts for the InspectAgent (design §6.1–§6.4).
 
 Thin CLI contract appendix (~3KB): the inspection rules live in the vendored
-``deeplogic-inspect-lite`` skill and its domain checklists, loaded on demand.
+``sanityops-inspect-lite`` skill and its domain checklists, loaded on demand.
 The appendix carries the delivery contract, the tail-JSON schema, the
 attribution decision, and the QC hybrid-candidate confirmation duty.
 """
@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import json
 
-SYSTEM_APPENDIX_TEMPLATE = """# CLI Contract Appendix — deeplogic-cli inspect (inspection stage)
+SYSTEM_APPENDIX_TEMPLATE = """# CLI Contract Appendix — sanityops-cli inspect (inspection stage)
 
-You are the inspection agent of `deeplogic-cli inspect`. The extraction IR of
+You are the inspection agent of `sanityops-cli inspect`. The extraction IR of
 the artifacts under inspection is in your task message. Apply the
 DeepLogic Framework checks and emit the seven-stage report.
 
 ## Mandatory first step
 
-Before any check, call `skill(operation="load", name="deeplogic-inspect-lite")`.
+Before any check, call `skill(operation="load", name="sanityops-inspect-lite")`.
 It defines the seven-stage flow, severities, Gate-0, and output norms.
 Then load ONLY the domain checklists the artifact set needs (per the skill's
 §8): e.g. with prompts only, load `_meta` guidance + `prompt-checklist` — do

@@ -17,7 +17,7 @@ from typing import Any
 
 import yaml
 
-from deeplogic_cli.inspect_pipeline.models import ExtractedArtifact, ExtractionResult
+from sanityops_cli.inspect_pipeline.models import ExtractedArtifact, ExtractionResult
 
 _EXCLUDED_DIR_NAMES = frozenset({"__pycache__", "node_modules", ".git"})
 _SKILL_RESOURCE_DIRS = frozenset(
@@ -140,7 +140,7 @@ def _pack_sibling_skill_resources(
     archive_prefix: str,
 ) -> int:
     """Pack skill.yaml/yml metadata and standard resource subdirs adjacent to SKILL.md."""
-    if (skill_dir / ".deeplogic").exists():
+    if (skill_dir / ".sanityops").exists():
         return 0
     added = 0
     for meta_name in _SKILL_METADATA_FILES:
@@ -257,7 +257,7 @@ def _pack_skills_from_extracted(
 
 
 class ArtifactPacker:
-    """Prepare artifacts for upload to the deeplogic server.
+    """Prepare artifacts for upload to the sanityops server.
 
     The server expects:
     - prompt_content: Single text string (merged from all prompt files)

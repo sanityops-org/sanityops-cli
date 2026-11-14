@@ -1,26 +1,26 @@
 ---
-title: System Prompt Checklist (v2 统一引擎版)
+title: System Prompt Checklist (v2 unified engine edition)
 ---
 
 # System Prompt Checklist (QD-P, v2)
 
-> **状态**：v2 统一引擎版。规则语义源自 `inspect/prompt.md` v1.1（2026-10）：ID、名称、严重度取值、合并/转移/废弃记录均保持不变；变化的是**组织方式**——全字段 + 正文表格（模型项）+ 程序块（程序项）。
+> **Status**: v2 unified engine edition. Rule semantics derive from `inspect/prompt.md` v1.1 (2026-10): IDs, names, severity values, and merge/transfer/deprecation records all remain unchanged; what changes is the **organization** — full fields + body tables (model items) + program block (program items).
 >
-> 共享定义（字段模型 / check_engine 映射 / applicability 结构事实门 / severity 记号 / 打分规则）见 [_meta.md](_meta.md)，本文件不重复。本文件只承载 Prompt 域检查项本身。
+> Shared definitions (field model / check_engine mapping / applicability structural-fact gate / severity notation / scoring rules) see [_meta.md](_meta.md); not repeated here. This file carries only the Prompt-domain check items themselves.
 
-## 1. 域内说明
+## 1. Domain notes
 
-- **L 命名**：本域 severity 表头用 **AC-L1/AC-L2/AC-L3**（Agent complexity level），非 OR-L。System Prompt 无 operation-risk 维度。
-- **check_engine 分配口径（本域重分类日志）**（源无 Method 列，按源"detection nature"映射）：
-  - **Part 1（QD-P-1.x，逻辑缺陷，可语义阅读检出）→ `model`**。
-  - **Part 2（QD-P-2.x，完整性/安全缺口，需显式 checklist）**：缺声明类（"未声明/缺失 X"）→ `hybrid`（程序初筛声明存在 + 模型确认充分性）；纯语义质量类 → `model`。
-- **条件项**：QD-P-2.3.4 / 2.3.7 / 2.5.7 / 2.5.9 无固定 tier severity，触发→P0（2.3.7 为 P1），不触发→N/A，**不计入静态分母**。
-- **建议项（ungraded，6）**：QD-P-1.4.1 / 2.1.3 / 2.1.5 / 2.7.1 / 2.7.2 / 2.7.3，见 §6，不评分、不计入、不阻断。
-- **primary-defect 合并**（源 §4.6）：同一事实命中多个语义重叠 ID 时只记 primary，其余标"related"。重叠组见源，不在此重推导。
+- **L naming**: this domain's severity header uses **AC-L1/AC-L2/AC-L3** (Agent complexity level), not OR-L. System Prompt has no operation-risk dimension.
+- **check_engine assignment convention (this domain's reclassification log)** (source has no Method column; mapped by the source "detection nature"):
+  - **Part 1 (QD-P-1.x, logic defects, detectable by semantic reading) → `model`**.
+  - **Part 2 (QD-P-2.x, completeness/security gaps, requiring an explicit checklist)**: missing-declaration class ("X not declared/missing") → `hybrid` (program pre-screens declaration presence + model confirms sufficiency); pure semantic-quality class → `model`.
+- **Conditional items**: QD-P-2.3.4 / 2.3.7 / 2.5.7 / 2.5.9 have no fixed tier severity; triggered → P0 (2.3.7 is P1), not triggered → N/A, **not counted in the static denominator**.
+- **Advisory items (ungraded, 6)**: QD-P-1.4.1 / 2.1.3 / 2.1.5 / 2.7.1 / 2.7.2 / 2.7.3, see §6; not scored, not counted, not blocking.
+- **primary-defect merging** (source §4.6): when the same fact hits multiple semantically overlapping IDs, record only the primary and mark the rest "related". Overlap groups see source; not re-derived here.
 
-## 2. 检查项索引（48 项 = 44 计入 + 4 条件；另有 6 建议项 + 4 tombstone）
+## 2. Check item index (48 items = 44 counted + 4 conditional; plus 6 advisory items + 4 tombstones)
 
-| ID | name | check_engine | applicability.fact | severity AC-L1/L2/L3 | 计入打分 |
+| ID | name | check_engine | applicability.fact | severity AC-L1/L2/L3 | Counted in scoring |
 |---|---|---|---|---|---|
 | QD-P-1.1.1 | Direct Contradiction | model | is_prompt | P0 / P0 / P0 | ✓ |
 | QD-P-1.1.2 | Priority Conflict | model | is_prompt | P1 / P1 / P0 | ✓ |
@@ -50,10 +50,10 @@ title: System Prompt Checklist (v2 统一引擎版)
 | QD-P-2.2.4 | Undefined Missing-Input Handling | hybrid | is_prompt | P1 / P0 / P0 | ✓ |
 | QD-P-2.3.1 | Undefined Output Format | hybrid | has_machine_consumed_output | P1 / P0 / P0 | ✓ |
 | QD-P-2.3.2 | Incomplete Output Schema | hybrid | has_structured_output | P1 / P0 / P0 | ✓ |
-| QD-P-2.3.4 | Missing Security/Privacy Filtering | model | has_pii | P0(条件) | ✗（条件） |
+| QD-P-2.3.4 | Missing Security/Privacy Filtering | model | has_pii | P0 (conditional) | ✗ (conditional) |
 | QD-P-2.3.5 | Factuality & Hallucination Control | model | has_retrieval_or_tool | ∅ / P0 / P0 | ✓ |
 | QD-P-2.3.6 | Output Length & Truncation | hybrid | is_prompt | P2 / P2 / P2 | ✓ |
-| QD-P-2.3.7 | Output Localization & Conventions | model | is_multi_region | P1(条件) | ✗（条件） |
+| QD-P-2.3.7 | Output Localization & Conventions | model | is_multi_region | P1 (conditional) | ✗ (conditional) |
 | QD-P-2.4.1 | Incomplete Workflow Steps | model | has_workflow | ∅ / P1 / P0 | ✓ |
 | QD-P-2.4.2 | Undeclared Resources/Tools | hybrid | has_tool_usage | ∅ / P0 / P0 | ✓ |
 | QD-P-2.4.3 | Tool Invocation Parameter/Order Error | model | has_tool_invocation | ∅ / P1 / P1 | ✓ |
@@ -63,131 +63,131 @@ title: System Prompt Checklist (v2 统一引擎版)
 | QD-P-2.5.3 | Missing Permission Control Boundaries | hybrid | has_permission_control | ∅ / P1 / P0 | ✓ |
 | QD-P-2.5.4 | Undefined Constraint Priority | model | has_conflicting_constraints | ∅ / P1 / P0 | ✓ |
 | QD-P-2.5.6 | Instruction-Data Trust Boundary | model | has_external_data | ∅ / P0 / P0 | ✓ |
-| QD-P-2.5.7 | High-Risk Operation Human Confirmation | model | has_side_effect_op | P0(条件) | ✗（条件） |
+| QD-P-2.5.7 | High-Risk Operation Human Confirmation | model | has_side_effect_op | P0 (conditional) | ✗ (conditional) |
 | QD-P-2.5.8 | System Prompt Confidentiality & Leakage | model | has_confidential_content | ∅ / P1 / P1 | ✓ |
-| QD-P-2.5.9 | Industry Compliance & Disclaimer Boundary | model | is_regulated_domain | P0(条件) | ✗（条件） |
+| QD-P-2.5.9 | Industry Compliance & Disclaimer Boundary | model | is_regulated_domain | P0 (conditional) | ✗ (conditional) |
 | QD-P-2.6.1 | Runtime Exceptions Not Covered | hybrid | has_tool_usage | ∅ / P1 / P0 | ✓ |
 | QD-P-2.6.2 | Missing Degradation & Recovery Strategy | model | is_complex_agent | ∅ / ∅ / P1 | ✓ |
 | QD-P-2.6.3 | Unreasonable Retry Mechanism | model | has_retry_or_loop | ∅ / ∅ / P1 | ✓ |
 | QD-P-2.6.4 | Out-of-scope Rejection & Human Escalation | model | is_prompt | P1 / P1 / P0 | ✓ |
 
-> 计数说明：48 行中 44 项计入静态分母（L1=28 / L2=42 / L3=44，源 §3.3.3）；4 项条件项（2.3.4/2.3.7/2.5.7/2.5.9）不计入固定分母。建议项见 §6，tombstone 见 §5。
+> Count note: of the 48 rows, 44 items are counted in the static denominator (L1=28 / L2=42 / L3=44, source §3.3.3); the 4 conditional items (2.3.4/2.3.7/2.5.7/2.5.9) are not counted in the fixed denominator. Advisory items see §6, tombstones see §5.
 
-## 3. 模型判定要点（definition 凝练 + model_prompt）
+## 3. Model judgment points (condensed definition + model_prompt)
 
-> skill 全模型一次推理；CLI 的 model 项 / hybrid 项确认阶段也读此处。`definition` 取自源 §3.3.2 的 Severity Variation Notes + 最小集 Definition。
+> skill does full-model single-pass reasoning; the CLI's model-item / hybrid-item confirmation phase also reads here. `definition` is taken from source §3.3.2's Severity Variation Notes + minimal-set Definition.
 
-### 3.1 纯 model 项（37 项）
+### 3.1 Pure model items (37 items)
 
-| ID | definition（凝练） | model_prompt（判定要点） |
+| ID | definition (condensed) | model_prompt (judgment points) |
 |---|---|---|
-| QD-P-1.1.1 | 同一对象在同一上下文被赋予互斥属性/指令 | 找同一对象的两处属性/指令是否直接矛盾 |
-| QD-P-1.1.2 | 多条 MUST 约束在无优先级/仲裁的场景下冲突 | 找冲突场景，且未定义优先级或仲裁 |
-| QD-P-1.1.3 | 正文规则与示例相矛盾 | 对照规则定义与所给示例是否冲突 |
-| QD-P-1.2.1 | 角色身份/能力范围与职责要求不匹配 | 判角色身份是否支撑其被要求承担的职责 |
-| QD-P-1.2.2 | 角色与输出风格要求不匹配 | 仅当风格要求显式不兼容时判 FAIL |
-| QD-P-1.2.3 | 约束范围与职责行为范围冲突/错配 | 判约束是否落到错误的职责范围上 |
-| QD-P-1.2.4 | 冒充真人/组织，或漏 AI 身份声明 | 判是否允许冒充，或漏 AI 身份声明；C 端用户 P0 |
-| QD-P-1.3.1 | 量词误用产生与他条规则的逻辑冲突 | 仅当量词误用导致逻辑冲突时判（"过度绝对"不算） |
-| QD-P-1.3.2 | 模糊词模糊了关键决策边界 | 仅当模糊词模糊关键决策边界时判 |
-| QD-P-1.3.3 | 关键行为边界（授权/禁止/交接）未定义 | 判授权/禁止/交接边界是否缺失 |
-| QD-P-1.4.3 | 定义的 Skill 触发/用法不清或冲突导致永不调用 | 判 Skill 定义是否清晰、可触发、无冲突 |
-| QD-P-1.5.1 | 定义的行为无法达成角色总体目标 | 判职责集合能否支撑总体目标 |
-| QD-P-1.5.2 | 工作流步骤引用了未定义/未授权的资源 | 判工作流引用的资源/工具是否已定义 |
-| QD-P-1.6.1 | 关键决策词模糊，且该词是决策依据 | 判模糊词是否充当安全/权限决策依据（区别于 1.3.2） |
-| QD-P-1.6.2 | 关键决策仅靠模型自我评估，无可观测触发 | 判关键决策是否唯一依赖模型内部状态 |
-| QD-P-1.6.3 | 软规则交织无仲裁 | 仅当能给出具体不兼容场景判；涉安全/权限 P0 |
-| QD-P-1.6.4 | 用不可验证的内部推理方法作合规保证 | 判是否以不可验证推理方法作为保证 |
-| QD-P-1.6.5 | 自指/递归约束 | 仅非终止/不可满足/循环递归判 |
-| QD-P-1.6.6 | 关键、非显然、外部不保证的隐含假设 | 判是否依赖未声明的关键外部假设 |
-| QD-P-1.6.7 | 跨轮状态/已承诺结论存在非单调缺陷 | 判跨轮状态或已承诺结论是否被推翻；单轮 N/A |
-| QD-P-1.6.8 | 规则要求模型不可靠能力（计数/计时/算术） | 判规则是否强求计数/计时/算术等不可靠能力 |
-| QD-P-2.1.2 | 工具/资源引用不清晰 | 判引用是否含糊、无法定位 |
-| QD-P-2.3.4 | 敏感数据脱敏/最小字段输出未声明（涉 PII） | 判是否涉 PII 且未声明过滤 |
-| QD-P-2.3.5 | 未声明不捏造工具结果/不引用未调用工具/不编造参考 | 判是否缺反幻觉声明（RAG/Tool agent） |
-| QD-P-2.3.7 | 多区域本地化/约定未声明 | 判是否多区域且未声明本地化约定 |
-| QD-P-2.4.1 | 工作流步骤依赖/顺序未定义或引用未定义步骤 | 判工作流步骤是否完整、依赖是否定义 |
-| QD-P-2.4.3 | 正文写的工具调用参数/顺序错误 | 判正文内工具调用的参数/顺序是否写错 |
-| QD-P-2.4.4 | 跨轮/跨会话上下文与记忆边界未定义 | 判多轮上下文的记忆边界是否缺失 |
-| QD-P-2.5.1 | 完成/放弃条件、部分成功上报、"不得声称成功"步骤未定义 | 判终止约束是否缺失 |
-| QD-P-2.5.4 | 可能冲突的 SHOULD 约束的仲裁规则未定义 | 判约束优先级/仲裁是否缺失 |
-| QD-P-2.5.6 | 指令与外部数据的信任边界未声明（防注入） | 判是否缺指令-数据信任边界声明 |
-| QD-P-2.5.7 | 高风险/不可逆操作未声明需用户确认 | 判有副作用操作（资金/删除/发送/生产变更）是否缺确认声明 |
-| QD-P-2.5.8 | 系统提示机密性与泄漏响应未声明 | 判是否缺机密性/泄漏响应声明 |
-| QD-P-2.5.9 | 行业合规约束、免责、资质边界未声明 | 判医疗/金融/法律域是否缺合规声明 |
-| QD-P-2.6.2 | 降级与恢复策略缺失（"停并报告"合法） | 判是否有降级/恢复策略 |
-| QD-P-2.6.3 | 不合理重试（无上限/盲写重试/未查询超时态） | 判重试机制是否合理；"停并报告"归 2.6.2 勿双扣 |
-| QD-P-2.6.4 | 拒绝模板、转介目标、升级条件未定义 | 判越界拒绝/人工升级是否缺失 |
+| QD-P-1.1.1 | The same object is given mutually exclusive attributes/instructions within the same context | Check whether two attributes/instructions for the same object directly contradict |
+| QD-P-1.1.2 | Multiple MUST constraints conflict in a scenario without priority/arbitration | Find the conflicting scenario, and whether priority or arbitration is undefined |
+| QD-P-1.1.3 | Body rules contradict the examples | Compare rule definitions with the given examples for conflict |
+| QD-P-1.2.1 | Role identity/capability scope does not match the required responsibilities | Judge whether the role identity supports the responsibilities it is asked to bear |
+| QD-P-1.2.2 | Role does not match the output style requirements | Mark FAIL only when the style requirement is explicitly incompatible |
+| QD-P-1.2.3 | Constraint scope conflicts/mismatches the responsibility behavior scope | Judge whether constraints land on the wrong responsibility scope |
+| QD-P-1.2.4 | Impersonating a real person/organization, or missing AI identity disclosure | Judge whether impersonation is allowed, or AI identity disclosure is missing; P0 for C-end users |
+| QD-P-1.3.1 | Quantifier misuse creates a logical conflict with another rule | Judge only when quantifier misuse causes a logical conflict ("over-absolute" does not count) |
+| QD-P-1.3.2 | Vague wording blurs a critical decision boundary | Judge only when vague wording blurs a critical decision boundary |
+| QD-P-1.3.3 | Critical behavior boundaries (authorization / prohibition / handoff) undefined | Judge whether authorization / prohibition / handoff boundaries are missing |
+| QD-P-1.4.3 | Defined Skill trigger/usage unclear or conflicting, causing it never to be invoked | Judge whether the Skill definition is clear, triggerable, and conflict-free |
+| QD-P-1.5.1 | Defined behaviors cannot achieve the role's overall objective | Judge whether the responsibility set supports the overall objective |
+| QD-P-1.5.2 | Workflow steps reference undefined/unauthorized resources | Judge whether resources/tools referenced by the workflow are defined |
+| QD-P-1.6.1 | Critical decision wording is vague, and that wording is the decision basis | Judge whether the vague wording serves as the security/permission decision basis (distinct from 1.3.2) |
+| QD-P-1.6.2 | Critical decisions rely solely on model self-assessment, with no observable trigger | Judge whether critical decisions uniquely depend on model internal state |
+| QD-P-1.6.3 | Soft rules interweave without arbitration | Judge only when a concrete incompatible scenario can be given; security/permission involvement → P0 |
+| QD-P-1.6.4 | Unverifiable internal reasoning methods used as compliance assurance | Judge whether unverifiable reasoning methods are used as assurance |
+| QD-P-1.6.5 | Self-referential/recursive constraints | Judge only non-terminating / unsatisfiable / cyclic recursion |
+| QD-P-1.6.6 | Critical, non-obvious implicit assumptions not guaranteed externally | Judge whether it depends on undeclared critical external assumptions |
+| QD-P-1.6.7 | Cross-turn state / already committed conclusions have non-monotonic defects | Judge whether cross-turn state or already committed conclusions are overturned; N/A for a single turn |
+| QD-P-1.6.8 | Rules require unreliable model capabilities (counting/timing/arithmetic) | Judge whether rules force unreliable capabilities such as counting/timing/arithmetic |
+| QD-P-2.1.2 | Tool/resource references unclear | Judge whether references are ambiguous and unlocatable |
+| QD-P-2.3.4 | Sensitive-data redaction / minimal-field output not declared (PII involved) | Judge whether PII is involved and filtering is undeclared |
+| QD-P-2.3.5 | Anti-hallucination rules (no fabricated tool results / no citing uncalled tools / no invented references) not declared | Judge whether anti-hallucination declarations are missing (RAG/Tool agent) |
+| QD-P-2.3.7 | Multi-region localization/conventions not declared | Judge whether it is multi-region and localization conventions are undeclared |
+| QD-P-2.4.1 | Workflow step dependencies/order undefined or references undefined steps | Judge whether workflow steps are complete and dependencies are defined |
+| QD-P-2.4.3 | Tool invocation parameters/order written in the body are wrong | Judge whether the parameters/order of tool invocations in the body are written wrong |
+| QD-P-2.4.4 | Cross-turn/cross-session context and memory boundaries undefined | Judge whether memory boundaries for multi-turn context are missing |
+| QD-P-2.5.1 | Completion/abandon conditions, partial-success reporting, and "must not claim success" steps undefined | Judge whether termination constraints are missing |
+| QD-P-2.5.4 | Arbitration rules for potentially conflicting SHOULD constraints undefined | Judge whether constraint priority/arbitration is missing |
+| QD-P-2.5.6 | Instruction vs external data trust boundary not declared (injection prevention) | Judge whether the instruction-data trust boundary declaration is missing |
+| QD-P-2.5.7 | High-risk/irreversible operations not declared as requiring user confirmation | Judge whether side-effect operations (funds/deletion/sending/production changes) lack confirmation declarations |
+| QD-P-2.5.8 | System prompt confidentiality and leakage response not declared | Judge whether the confidentiality/leakage response declaration is missing |
+| QD-P-2.5.9 | Industry compliance constraints, disclaimers, and qualification boundaries not declared | Judge whether medical/financial/legal domains lack compliance declarations |
+| QD-P-2.6.2 | Degradation and recovery strategy missing ("stop and report" is legitimate) | Judge whether a degradation/recovery strategy exists |
+| QD-P-2.6.3 | Unreasonable retry (no cap / blind retry / timeout state not queried) | Judge whether the retry mechanism is reasonable; "stop and report" belongs to 2.6.2, do not double-deduct |
+| QD-P-2.6.4 | Rejection templates, referral targets, and escalation conditions undefined | Judge whether out-of-scope rejection / human escalation is missing |
 
-### 3.2 hybrid 项的模型确认部分（11 项）
+### 3.2 Model-confirmation portion of hybrid items (11 items)
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅检…／程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **On the skill side: this section is the complete set of judgment points; there is no program pre-screening upstream.** "program only checks… / program only does…" describes the CLI / platform pre-screening path; skill reasons with the full model, does not execute §4, must complete the semantic judgment itself, must not treat it as "already screened", and must not use it to mark N/A.
 
-| ID | model_prompt（确认要点） |
+| ID | model_prompt (confirmation points) |
 |---|---|
-| QD-P-2.2.1 | 确认输入来源声明是否真缺失（程序仅检 user/system/external 等来源关键词缺失） |
-| QD-P-2.2.2 | 确认结构化输入是否真缺格式/编码/大小约束（程序仅检约束声明缺失） |
-| QD-P-2.2.3 | 确认 required/optional 是否真未区分（程序仅检 required 声明缺失） |
-| QD-P-2.2.4 | 确认缺失/异常输入处理是否真未定义（程序仅检处理声明缺失） |
-| QD-P-2.3.1 | 仅当输出被机器消费时适用（自由文本聊天回答 N/A）；确认格式/结构/编码是否真未定义（程序仅检格式声明缺失） |
-| QD-P-2.3.2 | 确认输出 schema 是否真缺关键字段（程序仅检 outputSchema 字段缺失） |
-| QD-P-2.3.6 | 确认输出长度/截断是否真未声明（程序仅检长度声明缺失） |
-| QD-P-2.4.2 | 确认正文实际用到的资源/工具是否真未声明（程序仅做引用层比对） |
-| QD-P-2.5.2 | 确认安全边界是否真缺失（程序仅检禁操作/敏感访问/外部系统声明缺失） |
-| QD-P-2.5.3 | 确认权限控制边界是否真缺失（程序仅检权限范围/提权/越权声明缺失） |
-| QD-P-2.6.1 | 确认运行时异常处理是否真未定义（程序仅检异常处理声明缺失） |
+| QD-P-2.2.1 | Confirm whether input source declarations are truly missing (program only checks for missing source keywords such as user/system/external) |
+| QD-P-2.2.2 | Confirm whether structured input truly lacks format/encoding/size constraints (program only checks for missing constraint declarations) |
+| QD-P-2.2.3 | Confirm whether required/optional is truly undistinguished (program only checks for missing required declarations) |
+| QD-P-2.2.4 | Confirm whether missing/abnormal input handling is truly undefined (program only checks for missing handling declarations) |
+| QD-P-2.3.1 | Applicable only when output is machine-consumed (free-text chat answers are N/A); confirm whether format/structure/encoding are truly undefined (program only checks for missing format declarations) |
+| QD-P-2.3.2 | Confirm whether the output schema truly lacks critical fields (program only checks for missing outputSchema fields) |
+| QD-P-2.3.6 | Confirm whether output length/truncation is truly undeclared (program only checks for missing length declarations) |
+| QD-P-2.4.2 | Confirm whether resources/tools actually used in the body are truly undeclared (program only compares the reference layer) |
+| QD-P-2.5.2 | Confirm whether security boundaries are truly missing (program only checks for missing prohibited-operation/sensitive-access/external-system declarations) |
+| QD-P-2.5.3 | Confirm whether permission control boundaries are truly missing (program only checks for missing permission-scope/privilege-escalation/unauthorized-access declarations) |
+| QD-P-2.6.1 | Confirm whether runtime exception handling is truly undefined (program only checks for missing exception-handling declarations) |
 
-## 4. 程序判定项（program-check 代码块）
+## 4. Program-judgment items (program-check code block)
 
-> **CLI / platform 专用：skill 不解析、不执行本代码块**（skill 全模型推理，不消费 `check_engine` 与 `program_rule`）。程序引擎只 parse 本代码块。覆盖 hybrid 项的初筛规则（声明存在性 / 字段缺失）。`rule` 为语义示意。
+> **CLI / platform only: skill does not parse or execute this code block** (skill does full-model reasoning, does not consume `check_engine` or `program_rule`). The program engine only parses this code block. Covers pre-screening rules for hybrid items (declaration presence / field absence). `rule` is a semantic illustration.
 
 <!-- program-check -->
 ```json
 {
   "domain": "prompt",
   "version": "v2",
-  "note": "hybrid 项初筛规则（声明存在性/字段缺失）。rule 为语义示意。",
+  "note": "Pre-screening rules for hybrid items (declaration presence / field absence). rule is a semantic illustration.",
   "checks": [
-    { "id": "QD-P-2.2.1", "summary": "未出现输入来源声明（user/system/external）" },
-    { "id": "QD-P-2.2.2", "summary": "结构化输入未声明格式/编码/大小限制" },
-    { "id": "QD-P-2.2.3", "summary": "结构化输入未区分 required/optional" },
-    { "id": "QD-P-2.2.4", "summary": "未声明缺失/异常输入处理" },
-    { "id": "QD-P-2.3.1", "summary": "机器消费的输出未声明格式/结构/编码（自由文本聊天 N/A）" },
-    { "id": "QD-P-2.3.2", "summary": "结构化输出缺 outputSchema 关键字段" },
-    { "id": "QD-P-2.3.6", "summary": "未声明输出长度/截断" },
-    { "id": "QD-P-2.4.2", "summary": "正文使用工具/DB/API 但未声明（与引用层比对）" },
-    { "id": "QD-P-2.5.2", "summary": "未声明安全边界（禁操作/敏感访问/外部系统）" },
-    { "id": "QD-P-2.5.3", "summary": "未声明权限范围/提权条件/越权处理" },
-    { "id": "QD-P-2.6.1", "summary": "未声明运行时异常处理" }
+    { "id": "QD-P-2.2.1", "summary": "No input source declaration appears (user/system/external)" },
+    { "id": "QD-P-2.2.2", "summary": "Structured input does not declare format/encoding/size limits" },
+    { "id": "QD-P-2.2.3", "summary": "Structured input does not distinguish required/optional" },
+    { "id": "QD-P-2.2.4", "summary": "Handling of missing/abnormal input not declared" },
+    { "id": "QD-P-2.3.1", "summary": "Machine-consumed output does not declare format/structure/encoding (free-text chat N/A)" },
+    { "id": "QD-P-2.3.2", "summary": "Structured output lacks critical outputSchema fields" },
+    { "id": "QD-P-2.3.6", "summary": "Output length/truncation not declared" },
+    { "id": "QD-P-2.4.2", "summary": "Body uses tools/DB/API but does not declare them (compared with reference layer)" },
+    { "id": "QD-P-2.5.2", "summary": "Security boundary not declared (prohibited operations/sensitive access/external systems)" },
+    { "id": "QD-P-2.5.3", "summary": "Permission scope/privilege-escalation conditions/unauthorized-access handling not declared" },
+    { "id": "QD-P-2.6.1", "summary": "Runtime exception handling not declared" }
   ]
 }
 ```
 <!-- /program-check -->
 
-## 5. Tombstone 记录（废弃 / 合并 / 转移）
+## 5. Tombstone records (deprecated / merged / transferred)
 
-| ID | name | 状态 | 指向 |
+| ID | name | Status | Points to |
 |---|---|---|---|
-| QD-P-2.1.1 | (injection point) | deleted | 注入点并入 QD-P-2.5.6 |
-| QD-P-2.1.4 | (redundant constraints) | merged | → QD-P-1.4.1（建议项） |
-| QD-P-2.5.5 | Resource-Call Frequency Limit | deprecated | 频率/批量期望由 cross QD-PT-2.6 / QD-ST-3.4 承接 |
-| QD-P-2.3.3 | (numbering gap) | gap | 无状态说明，仅编号空位 |
+| QD-P-2.1.1 | (injection point) | deleted | Injection point merged into QD-P-2.5.6 |
+| QD-P-2.1.4 | (redundant constraints) | merged | → QD-P-1.4.1 (advisory item) |
+| QD-P-2.5.5 | Resource-Call Frequency Limit | deprecated | Frequency/batch expectations carried by cross QD-PT-2.6 / QD-ST-3.4 |
+| QD-P-2.3.3 | (numbering gap) | gap | No status note; numbering gap only |
 
-## 6. 建议项（ungraded，6）
+## 6. Advisory items (ungraded, 6)
 
-> 仅优化价值：不评分、不计入分母、不阻断、无 waiver。applicability 均为 `is_prompt`。
+> Optimization value only: not scored, not counted in the denominator, not blocking, no waiver. applicability is always `is_prompt`.
 
-| ID | name | 说明 |
+| ID | name | Description |
 |---|---|---|
-| QD-P-1.4.1 | Redundant Constraints | 冗余约束（吸收 2.1.4） |
-| QD-P-2.1.3 | Structural Hierarchy | 结构层级清晰度 |
-| QD-P-2.1.5 | Context Budget Squeeze | 上下文预算挤压 |
-| QD-P-2.7.1 | Positive-Example Representativeness | 正例代表性 |
-| QD-P-2.7.2 | Counter-Example Coverage | 反例覆盖 |
-| QD-P-2.7.3 | Boundary-Case Examples | 边界例覆盖 |
+| QD-P-1.4.1 | Redundant Constraints | Redundant constraints (absorbs 2.1.4) |
+| QD-P-2.1.3 | Structural Hierarchy | Structural hierarchy clarity |
+| QD-P-2.1.5 | Context Budget Squeeze | Context budget squeeze |
+| QD-P-2.7.1 | Positive-Example Representativeness | Positive-example representativeness |
+| QD-P-2.7.2 | Counter-Example Coverage | Counter-example coverage |
+| QD-P-2.7.3 | Boundary-Case Examples | Boundary-case coverage |
 
-## 7. 打分字段说明（platform 专用）
+## 7. Scoring field notes (platform only)
 
-- 全局权重（`_meta.md`）：P0 : P1 : P2 = 5 : 3 : 1，按项最高严重度扣一次。
-- 分母：44 项计入（L1=28 / L2=42 / L3=44）；4 条件项、6 建议项、tombstone 不计入。
-- skill / CLI 不激活打分；`score_weight` 信息在索引表「计入打分」列保留供 platform。
+- Global weights (`_meta.md`): P0 : P1 : P2 = 5 : 3 : 1, deducted once at the item's highest severity.
+- Denominator: 44 items counted (L1=28 / L2=42 / L3=44); 4 conditional items, 6 advisory items, and tombstones are not counted.
+- skill / CLI do not activate scoring; `score_weight` information is retained in the index table's "Counted in scoring" column for platform.

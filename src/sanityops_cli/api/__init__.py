@@ -1,5 +1,5 @@
-"""API module for deeplogic CLI."""
+"""API module for sanityops CLI."""
 
-from deeplogic_cli.api.client import DeeplogicClient
+from sanityops_cli.api.client import SanityopsClient
 
-__all__ = ["DeeplogicClient"]
+__all__ = ["SanityopsClient"]

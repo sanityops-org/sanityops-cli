@@ -1,10 +1,10 @@
-"""local validators for deeplogic-cli"""
+"""local validators for sanityops-cli"""
 
 import json
 import os
 from pathlib import Path
 
-from deeplogic_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.exceptions.base_exceptions import ValidationError
 
 # Exclude directories
 EXCLUDED_DIRS = {

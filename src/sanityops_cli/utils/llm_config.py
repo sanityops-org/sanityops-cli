@@ -6,11 +6,11 @@ from pathlib import Path
 
 import yaml
 
-from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
+from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
 
-# Import ProviderConfig with safe fallback for deeplogic-agent packaging quirks.
+# Import ProviderConfig with safe fallback for sanityops-agent packaging quirks.
 try:
-    from aidynamic_agent.config import ProviderConfig
+    from sanityops_agent.config import ProviderConfig
 except ModuleNotFoundError:
     import importlib
 
@@ -25,11 +25,11 @@ except ModuleNotFoundError:
             )
     except Exception as _e:
         raise ModuleNotFoundError(
-            f"Failed to import ProviderConfig from aidynamic_agent.config: {_e}"
+            f"Failed to import ProviderConfig from sanityops_agent.config: {_e}"
         ) from _e
 
 # Default config file location
-DEFAULT_CONFIG_DIR = ".deeplogic"
+DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
 
@@ -123,7 +123,7 @@ def resolve_llm_config(config_path: str | None = None) -> dict[str, str]:
 
     Args:
         config_path: Optional path to config file. If None, looks for
-            .deeplogic/inspect_config.yaml in current working directory.
+            .sanityops/inspect_config.yaml in current working directory.
 
     Returns:
         dict with keys: llm_provider, llm_api_key, llm_model_id, llm_base_url

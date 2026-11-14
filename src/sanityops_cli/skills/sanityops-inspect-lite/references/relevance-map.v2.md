@@ -1,55 +1,55 @@
 ---
-title: Relevance Map (v2 统一引擎版)
+title: Relevance Map (v2 unified engine edition)
 ---
 
 # Relevance Map (Stage F Impact Outlook, v2)
 
-> **状态**：v2 统一引擎版。本文件是**映射（查找）文档，不是规则清单**：无新增检查项、无 `check_engine`、无 `applicability.fact`、无逐项 `severity`（`strength` ≠ `severity`）。规则语义源自 `framework/relevance.md` v1.1，映射方向 / 攻击面 / 候选失效模式 / 验证建议均保持不变。
+> **Status**: v2 unified engine edition. This file is a **mapping (lookup) document, not a rule checklist**: no new check items, no `check_engine`, no `applicability.fact`, no per-item `severity` (`strength` ≠ `severity`). Rule semantics derive from `framework/relevance.md` v1.1; the mapping direction / attack surfaces / candidate failure modes / validation recommendations all remain unchanged.
 >
-> 共享定义见 [_meta.md](_meta.md)。本文件在 Stage F（影响展望）使用：对 Stage A/B/D 已产生的 **FAIL** 逐条查 QD ID，输出候选 Impact Card。本文件**消费**各 v2 checklist 的统一 QD ID（单一事实源 = prompt/skill/tool/cross/permission 的 v2 检查项），不定义新 ID。
+> Shared definitions see [_meta.md](_meta.md). This file is used at Stage F (impact outlook): for each **FAIL** already produced by Stage A/B/D, look up the QD ID and output candidate Impact Cards. This file **consumes** the unified QD IDs of each v2 checklist (single source of truth = the v2 check items of prompt/skill/tool/cross/permission), and does not define new IDs.
 
-## 1. 域内说明
+## 1. Domain notes
 
-- **性质**：L2 跨域映射文档，从属于九个 L1 子规范。任何冲突（编号/定义/severity/发布要求）**以源子规范为准**（relevance.md §0.3.1）。映射强度/攻击面/候选失效模式不改变源子规范的原始判定。
-- **只映射实际 FAIL 的缺陷**：禁止预映射、推测映射、映射已修复/PASS 项。
-- **候选语言红线**：每行输出必须是"候选关联"——用 "may / candidate association / needs dynamic verification"；禁写因果断言 "will cause / guarantees / ensures / inevitably / proves"（相关性≠因果，relevance.md §0.4-1）。
-- **strength ≠ severity**（§1.3）：Strength 只描述"关联置信度 / 测试优先级"，绝不替代 P0/P1/P2；两者显式分列。
-- **无 check_engine / applicability.fact / 逐项 severity**：本域是查找表，行键是 QD ID（源锚点），列是 AS/Impact/Strength/Validation 元数据。`Applies` 列保留源规范作用域（AC-L/OR-L），非统一 applicability 结构事实。
-- **显式记录"未运行"**：每个影响区须声明 Risk Implicit 与运行时 Quality 子集**未运行**（动态可利用性未验证），且按 §1.4 不得假设工件外补偿控制缺失；Risk Explicit 不在本展望重分类（Stage E 已跑，Stage F 只做候选映射）。
-- **禁止自动推断 EX**（§2.3.1）：`QD-P-2.5.2` ≠ 自动命中 `NL-A-7`；`QD-T-1.4` ≠ `NR-S-3`；`QD-PS-1.3` ≠ `NL-B-9`。EX 码只在 Stage E 由 Risk Explicit 独立判定。
-- **缺陷链出 lite 范围**（§1.5）：仅支持单缺陷候选映射，不构造/断言/报告缺陷链（SC-*/QC-TA-*/QC-RA-*）。
-- **物理隔离**：影响展望与 Gate/verdict 结论分离，是建议性上下文，不得改变/软化/升级任何 Inspect 结论。
+- **Nature**: L2 cross-domain mapping document, subordinate to the nine L1 sub-specifications. In any conflict (numbering/definition/severity/release requirement) **the source sub-specification prevails** (relevance.md §0.3.1). Mapping strength / attack surface / candidate failure mode do not change the original judgment of the source sub-specification.
+- **Map only defects that actually FAIL**: pre-mapping, speculative mapping, and mapping of already fixed/PASS items are prohibited.
+- **Candidate language red line**: each output line must be a "candidate association" — use "may / candidate association / needs dynamic verification"; causal assertions "will cause / guarantees / ensures / inevitably / proves" are forbidden (correlation ≠ causation, relevance.md §0.4-1).
+- **strength ≠ severity** (§1.3): Strength describes only "association confidence / test priority", never replaces P0/P1/P2; the two are explicitly separate columns.
+- **No check_engine / applicability.fact / per-item severity**: this domain is a lookup table, the row key is the QD ID (source anchor), the columns are AS/Impact/Strength/Validation metadata. The `Applies` column retains the source specification scope (AC-L/OR-L), not a unified applicability structural fact.
+- **Explicitly record "not run"**: each impact area must declare that the Risk Implicit and runtime Quality subsets are **not run** (dynamic exploitability not verified), and per §1.4 must not assume compensating controls outside the artifact are missing; Risk Explicit is not reclassified in this outlook (already run in Stage E, Stage F only does candidate mapping).
+- **Automatic inference of EX is forbidden** (§2.3.1): `QD-P-2.5.2` ≠ automatic hit of `NL-A-7`; `QD-T-1.4` ≠ `NR-S-3`; `QD-PS-1.3` ≠ `NL-B-9`. EX codes are judged only independently by Risk Explicit in Stage E.
+- **Defect chain out of lite scope** (§1.5): only single-defect candidate mapping is supported; no defect chains are constructed/asserted/reported (SC-*/QC-TA-*/QC-RA-*).
+- **Physical separation**: the impact outlook is separated from Gate/verdict conclusions, is advisory context, and must not change/soften/upgrade any Inspect conclusion.
 
-## 2. 映射强度（strength，非 severity，§1.3）
+## 2. Mapping strength (strength, not severity, §1.3)
 
-| Strength | 含义（verbatim） | 全框架 platform 行为 |
+| Strength | Meaning (verbatim) | Framework-wide platform behavior |
 |---|---|---|
-| Strong | 缺陷直接扩大攻击入口，或极可能导致指定失效模式 | 自动推荐相关 Risk/Quality 测试用例 |
-| Medium | 在特定权限/数据/Tool/流程条件下可能有影响 | 按适用条件推荐 |
-| Conditional | 需外部知识库/运行时环境/模型行为/业务规则 | 作为候选调查方向，无自动结论 |
-| Not Applicable | 当前 Agent 类型/工件类型/运行时条件缺乏关联前提 | 不输出该推荐 |
+| Strong | The defect directly expands the attack entry point, or is highly likely to cause the specified failure mode | Automatically recommends related Risk/Quality test cases |
+| Medium | May have impact under specific permission/data/Tool/process conditions | Recommend per applicable conditions |
+| Conditional | Requires external knowledge base/runtime environment/model behavior/business rules | As a candidate investigation direction, no automatic conclusion |
+| Not Applicable | The current Agent type/artifact type/runtime conditions lack the prerequisite for association | Do not output this recommendation |
 
-> lite 口径：源 Appendix A 已有逐行 strength，下表照录；输出 Impact Card 时复制该行 strength 并标 "provisional (lite)"。
+> lite convention: the source Appendix A already has per-row strength; the table below copies it verbatim. When outputting an Impact Card, copy that row's strength and mark "provisional (lite)".
 
-## 3. 攻击面图例（AS-*，§2.2）
+## 3. Attack surface legend (AS-*, §2.2)
 
-| ID | 攻击面 | 定义 |
+| ID | Attack surface | Definition |
 |---|---|---|
-| AS-01 | Instruction and Context Boundary Confusion | 误把不可信输入/文档/历史/外部返回当作高优先级指令 |
-| AS-02 | Input and Parameter Injection | 无约束用户/外部输入进入 Tool/后端/下游解释器 |
-| AS-03 | Output Handling and Sensitive Data Exfiltration | 敏感信息被输出/拼接/引用/转发/写到外部 |
-| AS-04 | Permission, Identity, and Delegation Expansion | 宽泛能力/错误授权/链式调用导致越界操作 |
-| AS-05 | Tool Misuse and High-Risk Side Effects | 错误 Tool 选择/意外写/批量操作/未确认不可逆动作 |
-| AS-06 | Resource Exhaustion and Runaway Execution | 输入/输出/调用/重试/递归无上限导致资源失控 |
-| AS-07 | Anomaly Propagation and Cascading Failures | Tool/依赖失败后 Agent 采无定义扩张/重试/降级 |
-| AS-08 | Configuration, Naming, and Supply Chain Confusion | 相似 Tool 名/Schema 变更/危险默认值/异常回调地址 |
-| AS-09 | Cross-Artifact Contract Breach | Prompt/Skill/Tool 间授权/参数/输出/权限/错误策略不一致 |
+| AS-01 | Instruction and Context Boundary Confusion | Mistaking untrusted input/documents/history/external returns as high-priority instructions |
+| AS-02 | Input and Parameter Injection | Unconstrained user/external input enters Tool/backend/downstream interpreter |
+| AS-03 | Output Handling and Sensitive Data Exfiltration | Sensitive information is output/concatenated/referenced/forwarded/written externally |
+| AS-04 | Permission, Identity, and Delegation Expansion | Broad capability/incorrect authorization/chained invocation leads to out-of-scope operations |
+| AS-05 | Tool Misuse and High-Risk Side Effects | Wrong Tool selection/accidental write/batch operations/unconfirmed irreversible actions |
+| AS-06 | Resource Exhaustion and Runaway Execution | Unbounded input/output/invocation/retry/recursion leads to runaway resources |
+| AS-07 | Anomaly Propagation and Cascading Failures | After Tool/dependency failure the Agent escalates, retries, or degrades in undefined ways |
+| AS-08 | Configuration, Naming, and Supply Chain Confusion | Similar Tool names/Schema change/dangerous default values/abnormal callback addresses |
+| AS-09 | Cross-Artifact Contract Breach | Inconsistency of authorization/parameters/output/permissions/error policy among Prompt/Skill/Tool |
 
-> 影响维度码：`D1`=机密性损害、`D2`=完整性损害、`D3`=授权损害（§0.5）。"Availability/Auditability/Integrity" 在源表中为普通词。
+> Impact dimension codes: `D1`=confidentiality damage, `D2`=integrity damage, `D3`=authorization damage (§0.5). "Availability/Auditability/Integrity" are ordinary words in the source table.
 
-## 4. 缺陷→影响映射表（源 Appendix A）
+## 4. Defect→impact mapping table (source Appendix A)
 
-### A.1 Prompt（QD-P-*）
+### A.1 Prompt (QD-P-*)
 
 | QD ID | Name | Applies | AS | Impact | Strength |
 |---|---|---|---|---|---|
@@ -108,9 +108,9 @@ title: Relevance Map (v2 统一引擎版)
 | QD-P-2.7.2 | Counter-Example Coverage (rec.) | AC-L1~3 | AS-01, AS-05 | D2 | Conditional |
 | QD-P-2.7.3 | Boundary-Case Examples Missing (rec.) | AC-L1~3 | AS-01, AS-05 | D2 | Conditional |
 
-> 注：推荐项（无 P 级）统一 `Conditional`。已弃用/删除/合并规则不映射：`QD-P-2.5.5`（弃用）、`QD-P-2.1.1`（删除，注入点并入 2.5.6）、`QD-P-2.3.3`（编号空位）、`QD-P-2.1.4`（并入 1.4.1）。
+> Note: Recommended items (no P level) are uniformly `Conditional`. Deprecated/deleted/merged rules are not mapped: `QD-P-2.5.5` (deprecated), `QD-P-2.1.1` (deleted, injection point merged into 2.5.6), `QD-P-2.3.3` (numbering gap), `QD-P-2.1.4` (merged into 1.4.1).
 
-### A.2 Skill（QD-S-*）
+### A.2 Skill (QD-S-*)
 
 | QD ID | Name | Applies | AS | Impact | Strength |
 |---|---|---|---|---|---|
@@ -140,9 +140,9 @@ title: Relevance Map (v2 统一引擎版)
 | QD-S-5.3 | Environment Boundary Not Declared | OR-L1~3 (multi-env else N/A) | AS-04, AS-05 | D2, D3 | Medium |
 | QD-S-5.4 | Chained Invocation Permissions Undeclared | OR-L1~3 (chaining=false N/A) | AS-04, AS-05, AS-07 | D1, D2, D3 | Medium |
 
-> 注：QD-S-0.x 为入口门（无 P 级、不计分），统一映射 AS-09。同源去重：QD-S-1.4/2.4 并入 5.1；QD-S-2.1/2.2 是 1.1/1.3 的自动触发词表；QD-S-4.3 并入 4.1。
+> Note: QD-S-0.x are entry gates (no P level, not counted in scoring), uniformly mapped to AS-09. Same-source deduplication: QD-S-1.4/2.4 merged into 5.1; QD-S-2.1/2.2 are the automatic trigger word lists of 1.1/1.3; QD-S-4.3 merged into 4.1.
 
-### A.3 Tool（QD-T-*）
+### A.3 Tool (QD-T-*)
 
 | QD ID | Name | Applies | AS | Impact | Strength |
 |---|---|---|---|---|---|
@@ -175,9 +175,9 @@ title: Relevance Map (v2 统一引擎版)
 | QD-T-5.2 | Change Impact Assessment | change-check | AS-08, AS-09 | D2, D3, Availability | Conditional |
 | QD-T-5.3 | Semantic Change | change-check | AS-08, AS-09 | D2, D3, Availability | Conditional |
 
-> 注：已转移（跨 Tool 语义 → Cross 命名空间）：`QD-T-3.5`→`QD-TT-5.1`；`QD-T-4.3`→`QD-TT-5.2`。已合并：`QD-T-4.2`→`QD-T-3.1`。`QD-T-5.x` 为 change-check 项，统一 `Conditional`。
+> Note: Transferred (cross-Tool semantics → Cross namespace): `QD-T-3.5`→`QD-TT-5.1`; `QD-T-4.3`→`QD-TT-5.2`. Merged: `QD-T-4.2`→`QD-T-3.1`. `QD-T-5.x` are change-check items, uniformly `Conditional`.
 
-### A.4 Cross（QD-PS/PT/ST/CYC/SS/TT-*）
+### A.4 Cross (QD-PS/PT/ST/CYC/SS/TT-*)
 
 | QD ID | Name | Applies | AS | Impact | Strength |
 |---|---|---|---|---|---|
@@ -211,11 +211,11 @@ title: Relevance Map (v2 统一引擎版)
 | QD-TT-5.2 | Multi-Tool Semantic Competition | AC-L2/3 | AS-05, AS-08 | D2, D3 | Strong |
 | QD-TT-5.3 | Cross-Tool Data Structure Bridging | AC-L3 | AS-03, AS-09 | D2, Availability | Medium |
 
-> 注：QD-PS-1.6 与 QD-ST-3.5 同源（primary：QD-ST-3.5）。QD-TT-5.1/5.2 是 QD-T-3.5/4.3 的 Cross 命名空间后继。
+> Note: QD-PS-1.6 and QD-ST-3.5 are same-source (primary: QD-ST-3.5). QD-TT-5.1/5.2 are the Cross namespace successors of QD-T-3.5/4.3.
 
-### A.5 Permission（QD-PM-*）
+### A.5 Permission (QD-PM-*)
 
-> 源注：QD-PM 由 Inspect Permission Governance 子集产出，本表只定义映射方向，不自动判定权限缺陷为 EX 风险；EX 分类仍由 Risk Explicit 独立判定。Gate-0 未满足时无 QD-PM 缺陷，本表不适用。
+> Source note: QD-PM is produced by the Inspect Permission Governance subset; this table defines only the mapping direction and does not automatically judge permission defects as EX risks; EX classification is still judged independently by Risk Explicit. When Gate-0 is not satisfied there are no QD-PM defects, and this table does not apply.
 
 | QD ID | Name | Applies | AS | Impact | Strength |
 |---|---|---|---|---|---|
@@ -226,13 +226,13 @@ title: Relevance Map (v2 统一引擎版)
 | QD-PM-5.1~5.7 | Permission Boundary (5.4 fixed P0, 5.7 exemption) | AC-L1~4 (5.4 unconditional; 5.5/5.7 conditional) | AS-04, AS-05 | D2, D3 | Strong |
 | QD-PM-6.1~6.7 | Permission Auditability (6.3/6.5 fixed P0, 6.7 fixed P1) | AC-L1~4 (6.6 AC-L2+; others conditional) | AS-05, AS-09 | D2, D3, Auditability | Medium |
 
-> 注：QD-PM 全规范 43 项，此处按 6 组映射；组级 strength 表示整体测试优先级，非成员 severity。
+> Note: QD-PM has 43 items in the full specification; here mapped in 6 groups; group-level strength indicates the overall test priority, not member severity.
 
-## 5. 候选失效模式（FM-*，源 Appendix B.1）
+## 5. Candidate failure modes (FM-*, source Appendix B.1)
 
-> FM-* 码定义在 `quality/tool-agent.md`（L1），B.1 使用 FM-01~FM-10。此处按 QD 类别组粒度映射。若某 QD ID 无法归入任一组，写 "no category-level FM association defined in Appendix B.1"，不猜测。
+> FM-* codes are defined in `quality/tool-agent.md` (L1); B.1 uses FM-01~FM-10. Here mapped at QD category group granularity. If a QD ID cannot be assigned to any group, write "no category-level FM association defined in Appendix B.1" and do not guess.
 
-| QD 类别组（verbatim） | 候选失效模式 |
+| QD category group (verbatim) | Candidate failure modes |
 |---|---|
 | Prompt logic contradiction, mismatch, implication defects | FM-01, FM-02, FM-07, FM-09 |
 | Prompt input definition defects | FM-01, FM-04 |
@@ -255,68 +255,68 @@ title: Relevance Map (v2 统一引擎版)
 | Skill-to-Skill handoff loop (QD-CYC-1.3) | FM-08, FM-10 |
 | Permission proportionality defects (QD-PM) | FM-05, FM-09, FM-10 |
 
-> 通配约定（Appendix B）：类别通配（如 `QD-P-1.x`）只指**当前活跃**成员，排除删除/弃用/合并/转移 ID；权威活跃成员清单见 §4 上表。
+> Wildcard convention (Appendix B): a category wildcard (e.g. `QD-P-1.x`) refers only to **currently active** members, excluding deleted/deprecated/merged/transferred IDs; the authoritative active member list is in the table above in §4.
 
-## 6. 候选 RAG-Agent 质量指标（源 Appendix C.1）
+## 6. Candidate RAG-Agent quality metrics (source Appendix C.1)
 
-> RAG-Agent 质量评估"用户可见内容输出与边界处理"，不直接评分 Prompt/检索/知识库/模型/Tool 内部组件。映射为**候选**："may affect" = 值得优先设计补充测试，非必然丢分。lite 从不运行 Quality 子集。
+> RAG-Agent quality assessment evaluates "user-visible content output and boundary handling", and does not directly score Prompt/retrieval/knowledge base/model/Tool internal components. Mapping is **candidate**: "may affect" = worth prioritizing the design of additional tests, not necessarily a score loss. lite never runs the Quality subset.
 
-| QD 类别 | 候选影响指标 | 推荐补充测试（凝练） |
+| QD category | Candidate affected metrics | Recommended additional tests (condensed) |
 |---|---|---|
-| Prompt logic contradiction, mismatch, implication defects | Correctness, Relevance, Consistency, Format Compliance | 规则冲突、角色边界、多约束 Q&A |
-| Prompt gray zone defects | Consistency, Robustness, Boundary Recognition, Safety Response | 模糊措辞、多轮追问、冲突规则、知识更新 |
-| Prompt input definition defects | Relevance, Robustness, Decomposition Capability, Boundary Recognition | 口语改写、缺条件、多意图、异常格式 |
-| Prompt output definition defects | Completeness, Traceability, Format Compliance, Consistency | 引用、结构、免责声明、JSON/Markdown |
-| Prompt workflow, resource, and Tool defects | Correctness, Traceability, Timeliness | 知识源选择、检索 Tool、引用链、失败回退 |
-| Prompt security, permission, and exception boundary defects | Boundary Recognition, Safety Response, Coherence | 未授权、敏感、无命中、需转接、依赖失败 |
-| Prompt example design defects | Correctness, Robustness, Consistency, Format Compliance | 正/反例、边界表达、对抗改写 |
-| Skill resource and unbounded declaration defects | Completeness, Timeliness, Robustness | 大输入、多文档、超限、部分完成 |
-| Skill trigger, scope, and ambiguity defects | Relevance, Decomposition Capability, Boundary Recognition | 意图边界、不激活、澄清转接 |
-| Skill failure expansion defects | Completeness, Coherence, Safety Response | 无命中、低置信源、源冲突、检索失败 |
-| Skill permission and environment boundary defects | Boundary Recognition, Safety Response, Traceability | 敏感数据、用户身份、生产数据、外部资源 |
-| Tool parameter and semantic defects | Correctness, Relevance, Traceability, Format Compliance | 检索参数、源返回、引用解析、相似 Tool |
-| Cross contract defects | Correctness, Completeness, Consistency, Traceability, Safety Response | 端到端检索、引用、错误处理、权限、输出契约 |
-| Inter-Skill trigger conflict and name similarity (QD-SS) | Relevance, Correctness, Boundary Recognition | 重叠触发、相似名误选、应澄清却直答 |
-| Cross-Tool data structure incompatibility (QD-TT-5.3) | Correctness, Traceability, Format Compliance | 字段类型不匹配、缺序列化、引用解析失败 |
-| Skill-to-Skill handoff loop (QD-CYC-1.3) | Timeliness, Coherence | 无终止转接、重复路由、响应超时 |
-| Permission proportionality defects (QD-PM) | Boundary Recognition, Safety Response, Traceability | 未授权检索、跨租户访问、应拒绝却直答 |
+| Prompt logic contradiction, mismatch, implication defects | Correctness, Relevance, Consistency, Format Compliance | Rule conflicts, role boundaries, multi-constraint Q&A |
+| Prompt gray zone defects | Consistency, Robustness, Boundary Recognition, Safety Response | Vague wording, multi-turn follow-up, conflicting rules, knowledge update |
+| Prompt input definition defects | Relevance, Robustness, Decomposition Capability, Boundary Recognition | Colloquial rewriting, missing conditions, multi-intent, abnormal formats |
+| Prompt output definition defects | Completeness, Traceability, Format Compliance, Consistency | Citations, structure, disclaimers, JSON/Markdown |
+| Prompt workflow, resource, and Tool defects | Correctness, Traceability, Timeliness | Knowledge source selection, retrieval Tool, citation chain, failure fallback |
+| Prompt security, permission, and exception boundary defects | Boundary Recognition, Safety Response, Coherence | Unauthorized, sensitive, no hit, needs handoff, dependency failure |
+| Prompt example design defects | Correctness, Robustness, Consistency, Format Compliance | Positive/negative examples, boundary expression, adversarial rewriting |
+| Skill resource and unbounded declaration defects | Completeness, Timeliness, Robustness | Large input, multiple documents, over-limit, partial completion |
+| Skill trigger, scope, and ambiguity defects | Relevance, Decomposition Capability, Boundary Recognition | Intent boundaries, non-activation, clarification handoff |
+| Skill failure expansion defects | Completeness, Coherence, Safety Response | No hit, low-confidence sources, source conflict, retrieval failure |
+| Skill permission and environment boundary defects | Boundary Recognition, Safety Response, Traceability | Sensitive data, user identity, production data, external resources |
+| Tool parameter and semantic defects | Correctness, Relevance, Traceability, Format Compliance | Retrieval parameters, source returns, citation parsing, similar Tools |
+| Cross contract defects | Correctness, Completeness, Consistency, Traceability, Safety Response | End-to-end retrieval, citations, error handling, permissions, output contract |
+| Inter-Skill trigger conflict and name similarity (QD-SS) | Relevance, Correctness, Boundary Recognition | Overlapping triggers, wrong selection of similar names, direct answer when clarification is due |
+| Cross-Tool data structure incompatibility (QD-TT-5.3) | Correctness, Traceability, Format Compliance | Field type mismatch, missing serialization, citation parsing failure |
+| Skill-to-Skill handoff loop (QD-CYC-1.3) | Timeliness, Coherence | Non-terminating handoff, repeated routing, response timeout |
+| Permission proportionality defects (QD-PM) | Boundary Recognition, Safety Response, Traceability | Unauthorized retrieval, cross-tenant access, direct answer when refusal is due |
 
-> 出范围：Appendix C.2（RAG 失败反向诊断）与 D.3（缺陷链）不复现。
+> Out of scope: Appendix C.2 (RAG failure reverse diagnosis) and D.3 (defect chains) are not reproduced.
 
-## 7. 禁止的自动推断（verbatim，§2.3.1）
+## 7. Forbidden automatic inference (verbatim, §2.3.1)
 
-以下推断均无效：
+The following inferences are all invalid:
 
-- `QD-P-2.5.2` ≠ 自动命中 `NL-A-7`
-- `QD-T-1.4` ≠ 自动命中 `NR-S-3`
-- `QD-PS-1.3` ≠ 自动命中 `NL-B-9`
+- `QD-P-2.5.2` ≠ automatic hit of `NL-A-7`
+- `QD-T-1.4` ≠ automatic hit of `NR-S-3`
+- `QD-PS-1.3` ≠ automatic hit of `NL-B-9`
 
-源收尾规则："仅当工件中存在满足 EX 定义的显式表达，Risk Explicit 才能独立判定相应 EX 分类。" Stage F 从不推导 EX 码。
+Source closing rule: "Only when an explicit expression satisfying the EX definition exists in the artifact can Risk Explicit independently judge the corresponding EX classification." Stage F never derives EX codes.
 
-## 8. Impact Card 模板（单缺陷 lite 形，§5.5）
+## 8. Impact Card template (single-defect lite form, §5.5)
 
 ```markdown
-### Impact Card: <QD-ID> | <短缺陷名> | <P0/P1/P2> (scope)
+### Impact Card: <QD-ID> | <short defect name> | <P0/P1/P2> (scope)
 
 **Static Discovery**
 - Artifact: <prompt|skill|tool>:<name>
 - Version: <version label / hash>
 - Evidence: <rule hit and location, one line>
 
-**Potential Security Associations**  <!-- 候选关联，非确认影响 -->
+**Potential Security Associations**  <!-- candidate association, not confirmed impact -->
 - Candidate Attack Surface: AS-xx <name> [, AS-yy ...]
 - Potential Impact: D1 / D2 / D3 / Availability / Integrity / Auditability
-- Mapping Strength: <Strong|Medium|Conditional> "provisional (lite)" — 仅关联置信度，非 severity
-- Note: 本结论指示验证优先级，尚未指示后端可利用。
+- Mapping Strength: <Strong|Medium|Conditional> "provisional (lite)" — association confidence only, not severity
+- Note: This conclusion indicates validation priority, and does not yet indicate backend exploitability.
 
 **Recommended Validation — NOT run by this lite inspector**
-- Risk Explicit: Stage E 已跑，此处不重分类。
-- Risk Implicit: 未运行——动态可利用性未验证。
-- External controls: 存在性未知；按 §1.4 不得假设工件外补偿控制缺失。
+- Risk Explicit: Stage E already run, not reclassified here.
+- Risk Implicit: not run — dynamic exploitability not verified.
+- External controls: existence unknown; per §1.4 must not assume compensating controls outside the artifact are missing.
 
 **Potential Quality Associations**
-- Tool-Agent: FM-xx, FM-yy（类别级，B.1）
-- RAG-Agent: <metrics>（候选，C.1；非质量结果）
+- Tool-Agent: FM-xx, FM-yy (category level, B.1)
+- RAG-Agent: <metrics> (candidate, C.1; not a quality result)
 
 **Current Evidence Status**
 - Static Defect: Confirmed
@@ -329,9 +329,9 @@ title: Relevance Map (v2 统一引擎版)
 - Minimum Regression: Inspect re-scan of the updated artifact passing the same rule ID
 ```
 
-**措辞红线（verbatim，§5.5.1）**：
+**Wording red line (verbatim, §5.5.1)**:
 
-| 允许 | 禁止 |
+| Allowed | Forbidden |
 |---|---|
 | "May expand the attack surface" | "Has already been attacked" |
 | "Recommended to prioritize validation" | "Vulnerability necessarily exists" |
@@ -339,27 +339,27 @@ title: Relevance Map (v2 统一引擎版)
 | "Relies on compensating controls" | "Completely secure" |
 | "Not reproduced under current test conditions" | "Absolutely unexploitable" |
 
-### 8.1 Compact 模板（按影响类别分组，lite 可选用）
+### 8.1 Compact template (grouped by impact category, optional in lite)
 
-当缺陷较多、缩写密度影响可读性时，可用下表的**分组形态**替代逐缺陷卡片（§8 完整模板仍可用于需详述的单缺陷）。硬要求不变：候选语言、Strength ≠ severity、Risk Implicit / 运行时 Quality 未运行、与 verdict 物理隔离。
+When defects are numerous and the abbreviation density affects readability, the **grouped form** in the table below may replace per-defect cards (the full template in §8 can still be used for single defects that need detail). Hard requirements unchanged: candidate language, Strength ≠ severity, Risk Implicit / runtime Quality not run, physical separation from the verdict.
 
-**术语表（必带，只列本表实际用到的编码）**
+**Terminology table (required, only lists the codes actually used in this table)**
 
-| 编码 | 含义 |
+| Code | Meaning |
 |---|---|
-| AS-xx | <攻击面中文名，取自 §3 图例> |
-| D1 / D2 / D3 | 机密性 / 完整性 / 授权损害 |
-| Strong / Medium / Conditional | 关联强度（=验证优先级，非严重度） |
-| FM 类别组 | <组名，取自 §5>（逐码定义未随包分发，不展开） |
+| AS-xx | <attack surface name in the report language, from the §3 legend> |
+| D1 / D2 / D3 | Confidentiality / Integrity / Authorization damage |
+| Strong / Medium / Conditional | Association strength (= validation priority, not severity) |
+| FM category group | <group name, taken from §5> (per-code definitions are not distributed with the package, not expanded) |
 
-**分组表（每行一个影响类别）**
+**Grouped table (one impact category per row)**
 
-| 影响类别 | 缺陷（内联归属，逐缺陷不可合并） | 可能后果（人话） | 建议先测 |
+| Impact category | Defect (inline attribution, per-defect must not be merged) | Possible consequence (plain language) | Suggest testing first |
 |---|---|---|---|
-| <类别名>（AS-xx/…） | `<QD-ID>`（AS-… · impact · strength · FM-…）、`<QD-ID>`（…） | … | … |
+| <category name> (AS-xx/…) | `<QD-ID>` (AS-… · impact · strength · FM-…), `<QD-ID>` (…) | … | … |
 
-> 约束：每行内每个缺陷必须内联自己的 `AS / impact / strength / FM`；strength 组内可能不同（如 Strong 与 Conditional 并存），不得因分组丢失；P0 缺陷加粗。
+> Constraint: within each row each defect must inline its own `AS / impact / strength / FM`; strengths may differ within a group (e.g. Strong and Conditional coexist) and must not be lost due to grouping; P0 defects are bolded.
 
-## 9. 缺陷链——出 lite 范围（§1.5）
+## 9. Defect chain — out of lite scope (§1.5)
 
-缺陷链用于识别多缺陷组合形成的候选利用/失败路径，需唯一 `chain_id`、保留成员缺陷与跨工件关系、端到端 Risk Implicit 验证等。**lite inspector v1 出范围**：本参考仅支持单缺陷候选映射，不构造/断言/报告缺陷链（SC-*/QC-TA-*/QC-RA-*），不把分离的单缺陷候选关联升级为链路径。
+Defect chains are used to identify candidate exploitation/failure paths formed by combinations of multiple defects, requiring a unique `chain_id`, retained member defects and cross-artifact relations, end-to-end Risk Implicit validation, etc. **Out of scope for lite inspector v1**: this reference supports only single-defect candidate mapping, does not construct/assert/report defect chains (SC-*/QC-TA-*/QC-RA-*), and does not upgrade separate single-defect candidate associations into chain paths.

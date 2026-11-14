@@ -1,4 +1,4 @@
-"""HTTP client for deeplogic SaaS API."""
+"""HTTP client for sanityops SaaS API."""
 
 from __future__ import annotations
 
@@ -7,25 +7,25 @@ from typing import Any
 
 import httpx
 
-from deeplogic_cli.exceptions.api_exceptions import (
+from sanityops_cli.exceptions.api_exceptions import (
     APIError,
     AuthenticationError,
     NetworkError,
     ProjectNotFoundError,
 )
-from deeplogic_cli.exceptions.api_exceptions import (
+from sanityops_cli.exceptions.api_exceptions import (
     ValidationError as APIValidationError,
 )
 
 
-class DeeplogicClient:
-    """HTTP client for deeplogic SaaS API.
+class SanityopsClient:
+    """HTTP client for sanityops SaaS API.
 
     Handles authentication, request formatting, and error handling for all
-    deeplogic API operations.
+    sanityops API operations.
 
     Attributes:
-        base_url: The base URL for the API (e.g., "https://api.deeplogic.com").
+        base_url: The base URL for the API (e.g., "https://api.sanityops.com").
         api_key: The API key for Bearer token authentication.
         timeout: Request timeout in seconds.
     """

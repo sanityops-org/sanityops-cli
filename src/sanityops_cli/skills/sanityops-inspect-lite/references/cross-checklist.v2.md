@@ -1,36 +1,36 @@
 ---
-title: Cross-Artifact Consistency Checklist (v2 统一引擎版)
+title: Cross-Artifact Consistency Checklist (v2 unified engine edition)
 ---
 
 # Cross-Artifact Consistency Checklist (QD-PS/PT/ST/SS/TT/CYC, v2)
 
-> **状态**：v2 统一引擎版。规则语义源自 `inspect/cross.md` v1.1：ID、名称、默认严重度、AC-L 适用性、OR-L3/实例升级、去重组均保持不变；变化的是**组织方式**——全字段 + 正文表格（模型项）+ 程序块（程序项）。
+> **Status**: v2 unified engine edition. Rule semantics originate from `inspect/cross.md` v1.1: IDs, names, default severities, AC-L applicability, OR-L3/instance escalation, and dedup groups all remain unchanged; what changes is the **organization** — all fields + body tables (model items) + program blocks (program items).
 >
-> 共享定义（字段模型 / check_engine 映射 / applicability 结构事实门 / severity 记号 / 打分规则）见 [_meta.md](_meta.md)，本文件不重复。本文件只承载 Cross 域检查项本身。
+> Shared definitions (field model / check_engine mapping / applicability structural-fact gate / severity notation / scoring rules) are in [_meta.md](_meta.md); this file does not repeat them. This file only carries the Cross domain check items themselves.
 
-## 1. 域内说明
+## 1. Domain notes
 
-- **双 L 维度**：本域 severity 由 **AC-L**（决定 default P 取值）与 **OR-L**（升级：OR-L3 → P0/P1）共同决定。哪些项适用由 `applicability.fact` 决定，**不由 AC-L**（原 tier-scoped 规格的 L1=7 / L2=20 / L3=29 范围仅作历史参考，不再决定"考不考"）。索引表 severity 列标 **AC-L1/L2/L3 的 default 取值**（`∅` = 该 L 下原规范不分配 P，参考级展示）；OR-L3 升级与实例升级见下方表格。
-- **非阻塞模式**（源 §How to Use）：上游单工件 P0 不阻断本清单执行，聚合 P0 而非 halt。开始前确认 Prompt/Skill/Tool 版本号、时间戳、来源一致，不一致先问用户。
-- **仅检跨工件关系**（六组：QD-PS / QD-PT / QD-ST / QD-SS / QD-TT / QD-CYC），不复检 QD-P/QS/QD-T 的单工件内部缺陷。
-- **每项证据须引双方工件位置**（三级定位：关系→工件→字段）。
-- **N/A 纪律**：N/A 必写依据（如"无 Tool Schema""Agent 仅 1 个 Skill"）；无依据的 N/A 视为未检，按默认级计失败。
-- **check_engine 分配口径（本域重分类日志）**：跨工件一致性本质是语义推理 → 绝大多数 `model`；存在性/唯一性/竞争（2.1、3.1、4.2、5.2）有程序初筛（名称匹配）→ `hybrid`。本域**无纯 program 项**。
+- **Dual L dimension**: severity in this domain is determined jointly by **AC-L** (decides the default P value) and **OR-L** (escalation: OR-L3 → P0/P1). Which items apply is decided by `applicability.fact`, **not by AC-L** (the L1=7 / L2=20 / L3=29 ranges in the original tier-scoped specification are for historical reference only and no longer decide whether a check runs). The severity column in the index table shows **the default values for AC-L1/L2/L3** (`∅` = the original specification assigns no P under that L, shown for reference only); OR-L3 escalation and instance escalation are in the table below.
+- **Non-blocking mode** (source §How to Use): an upstream single-artifact P0 does not block execution of this checklist; aggregate P0s rather than halt. Before starting, confirm that Prompt/Skill/Tool version numbers, timestamps, and provenance are consistent; if inconsistent, ask the user first.
+- **Only cross-artifact relationships are checked** (six groups: QD-PS / QD-PT / QD-ST / QD-SS / QD-TT / QD-CYC); single-artifact internal defects of QD-P/QS/QD-T are not re-checked.
+- **Each item's evidence must cite positions in both artifacts** (three-level location: relationship→artifact→field).
+- **N/A discipline**: N/A must state a basis (e.g., "no Tool Schema", "Agent has only 1 Skill"); a basis-less N/A is treated as not checked and counted as a failure at the default level.
+- **check_engine assignment convention (reclassification log for this domain)**: cross-artifact consistency is essentially semantic reasoning → the vast majority are `model`; existence/uniqueness/competition (2.1, 3.1, 4.2, 5.2) have a program pre-screen (name matching) → `hybrid`. This domain has **no pure program items**.
 
-**OR-L3 升级表（源 Appendix C.2，跨项）**：
+**OR-L3 escalation table (source Appendix C.2, cross items)**:
 
-| 升级 | 项 |
+| Escalation | Items |
 |---|---|
 | P1 → P0 | QD-PS-1.2, 1.4, 1.5, 1.7 · QD-PT-2.3, 2.7 · QD-ST-3.5 · QD-SS-4.1 · QD-TT-5.1, 5.2 · QD-CYC-1.1, 1.2, 1.3 |
-| P2 → P1（→P0 当会误触发 OR-L3 Skill） | QD-SS-4.2 |
-| 无升级（P1 保持） | QD-PT-2.5, QD-ST-3.7 |
-| P2 无 OR-L3 升级（保持 P2） | QD-PS-1.6, QD-PT-2.6, QD-ST-3.4, QD-TT-5.3 |
+| P2 → P1 (→P0 when it would mistakenly trigger an OR-L3 Skill) | QD-SS-4.2 |
+| No escalation (P1 stays) | QD-PT-2.5, QD-ST-3.7 |
+| P2 with no OR-L3 escalation (stays P2) | QD-PS-1.6, QD-PT-2.6, QD-ST-3.4, QD-TT-5.3 |
 
-**实例升级（各规则体 `→P0` 分支）**：QD-CYC 确定的闭环 → P0；QD-TT-5.1 敏感输出+危险消费并存 → P0；QD-TT-5.2 行为差异大 → P0；QD-SS-4.1 涉及 OR-L3 Skill → P0。
+**Instance escalation (`→P0` branches in the rule bodies)**: QD-CYC confirmed closed loop → P0; QD-TT-5.1 sensitive output plus dangerous consumption coexist → P0; QD-TT-5.2 large behavioral difference → P0; QD-SS-4.1 involves an OR-L3 Skill → P0.
 
-## 2. 检查项索引（29 项，六组）
+## 2. Check item index (29 items, six groups)
 
-| ID | name | check_engine | applicability.fact | severity AC-L1/L2/L3 | 计入打分 |
+| ID | name | check_engine | applicability.fact | severity AC-L1/L2/L3 | Counted in scoring |
 |---|---|---|---|---|---|
 | QD-PS-1.1 | Skill Authorization Consistency | model | has_skill_reference | P0 / P0 / P0 | ✓ |
 | QD-PS-1.2 | Trigger Condition Consistency | model | has_prompt_and_skill | ∅ / P1 / P1 | ✓ |
@@ -62,80 +62,80 @@ title: Cross-Artifact Consistency Checklist (v2 统一引擎版)
 | QD-TT-5.2 | Multi-Tool Semantic Competition | hybrid | has_multiple_tools | ∅ / P1 / P1 | ✓ |
 | QD-TT-5.3 | Cross-Tool Data Structure Bridging | model | has_multiple_tools | ∅ / ∅ / P2 | ✓ |
 
-> 计数说明：29 项 = QD-PS(7) + QD-PT(7) + QD-ST(7) + QD-CYC(3) + QD-SS(2) + QD-TT(3)。severity 为 AC-L 三档 default（L1=7 项全 P0 / L2=20 / L3=29）；`∅` = 该 L 下原规范不分配 P（参考级展示）。`has_*` 为结构关系事实（工件间是否存在该关系），非"是否已声明一致"（防点1悖论）。QD-CYC-1.2 仅当 Prompt 编排声明 ≥2 Agent 角色，否则 N/A。
+> Count note: 29 items = QD-PS(7) + QD-PT(7) + QD-ST(7) + QD-CYC(3) + QD-SS(2) + QD-TT(3). severity is the default for the three AC-L tiers (L1=7 items all P0 / L2=20 / L3=29); `∅` = the original specification assigns no P under that L (shown for reference only). `has_*` are structural relationship facts (whether that relationship exists between artifacts), not "whether it has been declared consistent" (point-1-paradox prevention). QD-CYC-1.2 applies only when the Prompt orchestration declares ≥2 Agent roles; otherwise N/A.
 
-> **存在性检查的 applicability 例外（防点1悖论在跨工件存在性检查上的应用）**：QD-PS-1.1 / QD-PT-2.1 / QD-ST-3.1 检查"声明的 X 是否真的存在"，其 applicability 用**引用事实**而非"双方都存在"的关系事实——`has_skill_reference`（Prompt 声明了 Skill 名，含 IR reference layer 条目）、`has_tool_reference`（Prompt/Skill 声明了 Tool 名，含 IR reference layer 条目）。这样当被引用对象缺失（"referenced but missing"）时检查仍运行并命中，而不是因 `has_prompt_and_tool` 等为假而自锁 N/A。
+> **applicability exception for existence checks (application of point-1-paradox prevention to cross-artifact existence checks)**: QD-PS-1.1 / QD-PT-2.1 / QD-ST-3.1 check "whether the declared X actually exists"; their applicability uses a **reference fact** rather than the relationship fact "both exist" — `has_skill_reference` (the Prompt declares a Skill name, including IR reference layer entries), `has_tool_reference` (the Prompt/Skill declares a Tool name, including IR reference layer entries). This way, when the referenced object is missing ("referenced but missing") the check still runs and hits, instead of self-locking to N/A because `has_prompt_and_tool` etc. is false.
 
-## 3. 模型判定要点（definition 凝练 + model_prompt）
+## 3. Model judgment points (definition condensed + model_prompt)
 
-### 3.1 纯 model 项（25 项）
+### 3.1 Pure model items (25 items)
 
-| ID | definition（凝练） | model_prompt（判定要点） |
+| ID | definition (condensed) | model_prompt (judgment points) |
 |---|---|---|
-| QD-PS-1.1 | Prompt 声明的 Skill 与已定义 Skill 匹配（授权范围外） | 核对 Prompt 声明的 Skill 列表与已定义 Skill，判是否越权/缺声明 |
-| QD-PS-1.2 | Prompt 工作流触发条件匹配 Skill 的 allowed_when/forbidden_when | 比对 Prompt 触发与 Skill TRIGGER 维度 |
-| QD-PS-1.3 | Prompt 授权权限覆盖 Skill 的 allowed_operations | 判 Prompt 权限是否覆盖 Skill 允许操作 |
-| QD-PS-1.4 | Prompt 声明资源对齐 Skill 的 allowed_resources | 比对资源声明 |
-| QD-PS-1.5 | Prompt 异常处理对齐 Skill FAILURE 维度 | 比对 on_empty/on_insufficient/forbidden_behaviors |
-| QD-PS-1.6 | Prompt 输出要求由 Skill OUTPUT 维度满足 | 比对 max_total_chars/format/partial_result_allowed |
-| QD-PS-1.7 | Skill 声明前置条件由前一 Prompt 步骤满足 | 判调用前前置条件是否已满足 |
-| QD-PT-2.2 | Prompt 工具调用规范匹配 Tool Schema（name/description/inputSchema） | 比对调用规范与 schema |
-| QD-PT-2.3 | Prompt 参数约束对齐 Tool inputSchema（required/properties/maxLength/pattern） | 比对参数约束 |
-| QD-PT-2.4 | Prompt 权限声明匹配 Tool 风险级（OR-L3 需安全边界） | 判高风险 Tool 是否有 Prompt 安全边界声明 |
-| QD-PT-2.5 | Prompt 异常处理覆盖 Tool 所有关键错误类型 | 判错误类型覆盖 |
-| QD-PT-2.6 | Prompt 声明合理的业务级调用频率/批量期望 | 判频率/批量期望合理性 |
-| QD-PT-2.7 | Prompt 参数语义/单位（名称/单位/货币/时区）匹配 inputSchema | 比对语义与单位 |
-| QD-ST-3.2 | Skill INPUT 约束由 Tool inputSchema 支持（maxLength/pattern/maxItems） | 比对输入约束支持性 |
-| QD-ST-3.3 | Tool 必填参数在 Skill 中有来源声明（用户输入或其他工具输出） | 判必填参数是否有来源 |
-| QD-ST-3.4 | Skill 调用频率/批量期望与 Tool 能力组合合理 | 判频率合理性 |
-| QD-ST-3.5 | Skill OUTPUT 期望匹配 Tool 返回结构 | 比对输出结构 |
-| QD-ST-3.6 | Skill 权限声明覆盖 Tool 副作用（写/敏感数据） | 判权限覆盖副作用 |
-| QD-ST-3.7 | Skill FAILURE 维度覆盖 Tool 所有关键错误类型 | 判错误覆盖 |
-| QD-CYC-1.1 | Prompt/Skill/Tool 调用关系形成闭环 | 判是否存在跨工件调用环；确定闭环→P0 |
-| QD-CYC-1.2 | 多 Agent 角色间形成闭环 | 判 Agent 间闭环（仅 ≥2 Agent 角色） |
-| QD-CYC-1.3 | 多 Skill 经 handoff 互指形成不终止循环 | 判 Skill 间 handoff 环 |
-| QD-SS-4.1 | 多 Skill 触发重叠，同一输入激活多个 Skill | 判触发冲突 |
-| QD-TT-5.1 | 一 Tool 敏感输出被另一 Tool 用于危险操作，形成数据泄漏链 | 判敏感输出+危险消费链；并存→P0 |
-| QD-TT-5.3 | 一 Tool 输出/输入类型不兼容且 Skill 无转换步骤 | 判类型桥接缺失 |
+| QD-PS-1.1 | Skills declared by the Prompt match the defined Skills (outside the authorized scope) | Compare the Skill list declared by the Prompt with the defined Skills; judge whether there is unauthorized access / a missing declaration |
+| QD-PS-1.2 | The Prompt workflow trigger conditions match the Skill's allowed_when/forbidden_when | Compare Prompt triggering with the Skill TRIGGER dimensions |
+| QD-PS-1.3 | The Prompt authorization permissions cover the Skill's allowed_operations | Judge whether Prompt permissions cover the operations the Skill allows |
+| QD-PS-1.4 | Resources declared by the Prompt align with the Skill's allowed_resources | Compare resource declarations |
+| QD-PS-1.5 | Prompt exception handling aligns with the Skill FAILURE dimensions | Compare on_empty/on_insufficient/forbidden_behaviors |
+| QD-PS-1.6 | Prompt output requirements are satisfied by the Skill OUTPUT dimensions | Compare max_total_chars/format/partial_result_allowed |
+| QD-PS-1.7 | Prerequisites declared by the Skill are satisfied by the preceding Prompt step | Judge whether prerequisites are satisfied before invocation |
+| QD-PT-2.2 | The Prompt's tool invocation specification matches the Tool Schema (name/description/inputSchema) | Compare the invocation specification with the schema |
+| QD-PT-2.3 | Prompt parameter constraints align with Tool inputSchema (required/properties/maxLength/pattern) | Compare parameter constraints |
+| QD-PT-2.4 | Prompt permission declarations match the Tool risk level (OR-L3 needs a security boundary) | Judge whether a high-risk Tool has a Prompt security boundary declaration |
+| QD-PT-2.5 | Prompt exception handling covers all critical error types of the Tool | Judge error type coverage |
+| QD-PT-2.6 | The Prompt declares a reasonable business-level invocation frequency/batch expectation | Judge the reasonableness of the frequency/batch expectation |
+| QD-PT-2.7 | Prompt parameter semantics/units (name/unit/currency/timezone) match inputSchema | Compare semantics and units |
+| QD-ST-3.2 | Skill INPUT constraints are supported by Tool inputSchema (maxLength/pattern/maxItems) | Compare input constraint supportability |
+| QD-ST-3.3 | The Tool's required parameters have a source declaration in the Skill (user input or another tool's output) | Judge whether required parameters have a source |
+| QD-ST-3.4 | Skill invocation frequency/batch expectation is reasonable given the Tool's capability combination | Judge frequency reasonableness |
+| QD-ST-3.5 | Skill OUTPUT expectations match the Tool return structure | Compare output structures |
+| QD-ST-3.6 | Skill permission declarations cover the Tool's side effects (writes/sensitive data) | Judge whether permissions cover side effects |
+| QD-ST-3.7 | Skill FAILURE dimensions cover all critical error types of the Tool | Judge error coverage |
+| QD-CYC-1.1 | Prompt/Skill/Tool invocation relationships form a closed loop | Judge whether a cross-artifact invocation cycle exists; a confirmed closed loop → P0 |
+| QD-CYC-1.2 | Multiple Agent roles form a closed loop among themselves | Judge the Agent-to-Agent closed loop (only with ≥2 Agent roles) |
+| QD-CYC-1.3 | Multiple Skills reference each other via handoff forming a non-terminating loop | Judge the Skill-to-Skill handoff cycle |
+| QD-SS-4.1 | Multiple Skill triggers overlap so that the same input activates multiple Skills | Judge trigger conflict |
+| QD-TT-5.1 | One Tool's sensitive output is used by another Tool for a dangerous operation, forming a data leakage chain | Judge the sensitive-output plus dangerous-consumption chain; coexistence → P0 |
+| QD-TT-5.3 | One Tool's output/input types are incompatible and the Skill has no conversion step | Judge the missing type bridging |
 
-### 3.2 hybrid 项的模型确认部分
+### 3.2 Model-confirmation portion of hybrid items
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **Skill side: this section is the complete judgment points, with no program pre-screening upstream.** "The program only does..." describes the CLI / platform pre-screen path; the skill performs full model reasoning, does not execute §4, must complete the semantic judgment itself, and must not treat it as "already screened" nor judge N/A on that basis.
 
-| ID | model_prompt（确认要点） |
+| ID | model_prompt (confirmation points) |
 |---|---|
-| QD-PT-2.1 | 确认 Prompt 声明 Tool 名是否真存在于已知 Tool Schema 列表且语义一致（程序仅做名称匹配） |
-| QD-ST-3.1 | 确认 Skill 声明 Tool 名是否真存在于已知 Tool Schema 列表且语义一致 |
-| QD-SS-4.2 | 确认名称相同/近似是否真导致误调用（程序仅做名称相似度） |
-| QD-TT-5.2 | 确认 name/description 近似是否真导致误调用（程序仅做名称/描述相似度） |
+| QD-PT-2.1 | Confirm whether the Tool name declared by the Prompt really exists in the known Tool Schema list and is semantically consistent (the program only does name matching) |
+| QD-ST-3.1 | Confirm whether the Tool name declared by the Skill really exists in the known Tool Schema list and is semantically consistent |
+| QD-SS-4.2 | Confirm whether identical/similar names really cause misinvocation (the program only does name similarity) |
+| QD-TT-5.2 | Confirm whether similar name/description really causes misinvocation (the program only does name/description similarity) |
 
-## 4. 程序判定项（program-check 代码块）
+## 4. Program-judgment items (program-check code block)
 
-> **CLI / platform 专用：skill 不解析、不执行本代码块**（skill 全模型推理，不消费 `check_engine` 与 `program_rule`）。程序引擎只 parse 本代码块。`rule` 字段为**判定语义示意**。本域仅 hybrid 项有初筛规则，无纯 program 项。
+> **CLI / platform only: the skill does not parse or execute this code block** (the skill performs full model reasoning and does not consume `check_engine` or `program_rule`). The program engine only parses this code block. The `rule` field is a **semantic illustration of judgment**. This domain has pre-screen rules only for hybrid items; there are no pure program items.
 
 <!-- program-check -->
 ```json
 {
   "domain": "cross",
   "version": "v2",
-  "note": "hybrid 项初筛规则。rule 为语义示意。",
+  "note": "Pre-screen rules for hybrid items. rule is illustrative semantics.",
   "checks": [
-    { "id": "QD-PT-2.1", "summary": "Prompt 声明 Tool 名与已知 Tool Schema 列表名称匹配（语义一致性由模型确认）" },
-    { "id": "QD-ST-3.1", "summary": "Skill 声明 Tool 名与已知 Tool Schema 列表名称匹配（语义一致性由模型确认）" },
-    { "id": "QD-SS-4.2", "summary": "多 Skill 名称相同或近似（误调用风险由模型确认）" },
-    { "id": "QD-TT-5.2", "summary": "多 Tool name/description 近似（误调用风险由模型确认）" }
+    { "id": "QD-PT-2.1", "summary": "The Tool name declared by the Prompt matches a name in the known Tool Schema list (semantic consistency confirmed by the model)" },
+    { "id": "QD-ST-3.1", "summary": "The Tool name declared by the Skill matches a name in the known Tool Schema list (semantic consistency confirmed by the model)" },
+    { "id": "QD-SS-4.2", "summary": "Multiple Skill names identical or similar (misinvocation risk confirmed by the model)" },
+    { "id": "QD-TT-5.2", "summary": "Multiple Tool name/description similar (misinvocation risk confirmed by the model)" }
   ]
 }
 ```
 <!-- /program-check -->
 
-## 5. Tombstone 记录
+## 5. Tombstone records
 
-无。Cross 域源规范未包含 merged / transferred 项。
+None. The Cross domain source specification contains no merged / transferred items.
 
-## 6. 打分字段说明（platform 专用）
+## 6. Scoring field notes (platform only)
 
-- 权重 `P0:P1:P2 = 5:3:1`；base = 100 / 总权重；每失败项按 default 级扣 base×5/3/1（每项一次，不论实例数）。
-- 分母为 tier 相关（AC-L1=7 / L2=20 / L3=29）；`计入打分` 列全部 ✓。
-- 同源去重（源 §8.5.2）：同一事实命中同组多 ID 时按最高级记一次，保留全部 ID 与证据，标 primary；分母不变。去重组：Tool 存在性（PT-2.1↔ST-3.1）、权限边界（PS-1.3↔1.4↔ST-3.6）、参数约束（PT-2.3↔ST-3.2）、输出契约（PS-1.6↔ST-3.5，primary ST-3.5）、错误处理（PT-2.5↔ST-3.7）。PT-2.7 无 Skill 侧对应，不去重。
-- skill / CLI 不激活打分，但 score_weight 信息在索引表保留，供 platform 使用。
+- Weight `P0:P1:P2 = 5:3:1`; base = 100 / total weight; each failed item deducts base×5/3/1 at the default level (once per item, regardless of instance count).
+- The denominator is tier-dependent (AC-L1=7 / L2=20 / L3=29); the `Counted in scoring` column is ✓ for all.
+- Same-source deduplication (source §8.5.2): when the same fact hits multiple IDs in the same group, record it once at the highest level, retain all IDs and evidence, and mark the primary; the denominator is unchanged. Dedup groups: Tool existence (PT-2.1↔ST-3.1), permission boundary (PS-1.3↔1.4↔ST-3.6), parameter constraints (PT-2.3↔ST-3.2), output contract (PS-1.6↔ST-3.5, primary ST-3.5), error handling (PT-2.5↔ST-3.7). PT-2.7 has no Skill-side counterpart and is not deduplicated.
+- skill / CLI do not activate scoring, but the score_weight information is retained in the index table for platform use.

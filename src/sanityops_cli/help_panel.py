@@ -4,18 +4,18 @@ from rich.panel import Panel
 from rich.text import Text
 
 GETTING_STARTED_TEXT = """\
-  1. Run 'deeplogic-cli init' to create the default configuration
-  2. Edit .deeplogic/inspect_config.yaml to configure your project
-  3. Run 'deeplogic-cli inspect' to start the inspection\
+  1. Run 'sanityops-cli init' to create the default configuration
+  2. Edit .sanityops/inspect_config.yaml to configure your project
+  3. Run 'sanityops-cli inspect' to start the inspection\
 """
 
 ADVANCED_USAGE_TEXT = """\
   CI/CD Integration:
-    1. Commit .deeplogic/inspect_config.yaml to the repository
+    1. Commit .sanityops/inspect_config.yaml to the repository
     2. Set LLM API keys via environment variables (never commit sensitive keys)
-    3. Run 'deeplogic-cli inspect' in the pipeline
+    3. Run 'sanityops-cli inspect' in the pipeline
 
-  Config Command (deeplogic-cli config --help):
+  Config Command (sanityops-cli config --help):
     View detailed configuration options and usage examples\
 """
 

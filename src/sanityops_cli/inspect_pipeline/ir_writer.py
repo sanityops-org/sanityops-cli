@@ -1,7 +1,7 @@
 """Two-layer IR rendering (design §2 step ③, §6.2).
 
 One IR markdown per input document, written to
-``.deeplogic/results/ir/<run-id>/<document>.ir.md`` as a pure audit artifact. The same
+``.sanityops/results/ir/<run-id>/<document>.ir.md`` as a pure audit artifact. The same
 serialization feeds the InspectAgent injection payload (§6.2) — rendering
 here is the single source for both.
 """
@@ -17,7 +17,7 @@ from hashlib import sha256
 from pathlib import Path
 from unicodedata import normalize
 
-from deeplogic_cli.inspect_pipeline.models import (
+from sanityops_cli.inspect_pipeline.models import (
     ExtractedArtifact,
     ExtractionResult,
 )

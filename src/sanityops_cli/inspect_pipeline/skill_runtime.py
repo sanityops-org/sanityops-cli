@@ -1,6 +1,6 @@
 """Runtime for the vendored inspect skills.
 
-Vendored skills live inside the wheel (``src/deeplogic_cli/skills/``). They must
+Vendored skills live inside the wheel (``src/sanityops_cli/skills/``). They must
 be materialized to a real filesystem directory before ``SkillManager`` can scan
 them (PyInstaller/zipimport have no scannable paths), then wired into a
 ``ToolRegistry`` via ``SkillTool`` for on-demand lazy loading by the agents.
@@ -18,28 +18,28 @@ import tempfile
 from importlib import resources
 from pathlib import Path
 
-from aidynamic_agent.managers.skill import SkillManager
-from aidynamic_agent.tools.base import ToolResult
-from aidynamic_agent.tools.builtins.skill import SkillTool
-from aidynamic_agent.tools.registry import ToolRegistry
+from sanityops_agent.managers.skill import SkillManager
+from sanityops_agent.tools.base import ToolResult
+from sanityops_agent.tools.builtins.skill import SkillTool
+from sanityops_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-EXPECTED_SKILLS = ("deeplogic-inspect-lite", "pre-inspect-extract")
+EXPECTED_SKILLS = ("sanityops-inspect-lite", "pre-inspect-extract")
 CHECKLIST_NAME = "code-contract-checklist.v2.md"
 
 
 def default_cache_root() -> Path:
-    override = os.environ.get("DEEPLOGIC_SKILL_CACHE")
+    override = os.environ.get("SANITYOPS_SKILL_CACHE")
     if override:
         return Path(override)
-    return Path.home() / ".cache" / "deeplogic-cli" / "skills"
+    return Path.home() / ".cache" / "sanityops-cli" / "skills"
 
 
 def packaged_skills_dir() -> Path:
     """Filesystem path of the packaged ``skills/`` directory."""
     try:
-        traverse = resources.as_file(resources.files("deeplogic_cli").joinpath("skills"))
+        traverse = resources.as_file(resources.files("sanityops_cli").joinpath("skills"))
         path = traverse.__enter__()
         traverse.__exit__(None, None, None)  # copy out below; path needn't outlive
         if path.is_dir():
@@ -183,7 +183,7 @@ _CLI_HEADER_SECTION = """7. **报告头（每份报告和每份阶段报告均�
 def _rewrite_skill_for_cli(name: str, text: str) -> str:
     """Adapt skill load text for the CLI runtime without mutating vendored files."""
     rewritten = _rewrite_hint_for_cli(text)
-    if name == "deeplogic-inspect-lite":
+    if name == "sanityops-inspect-lite":
         rewritten = _rewrite_inspect_skill_for_cli(rewritten)
     return rewritten
 
@@ -192,11 +192,11 @@ def _rewrite_inspect_skill_for_cli(text: str) -> str:
     """Strip standalone-skill disclaimers, lite tags, and CLI upgrade prompts."""
     text = re.sub(
         r"由宿主模型执行，并使用 `references/` 中的浓缩检查清单。零依赖：无 CLI、无脚本、无网络调用。",
-        "由 `deeplogic-cli` 静态检查流水线执行，使用 `references/` 中的检查清单。",
+        "由 `sanityops-cli` 静态检查流水线执行，使用 `references/` 中的检查清单。",
         text,
     )
     text = re.sub(
-        r"^- 官方 `deeplogic-cli` 或任何 SaaS：[^\n]*\n",
+        r"^- 官方 `sanityops-cli` 或任何 SaaS：[^\n]*\n",
         "",
         text,
         flags=re.MULTILINE,
@@ -213,7 +213,7 @@ def _rewrite_inspect_skill_for_cli(text: str) -> str:
         "形式化自检（ID 存在、P 合法、证据非空、格式正确）",
     )
     text = re.sub(
-        r"以及升级指引（通过 `deeplogic-cli` 执行完整检查——见 https?://[^\s）]+）",
+        r"以及升级指引（通过 `sanityops-cli` 执行完整检查——见 https?://[^\s）]+）",
         "",
         text,
     )
@@ -229,7 +229,7 @@ def _rewrite_inspect_skill_for_cli(text: str) -> str:
         text,
     )
     text = re.sub(
-        r"——本 Skill 不要求实现 CLI（`deeplogic-org/deeplogic-cli`，Apache 2\.0）",
+        r"——本 Skill 不要求实现 CLI（`sanityops-org/sanityops-cli`，Apache 2\.0）",
         "",
         text,
     )

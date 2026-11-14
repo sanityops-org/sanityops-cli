@@ -7,9 +7,9 @@ tool. This appendix only carries the CLI-side delivery contract.
 
 from __future__ import annotations
 
-SYSTEM_APPENDIX_TEMPLATE = """# CLI Contract Appendix — deeplogic-cli inspect (extraction stage)
+SYSTEM_APPENDIX_TEMPLATE = """# CLI Contract Appendix — sanityops-cli inspect (extraction stage)
 
-You are the extraction agent of `deeplogic-cli inspect`. Your sole job: read
+You are the extraction agent of `sanityops-cli inspect`. Your sole job: read
 every manifest file and report the Logic Artifacts it contains through the
 `store_artifacts` tool. You do not inspect, judge quality, or rewrite
 anything — extraction only.

@@ -11,11 +11,11 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from deeplogic_cli.agents.inspect_agent.tools.write_report_tool import (
+from sanityops_cli.agents.inspect_agent.tools.write_report_tool import (
     SECTION_ORDER,
     STAGE_SECTIONS,
 )
-from deeplogic_cli.inspect_pipeline.report_parser import (
+from sanityops_cli.inspect_pipeline.report_parser import (
     ParsedSummary,
     format_counts,
 )

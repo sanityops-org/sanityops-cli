@@ -1,29 +1,29 @@
 ---
-title: Tool Schema Checklist (v2 统一引擎版)
+title: Tool Schema Checklist (v2 unified engine edition)
 ---
 
 # Tool Schema Checklist (QD-T, v2)
 
-> **状态**：v2 统一引擎版。
+> **Status**: v2 unified engine edition.
 >
-> **规则语义**源自 `inspect/tool.md` v1.1：ID、名称、严重度取值、合并/转移记录均保持不变；变化的是**组织方式**——改为"全字段 + 正文表格（模型项）+ 程序块（程序项）"。
+> The rule semantics originate from `inspect/tool.md` v1.1: IDs, names, severity values, and merge/transfer records all remain unchanged; what changes is the **organization** — switched to "all fields + body tables (model items) + program blocks (program items)".
 >
-> 全局判定口径（缺失声明即缺陷、N/A 必带依据、失效安全默认查、程序项全量枚举）见 `_meta.md`。本文件不重复。
+> Global judgment conventions (a missing declaration is a defect, N/A must carry a basis, fail-safe defaults apply — when in doubt, check, program items are enumerated in full) are in `_meta.md`. This file does not repeat them.
 
-## 1. 域内说明
+## 1. Domain notes
 
-> 共享定义（字段模型 / check_engine 映射 / applicability 结构事实门 / severity 记号 / 打分规则）见 [_meta.md](_meta.md)，本文件不重复。本文件只承载 Tool 域检查项本身。
+> Shared definitions (field model / check_engine mapping / applicability structural-fact gate / severity notation / scoring rules) are in [_meta.md](_meta.md); this file does not repeat them. This file only carries the Tool domain check items themselves.
 
-**`check_engine` 重分类说明**（相对源 `Method` 列）：基线映射 `Automated→program`、`Human→model`、`Semi-automated→hybrid`；以下 4 处偏离源 Method，动因是源 Method 列与自身定义矛盾，按设计 §2.8「优先收敛」纠正：
+**`check_engine` reclassification log** (relative to the source `Method` column): baseline mapping `Automated→program`, `Human→model`, `Semi-automated→hybrid`; the following 4 deviations from the source Method are driven by contradictions between the source Method column and its own definitions, corrected per design §2.8 "prioritize convergence":
 
-- `QD-T-1.4`：源标 Automated，但定义是"策略恰当性**判断**" → hybrid
-- `QD-T-4.1`：源标 Semi-automated，但纯语义（缺 ≥2 要素） → model
-- `QD-T-4.6`：源标 Semi-automated，但纯语义（"是否敏感"） → model
-- `QD-T-5.2`：源标 Semi-automated，但纯语义（影响评估缺失/矛盾） → model
+- `QD-T-1.4`: source marked Automated, but the definition is a "policy appropriateness **judgment**" → hybrid
+- `QD-T-4.1`: source marked Semi-automated, but purely semantic (missing ≥2 elements) → model
+- `QD-T-4.6`: source marked Semi-automated, but purely semantic ("whether sensitive") → model
+- `QD-T-5.2`: source marked Semi-automated, but purely semantic (impact assessment missing/contradictory) → model
 
-## 2. 检查项索引（28 活跃项 + 3 tombstone）
+## 2. Check item index (28 active items + 3 tombstones)
 
-| ID | name | check_engine | applicability.fact | severity OR-L1/OR-L2/OR-L3 | 计入打分 |
+| ID | name | check_engine | applicability.fact | severity OR-L1/OR-L2/OR-L3 | Counted in scoring |
 |---|---|---|---|---|---|
 | QD-T-1.1 | Base Field Missing | program | is_tool_schema | P0 / P0 / P0 | ✓ |
 | QD-T-1.2 | Required References Undefined Field | hybrid | has_required | P0 / P0 / P0 | ✓ |
@@ -50,97 +50,97 @@ title: Tool Schema Checklist (v2 统一引擎版)
 | QD-T-4.5 | description Inconsistent with Schema | hybrid | has_description | P1 / P1 / P1 | ✓ |
 | QD-T-4.6 | Sensitive Input Handling Undeclared | model | has_sensitive_param | ∅ / P1 / P1 | ✓ |
 | QD-T-4.7 | Output Contract Missing (outputSchema) | hybrid | has_output | ∅ / P1 / P1→P0(cross-flow) | ✓ |
-| QD-T-5.1 | Breaking Change Determination | hybrid | has_version_change | §4.3.1 matrix | ✗（change-check） |
-| QD-T-5.2 | Change Impact Assessment Missing/Wrong | model | has_change_note | P1 / P1 / P0 | ✗（change-check） |
-| QD-T-5.3 | Semantic Change | hybrid | has_version_change | P1 / P1 / P0 | ✗（change-check） |
+| QD-T-5.1 | Breaking Change Determination | hybrid | has_version_change | §4.3.1 matrix | ✗ (change-check) |
+| QD-T-5.2 | Change Impact Assessment Missing/Wrong | model | has_change_note | P1 / P1 / P0 | ✗ (change-check) |
+| QD-T-5.3 | Semantic Change | hybrid | has_version_change | P1 / P1 / P0 | ✗ (change-check) |
 
-> **5.x 说明**：QD-T-5.x 属 Schema 变更管理，仅在有 old/new Schema 对比对象时触发，**不计入静态检查分母**（源规范 §5.2.1）。tombstone 见 §5。
+> **5.x note**: QD-T-5.x belongs to Schema change management, triggered only when an old/new Schema comparison object exists, and is **not counted in the static check denominator** (source specification §5.2.1). See §5 for tombstones.
 
-## 3. 模型推理项（正文表格）
+## 3. Model-reasoning items (body tables)
 
-> 以下为 `check_engine = model` 的项（5 个）。hybrid 项的"模型确认要点"也在此列出（见 §3.2）。
+> The following are the items with `check_engine = model` (5 items). The "model-confirmation points" of hybrid items are also listed here (see §3.2).
 
-### 3.1 纯 model 项
+### 3.1 Pure model items
 
-| ID | definition（凝练） | model_prompt（判定要点） |
+| ID | definition (condensed) | model_prompt (judgment points) |
 |---|---|---|
-| QD-T-3.1 | 名称/描述读作只读，但实际有写/副作用未声明；或副作用（不可逆/外部/资金）完全未声明 | 判工具名称是否读作只读（verify/query/get）而 body 存在写语义；或写语义与名称一致但不可逆性未声明 |
-| QD-T-3.4 | 暴露应由系统控制的参数（tenantId / admin / token） | 判是否存在授权上下文参数，且该参数可由调用方自由填写 |
-| QD-T-4.1 | 描述缺少必需要素（动作、对象、范围/时效、关键参数语义、返回摘要），且缺 ≥2 个 | 逐项核对描述是否覆盖五个要素，缺 ≥2 判 FAIL |
-| QD-T-4.6 | 密码/密钥/身份证号等敏感输入未声明 writeOnly / 加密 / 不落日志 | 判参数是否敏感，且未声明敏感处理 |
-| QD-T-5.2 | 变更说明未声明调用方/数据/系统影响，或声明与事实矛盾 | 对照 change note 与 schema diff，判影响声明是否缺失或矛盾 |
+| QD-T-3.1 | The name/description reads as read-only, but writes/side effects are actually present and undeclared; or the side effect (irreversible/external/financial) is not declared at all | Determine whether the tool name reads as read-only (verify/query/get) while the body has write semantics; or the write semantics match the name but irreversibility is undeclared |
+| QD-T-3.4 | Exposes parameters that should be controlled by the system (tenantId / admin / token) | Determine whether an authorization context parameter exists and whether the caller can fill it freely |
+| QD-T-4.1 | The description lacks required elements (action, object, scope/timeliness, key parameter semantics, return summary), and ≥2 are missing | Check element by element whether the description covers the five elements; judge FAIL if ≥2 are missing |
+| QD-T-4.6 | Sensitive inputs such as passwords/keys/ID numbers are not declared as writeOnly / encrypted / not logged | Determine whether the parameter is sensitive and whether sensitive handling is undeclared |
+| QD-T-5.2 | The change note does not declare caller/data/system impact, or the declaration contradicts the facts | Compare the change note with the schema diff and judge whether the impact declaration is missing or contradictory |
 
-### 3.2 hybrid 项的模型确认部分
+### 3.2 Model-confirmation portion of hybrid items
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅检…／程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **Skill side: this section is the complete judgment points, with no program pre-screening upstream.** "Program only checks... / program only does..." describes the CLI / platform pre-screen path; the skill performs full model reasoning, does not execute §4, must complete the semantic judgment itself, and must not treat it as "already screened" nor judge N/A on that basis.
 
-| ID | model_prompt（确认要点） |
+| ID | model_prompt (confirmation points) |
 |---|---|
-| QD-T-1.2 | 确认 required 中的字段是否本就不该存在 / 违背业务契约（源 P1 子项：字段必要性，各档 P1） |
-| QD-T-1.4 | 确认 additionalProperties 策略是否恰当：封闭契约字段应为 false，tags/metadata 开放字典可省略 |
-| QD-T-2.2 | 确认该字符串是否"需要特定格式"（如日期、URL、编码），从而需要 pattern |
-| QD-T-2.5 | 确认参数是否金额/时间/货币/比例，从而需要 unit/currency/precision/timezone |
-| QD-T-2.7 | 确认参数间是否存在成对必填/互斥/条件必填/至少其一关系 |
-| QD-T-3.2 | 确认是否已参数化/有白名单/有沙箱，从而可豁免 |
-| QD-T-3.3 | 确认批量写是否有上限（maxItems、分页、拒绝空过滤） |
-| QD-T-3.6 | 确认 default/scope 是否为危险值（force=true、dry_run=false、scope=ALL） |
-| QD-T-3.7 | 确认开放式工具（sql/exec/http/eval）是否声明了操作白名单（表/命令/域名） |
-| QD-T-4.5 | 确认 description 声明与 schema 约束是否语义一致（如"max 10" vs schema 允许 100） |
-| QD-T-4.7 | 确认 outputSchema 缺失是否在跨工具数据流场景下升级 P0 |
-| QD-T-5.1 | 确认 old/new schema 差异是否破坏既有调用（breaking） |
-| QD-T-5.3 | 确认结构未变但语义是否变化（name/default/unit/scope/side-effect） |
+| QD-T-1.2 | Confirm whether a field in required should not exist in the first place / violates the business contract (source P1 sub-item: field necessity, P1 at all levels) |
+| QD-T-1.4 | Confirm whether the additionalProperties policy is appropriate: closed-contract fields should be false, tags/metadata open dictionaries may omit it |
+| QD-T-2.2 | Confirm whether the string needs a specific format (e.g., date, URL, encoding) and therefore needs a pattern |
+| QD-T-2.5 | Confirm whether the parameter is an amount/time/currency/ratio and thus needs unit/currency/precision/timezone |
+| QD-T-2.7 | Confirm whether the parameters have paired-required/mutually-exclusive/conditionally-required/at-least-one relationships |
+| QD-T-3.2 | Confirm whether it is already parameterized / has a whitelist / has a sandbox, and thus can be exempted |
+| QD-T-3.3 | Confirm whether batch writes have a cap (maxItems, pagination, rejecting empty filters) |
+| QD-T-3.6 | Confirm whether default/scope is a dangerous value (force=true, dry_run=false, scope=ALL) |
+| QD-T-3.7 | Confirm whether an open-ended tool (sql/exec/http/eval) declares an operation whitelist (table/command/domain) |
+| QD-T-4.5 | Confirm whether the description statements and schema constraints are semantically consistent (e.g., "max 10" vs schema allowing 100) |
+| QD-T-4.7 | Confirm whether the missing outputSchema should be escalated to P0 in cross-tool data flow scenarios |
+| QD-T-5.1 | Confirm whether the old/new schema differences break existing calls (breaking) |
+| QD-T-5.3 | Confirm whether semantics changed despite unchanged structure (name/default/unit/scope/side-effect) |
 
-## 4. 程序判定项（program-check 代码块）
+## 4. Program-judgment items (program-check code block)
 
-> **CLI / platform 专用：skill 不解析、不执行本代码块**（skill 全模型推理，不消费 `check_engine` 与 `program_rule`）。程序引擎只 parse 本代码块。`rule` 字段为**判定语义示意**（非最终可执行定义，程序级实现后续补）。
-> 涵盖纯 program 项 + hybrid 项的初筛规则。
+> **CLI / platform only: the skill does not parse or execute this code block** (the skill performs full model reasoning and does not consume `check_engine` or `program_rule`). The program engine only parses this code block. The `rule` field is a **semantic illustration of judgment** (not the final executable definition; program-level implementation to be added later).
+> Covers pure program items + the pre-screen rules for hybrid items.
 
 <!-- program-check -->
 ```json
 {
   "domain": "tool",
   "version": "v2-sample",
-  "note": "程序判定项 + hybrid 初筛规则。rule 为语义示意。",
+  "note": "Program-judgment items + hybrid pre-screen rules. rule is illustrative semantics.",
   "checks": [
-    { "id": "QD-T-1.1", "summary": "顶层缺少 name / description / inputSchema 之一" },
-    { "id": "QD-T-1.2", "summary": "required 引用了 properties 未定义的字段" },
-    { "id": "QD-T-1.3", "summary": "enum 重复值，或 enum 值与声明 type 冲突" },
-    { "id": "QD-T-1.4", "summary": "检测 additionalProperties 设置（策略恰当性由模型确认）" },
-    { "id": "QD-T-1.5", "summary": "name 不匹配 ^[a-zA-Z0-9_-]{1,64}$ 或非唯一" },
-    { "id": "QD-T-1.6", "summary": "minimum>maximum / minLength>maxLength / minItems>maxItems / default 违反约束" },
-    { "id": "QD-T-1.7", "summary": "缺 type / 多类型数组 / 嵌套>4 / 参数>30 / oneOf 滥用" },
-    { "id": "QD-T-2.1", "summary": "string 参数缺 maxLength（enum/const/pattern 固定长豁免）" },
-    { "id": "QD-T-2.2", "summary": "需特定格式的 string 缺 pattern（是否需格式由模型确认）" },
-    { "id": "QD-T-2.3", "summary": "number/integer 缺 minimum/maximum" },
-    { "id": "QD-T-2.4", "summary": "array 参数缺 maxItems" },
-    { "id": "QD-T-2.5", "summary": "金额/时间类 number 缺 multipleOf 或单位（语义由模型确认）" },
-    { "id": "QD-T-2.6", "summary": "list_*/search_* 工具缺 limit/page_size 或 limit 缺 maximum" },
-    { "id": "QD-T-2.7", "summary": "依赖/互斥未用 dependentRequired/oneOf 表达（语义由模型确认）" },
-    { "id": "QD-T-3.2", "summary": "参数命中 SQL/shell/code/template/URL/path 可执行特征（豁免由模型确认）" },
-    { "id": "QD-T-3.3", "summary": "批量写参数（ids/过滤条件）无上限（是否有 cap 由模型确认）" },
-    { "id": "QD-T-3.6", "summary": "default 命中 force=true / dry_run=false / scope=ALL（危险性由模型确认）" },
-    { "id": "QD-T-3.7", "summary": "开放式工具（sql_query/exec/http_request/eval）缺操作白名单" },
-    { "id": "QD-T-4.4", "summary": "property 缺 description" },
-    { "id": "QD-T-4.5", "summary": "description 字面量与 schema 约束不一致（语义由模型确认）" },
-    { "id": "QD-T-4.7", "summary": "缺 outputSchema（cross-flow 升级由模型确认）" },
-    { "id": "QD-T-5.1", "summary": "old/new schema 存在破坏性差异（是否 breaking 由模型确认）" },
-    { "id": "QD-T-5.3", "summary": "name/default/unit/scope 变更（是否语义变更由模型确认）" }
+    { "id": "QD-T-1.1", "summary": "One of name / description / inputSchema is missing at the top level" },
+    { "id": "QD-T-1.2", "summary": "required references a field not defined in properties" },
+    { "id": "QD-T-1.3", "summary": "Duplicate enum values, or enum value conflicts with the declared type" },
+    { "id": "QD-T-1.4", "summary": "Detects the additionalProperties setting (policy appropriateness confirmed by the model)" },
+    { "id": "QD-T-1.5", "summary": "name does not match ^[a-zA-Z0-9_-]{1,64}$ or is not unique" },
+    { "id": "QD-T-1.6", "summary": "minimum>maximum / minLength>maxLength / minItems>maxItems / default violates constraint" },
+    { "id": "QD-T-1.7", "summary": "Missing type / multi-type array / nesting >4 / params >30 / oneOf misuse" },
+    { "id": "QD-T-2.1", "summary": "string parameter missing maxLength (enum/const/pattern fixed-length exempt)" },
+    { "id": "QD-T-2.2", "summary": "string requiring a specific format missing pattern (whether a format is needed confirmed by the model)" },
+    { "id": "QD-T-2.3", "summary": "number/integer missing minimum/maximum" },
+    { "id": "QD-T-2.4", "summary": "array parameter missing maxItems" },
+    { "id": "QD-T-2.5", "summary": "amount/time type number missing multipleOf or unit (semantics confirmed by the model)" },
+    { "id": "QD-T-2.6", "summary": "list_*/search_* tool missing limit/page_size, or limit missing maximum" },
+    { "id": "QD-T-2.7", "summary": "dependency/mutual exclusion not expressed via dependentRequired/oneOf (semantics confirmed by the model)" },
+    { "id": "QD-T-3.2", "summary": "parameter matches SQL/shell/code/template/URL/path executable characteristics (exemption confirmed by the model)" },
+    { "id": "QD-T-3.3", "summary": "batch write parameters (ids/filter conditions) without a cap (whether a cap exists confirmed by the model)" },
+    { "id": "QD-T-3.6", "summary": "default matches force=true / dry_run=false / scope=ALL (dangerousness confirmed by the model)" },
+    { "id": "QD-T-3.7", "summary": "open-ended tool (sql_query/exec/http_request/eval) missing operation whitelist" },
+    { "id": "QD-T-4.4", "summary": "property missing description" },
+    { "id": "QD-T-4.5", "summary": "description literal inconsistent with schema constraint (semantics confirmed by the model)" },
+    { "id": "QD-T-4.7", "summary": "missing outputSchema (cross-flow escalation confirmed by the model)" },
+    { "id": "QD-T-5.1", "summary": "old/new schema has breaking differences (whether breaking confirmed by the model)" },
+    { "id": "QD-T-5.3", "summary": "name/default/unit/scope changed (whether a semantic change confirmed by the model)" }
   ]
 }
 ```
 <!-- /program-check -->
 
-## 5. Tombstone 记录（合并 / 转移，不参与判定）
+## 5. Tombstone record (merged / transferred, not part of judgment)
 
-| ID | name | 状态 | 指向 |
+| ID | name | Status | Points to |
 |---|---|---|---|
-| QD-T-4.2 | Side Effect Undeclared | merged | → QD-T-3.1（编号保留，不再独立使用） |
-| QD-T-3.5 | Cross-Tool Data Flow | transferred | → cross QD-TT-5.1（P2 lead 保留） |
-| QD-T-4.3 | Multi-Tool Semantic Competition | transferred | → cross QD-TT-5.2（P2 lead 保留） |
+| QD-T-4.2 | Side Effect Undeclared | merged | → QD-T-3.1 (numbering retained, no longer used independently) |
+| QD-T-3.5 | Cross-Tool Data Flow | transferred | → cross QD-TT-5.1 (P2 lead retained) |
+| QD-T-4.3 | Multi-Tool Semantic Competition | transferred | → cross QD-TT-5.2 (P2 lead retained) |
 
-## 6. 打分字段说明（platform 专用）
+## 6. Scoring field notes (platform only)
 
-- 全局权重规则（`_meta.md`）：`P0 : P1 : P2 = 5 : 3 : 1`，按项最高严重度扣一次。
-- `计入打分` 列 = `✓` 的项进入静态分母（20/25/25）；`✗`（5.x change-check）与 tombstone 不计入。
-- skill / CLI 不激活打分，但 `score_weight` 信息在索引表「计入打分」列保留，供 platform 使用。
+- Global weight rule (`_meta.md`): `P0 : P1 : P2 = 5 : 3 : 1`, deducted once at the item's highest severity.
+- Items with `✓` in the `Counted in scoring` column enter the static denominator (20/25/25); `✗` (5.x change-check) and tombstones are not counted.
+- skill / CLI do not activate scoring, but the `score_weight` information is retained in the index table's "Counted in scoring" column for platform use.
 

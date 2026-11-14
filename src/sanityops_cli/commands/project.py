@@ -22,20 +22,20 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from deeplogic_cli.api.client import DeeplogicClient
-from deeplogic_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
-from deeplogic_cli.constants.exit_codes import EXIT_FAILURE
-from deeplogic_cli.exceptions.api_exceptions import (
+from sanityops_cli.api.client import SanityopsClient
+from sanityops_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
+from sanityops_cli.constants.exit_codes import EXIT_FAILURE
+from sanityops_cli.exceptions.api_exceptions import (
     APIError,
     AuthenticationError,
     NetworkError,
     ProjectNotFoundError,
 )
-from deeplogic_cli.utils.config_loader import (
+from sanityops_cli.utils.config_loader import (
     InspectConfigLoader,
     read_file_with_encoding_fallback,
 )
-from deeplogic_cli.utils.config_resolver import ConfigResolver
+from sanityops_cli.utils.config_resolver import ConfigResolver
 
 console = Console()
 
@@ -45,7 +45,7 @@ _UUID_RE = re.compile(
 )
 
 # Config paths
-DEFAULT_CONFIG_DIR = ".deeplogic"
+DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
 # Placeholder UUID used by init template before project binding
@@ -61,15 +61,15 @@ def _require_api_key() -> tuple[str, str]:
     Raises:
         typer.Exit: If API key is not configured.
     """
-    api_key = ConfigResolver("server.api_key", "DEEPLOGIC_API_KEY").resolve()
+    api_key = ConfigResolver("server.api_key", "SANITYOPS_API_KEY").resolve()
     if not api_key:
         console.print("[red]✗ API key not configured[/red]")
-        console.print("\n  Run: deeplogic-cli config server.api_key <your-key>")
-        console.print("  Or:  export DEEPLOGIC_API_KEY=<your-key>")
+        console.print("\n  Run: sanityops-cli config server.api_key <your-key>")
+        console.print("  Or:  export SANITYOPS_API_KEY=<your-key>")
         raise typer.Exit(code=EXIT_FAILURE)
 
     base_url = ConfigResolver(
-        "server.base_url", "DEEPLOGIC_BASE_URL", DEFAULT_SERVER_BASE_URL
+        "server.base_url", "SANITYOPS_BASE_URL", DEFAULT_SERVER_BASE_URL
     ).resolve()
     # base_url has a default value, so it won't be None
     return base_url or DEFAULT_SERVER_BASE_URL, api_key
@@ -83,15 +83,15 @@ def _require_token() -> tuple[str, str]:
     Raises:
         typer.Exit: If the token is not configured.
     """
-    token = ConfigResolver("server.token", "DEEPLOGIC_TOKEN").resolve()
+    token = ConfigResolver("server.token", "SANITYOPS_TOKEN").resolve()
     if not token:
         console.print("[red]✗ JWT token not configured[/red]")
-        console.print("\n  Run: deeplogic-cli config server.token <your-jwt>")
-        console.print("  Or:  export DEEPLOGIC_TOKEN=<your-jwt>")
+        console.print("\n  Run: sanityops-cli config server.token <your-jwt>")
+        console.print("  Or:  export SANITYOPS_TOKEN=<your-jwt>")
         raise typer.Exit(code=EXIT_FAILURE)
 
     base_url = ConfigResolver(
-        "server.base_url", "DEEPLOGIC_BASE_URL", DEFAULT_SERVER_BASE_URL
+        "server.base_url", "SANITYOPS_BASE_URL", DEFAULT_SERVER_BASE_URL
     ).resolve()
     return base_url or DEFAULT_SERVER_BASE_URL, token
 
@@ -157,8 +157,8 @@ def _require_project_id() -> str:
 
     if not _is_bound(project_id):
         console.print("[red]✗ No project bound to current directory[/red]")
-        console.print("\n  Run: deeplogic-cli project create <name>")
-        console.print("  Or:  deeplogic-cli project bind <project-id>")
+        console.print("\n  Run: sanityops-cli project create <name>")
+        console.print("  Or:  sanityops-cli project bind <project-id>")
         console.print(
             "\n[dim](These commands are hidden from --help. "
             "See README 'Artifact Version Management' for details.)[/dim]"
@@ -182,21 +182,21 @@ def _build_bind_help() -> str:
     the project ID at the exact server they're configured to use.
     """
     base_url = ConfigResolver(
-        "server.base_url", "DEEPLOGIC_BASE_URL", DEFAULT_SERVER_BASE_URL
+        "server.base_url", "SANITYOPS_BASE_URL", DEFAULT_SERVER_BASE_URL
     ).resolve()
     return (
         "Bind an existing remote project to local config.\n"
         "\n"
         "This command links your local directory to an existing project on the\n"
-        "deeplogic server by saving the project ID to .deeplogic/inspect_config.yaml.\n"
+        "sanityops server by saving the project ID to .sanityops/inspect_config.yaml.\n"
         "\n"
         "To find your project ID:\n"
-        f"    1. Open the deeplogic platform at: {base_url}\n"
+        f"    1. Open the sanityops platform at: {base_url}\n"
         "    2. Navigate to the project you want to bind\n"
         '    3. Click "Edit Project" and copy the project ID\n'
         "\n"
         "Example:\n"
-        "    deeplogic-cli project bind 156d05db-..."
+        "    sanityops-cli project bind 156d05db-..."
     )
 
 
@@ -221,18 +221,18 @@ def create_project(
     """Create a new remote project and bind it locally.
 
     This command:
-    1. Creates a new project on the deeplogic server
-    2. Saves the project ID to local .deeplogic/inspect_config.yaml
+    1. Creates a new project on the sanityops server
+    2. Saves the project ID to local .sanityops/inspect_config.yaml
 
     Example:
-        deeplogic-cli project create my-agent
-        deeplogic-cli project create my-agent -d "AI assistant for X"
+        sanityops-cli project create my-agent
+        sanityops-cli project create my-agent -d "AI assistant for X"
     """
     base_url, api_key = _require_api_key()
 
     console.print(f"Creating project [cyan]{name}[/]...")
 
-    client = DeeplogicClient(base_url, api_key)
+    client = SanityopsClient(base_url, api_key)
     try:
         result = client.create_project(name, description)
     except AuthenticationError as e:
@@ -260,8 +260,8 @@ def create_project(
 
     console.print(f"[green]✓[/] Created project [cyan]{name}[/] (id: {project_id})")
     console.print("\n[dim]Next steps:[/]")
-    console.print("[dim]  1. Edit .deeplogic/inspect_config.yaml to configure artifacts[/]")
-    console.print("[dim]  2. Run 'deeplogic-cli project push -m \"message\"' to upload[/]")
+    console.print("[dim]  1. Edit .sanityops/inspect_config.yaml to configure artifacts[/]")
+    console.print("[dim]  2. Run 'sanityops-cli project push -m \"message\"' to upload[/]")
 
 
 @project_app.command("bind", help=_build_bind_help(), hidden=True)
@@ -280,7 +280,7 @@ def bind_project(
     # Verify project exists and fetch its authoritative name (optional but helpful)
     console.print(f"Verifying project [cyan]{project_id[:8]}...[/]...")
 
-    client = DeeplogicClient(base_url, api_key)
+    client = SanityopsClient(base_url, api_key)
     server_name = None
     try:
         result = client.get_project(project_id)
@@ -315,8 +315,8 @@ def bind_project(
     if server_name:
         console.print(f"  Name: [cyan]{server_name}[/]")
     console.print("\n[dim]Next steps:[/]")
-    console.print("[dim]  1. Edit .deeplogic/inspect_config.yaml to configure artifacts[/]")
-    console.print("[dim]  2. Run 'deeplogic-cli project push -m \"message\"' to upload[/]")
+    console.print("[dim]  1. Edit .sanityops/inspect_config.yaml to configure artifacts[/]")
+    console.print("[dim]  2. Run 'sanityops-cli project push -m \"message\"' to upload[/]")
 
 
 def _print_source_group(label: str, files: list[str]) -> None:
@@ -355,9 +355,9 @@ def project_status() -> None:
     # Resolve server config once; reused by both the project name fetch and the
     # Server section below.
     base_url = ConfigResolver(
-        "server.base_url", "DEEPLOGIC_BASE_URL", DEFAULT_SERVER_BASE_URL
+        "server.base_url", "SANITYOPS_BASE_URL", DEFAULT_SERVER_BASE_URL
     ).resolve()
-    api_key = ConfigResolver("server.api_key", "DEEPLOGIC_API_KEY").resolve()
+    api_key = ConfigResolver("server.api_key", "SANITYOPS_API_KEY").resolve()
 
     # Project info
     project = config.get("project", {})
@@ -375,7 +375,7 @@ def project_status() -> None:
         name_is_cached = False
         if api_key:
             try:
-                client = DeeplogicClient(base_url or DEFAULT_SERVER_BASE_URL, api_key)
+                client = SanityopsClient(base_url or DEFAULT_SERVER_BASE_URL, api_key)
                 server_name = client.get_project(str(project_id)).get("name")
                 if server_name:
                     display_name = str(server_name)
@@ -468,17 +468,17 @@ def push_artifacts(
     """Scan artifacts and push to remote project.
 
     This command:
-    1. Reads artifact paths from .deeplogic/inspect_config.yaml
+    1. Reads artifact paths from .sanityops/inspect_config.yaml
     2. Packs artifacts directly from the configured paths
     3. Packs artifacts (prompts, tools, skills)
-    4. Uploads to the deeplogic server
+    4. Uploads to the sanityops server
     5. Creates a new version with the provided message
 
     The server automatically detects changes and only creates new versions
     for modified artifacts, reusing existing versions for unchanged ones.
 
     Example:
-        deeplogic-cli project push -m "Add new tool"
+        sanityops-cli project push -m "Add new tool"
     """
     base_url, api_key = _require_api_key()
     project_id = _require_project_id()
@@ -505,7 +505,7 @@ def push_artifacts(
     # skip the ScannerAgent (local-LLM) here: inspect_config.yaml already
     # declares the artifact paths, so the files can be packed deterministically
     # without a slow (multi-minute, token-heavy) LLM scan.
-    from deeplogic_cli.utils.artifact_packer import ArtifactPacker
+    from sanityops_cli.utils.artifact_packer import ArtifactPacker
 
     console.print("\n[bold]Packing artifacts...[/]")
     console.print(f"  Prompts: {len(prompt_files)}")
@@ -529,7 +529,7 @@ def push_artifacts(
         message = f"Update at {timestamp}"
 
     console.print("\n[bold]Uploading to server...[/]")
-    client = DeeplogicClient(base_url, api_key)
+    client = SanityopsClient(base_url, api_key)
 
     try:
         result = client.upload_artifacts(
@@ -575,13 +575,13 @@ def version_log(
     Shows a table of versions with their creation time and commit message.
 
     Example:
-        deeplogic-cli project log
-        deeplogic-cli project log -p 2 -s 20
+        sanityops-cli project log
+        sanityops-cli project log -p 2 -s 20
     """
     base_url, api_key = _require_api_key()
     project_id = _require_project_id()
 
-    client = DeeplogicClient(base_url, api_key)
+    client = SanityopsClient(base_url, api_key)
 
     try:
         result = client.list_versions(project_id, page=page, size=size)
@@ -648,13 +648,13 @@ def show_version(
     Use --full to show detailed artifact content.
 
     Example:
-        deeplogic-cli project show fe57740b
-        deeplogic-cli project show fe57740b --full
+        sanityops-cli project show fe57740b
+        sanityops-cli project show fe57740b --full
     """
     base_url, api_key = _require_api_key()
     project_id = _require_project_id()
 
-    client = DeeplogicClient(base_url, api_key)
+    client = SanityopsClient(base_url, api_key)
 
     # Resolve prefix to full UUID if needed
     resolved_id = version_id
@@ -969,13 +969,13 @@ def check_defects(
 ) -> None:
     """Run a server-side defect check and print the summary.
 
-    This triggers the deeplogic SaaS defect-check engine (QDS/QDT/QDP) on the
+    This triggers the sanityops SaaS defect-check engine (QDS/QDT/QDP) on the
     server, polls to completion, then prints the report. Unlike `inspect`, this
     does NOT run a local LLM — it is the authoritative server-side check.
     """
     base_url, token = _require_token()
     pid = project_id or _require_project_id()
-    client = DeeplogicClient(base_url, api_key="", token=token)
+    client = SanityopsClient(base_url, api_key="", token=token)
 
     console.print("[bold]Running server-side defect check[/]")
     console.print(f"  Project: {pid}")
@@ -1112,13 +1112,13 @@ def repair_artifacts(
     """Fetch repaired artifacts from the server and write them back to local files.
 
     For each defective artifact, calls the /repaired-* endpoint, then replaces
-    the corresponding local file (resolved from .deeplogic/inspect_config.yaml)
+    the corresponding local file (resolved from .sanityops/inspect_config.yaml)
     with the returned repairedContent. Use --all to repair everything, or
     --skill/--tool to target specific artifacts.
     """
     base_url, token = _require_token()
     pid = project_id or _require_project_id()
-    client = DeeplogicClient(base_url, api_key="", token=token)
+    client = SanityopsClient(base_url, api_key="", token=token)
 
     # Resolve the result to repair against.
     if result_id:
@@ -1133,7 +1133,7 @@ def repair_artifacts(
     console.print(f"[bold]Repairing project {pid}[/] (result: {rid})")
 
     # Load local artifact paths.
-    from deeplogic_cli.utils.config_loader import InspectConfigLoader
+    from sanityops_cli.utils.config_loader import InspectConfigLoader
 
     loader = InspectConfigLoader(require_project_id=False)
     artifacts = loader.load()
@@ -1269,7 +1269,7 @@ def _skill_frontmatter_name(path: str) -> str:
     """Read 'name:' from a SKILL.md frontmatter block."""
     from pathlib import Path
 
-    from deeplogic_cli.utils.config_loader import read_file_with_encoding_fallback
+    from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
 
     content = read_file_with_encoding_fallback(Path(path))
     if not content or not content.startswith("---"):
@@ -1354,4 +1354,4 @@ def all_in_one(
         raise
 
     console.print("\n[bold green]Workflow complete.[/]")
-    console.print("[dim]Run 'deeplogic-cli project check' to re-verify.[/]")
+    console.print("[dim]Run 'sanityops-cli project check' to re-verify.[/]")

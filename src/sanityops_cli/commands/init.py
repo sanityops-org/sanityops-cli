@@ -5,19 +5,19 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
-from deeplogic_cli.commands.inspect import inspect_app
-from deeplogic_cli.constants.exit_codes import EXIT_FAILURE
+from sanityops_cli.commands.inspect import inspect_app
+from sanityops_cli.constants.exit_codes import EXIT_FAILURE
 
 console = Console()
 
 # Default paths
-DEFAULT_CONFIG_DIR = ".deeplogic"
+DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
 
 @inspect_app.command("init")
 def init_config() -> None:
-    """Initialize .deeplogic/inspect_config.yaml with a template.
+    """Initialize .sanityops/inspect_config.yaml with a template.
 
     Creates a new config file with a placeholder project UUID. The project
     stays unbound until 'project create' or 'project bind' is run.
@@ -49,7 +49,7 @@ def init_config() -> None:
     try:
         config_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        console.print(f"[red]✗ Cannot create .deeplogic directory: {e}[/red]")
+        console.print(f"[red]✗ Cannot create .sanityops directory: {e}[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
 
     # Load template and generate UUID
@@ -61,7 +61,7 @@ def init_config() -> None:
 
     # The placeholder UUID is intentionally left as-is so that 'project status'
     # can correctly report the project as unbound. Real project binding happens
-    # via 'deeplogic-cli project create <name>' or 'project bind <id>'.
+    # via 'sanityops-cli project create <name>' or 'project bind <id>'.
 
     # Write config file
     try:
@@ -71,16 +71,16 @@ def init_config() -> None:
         console.print(f"[red]✗ Cannot write config file: {e}[/red]")
         raise typer.Exit(code=EXIT_FAILURE) from None
 
-    console.print("[green]✓[/green] Created .deeplogic/inspect_config.yaml")
+    console.print("[green]✓[/green] Created .sanityops/inspect_config.yaml")
     console.print("Before running inspect, you need:")
     console.print("-Edit this file to add your prompts, tools, and skills.")
     console.print(
         "-Edit this file to add your provider, api_key, model_id and base_url "
         "(optional. If omitted, the CLI uses LLM_* environment variables)."
     )
-    console.print("-To connect to the Deeplogic service, configure the server URL and API key:")
-    console.print('deeplogic-cli config server.base_url "<your-server-url>"')
-    console.print("deeplogic-cli config server.api_key")
+    console.print("-To connect to the Sanityops service, configure the server URL and API key:")
+    console.print('sanityops-cli config server.base_url "<your-server-url>"')
+    console.print("sanityops-cli config server.api_key")
 
 
 def _load_template() -> str:
@@ -94,11 +94,11 @@ def _load_template() -> str:
 
     # PyInstaller bundles resources in sys._MEIPASS
     if hasattr(sys, "_MEIPASS"):
-        template_path = Path(sys._MEIPASS) / "deeplogic_cli" / "templates" / "inspect_config.yaml"
+        template_path = Path(sys._MEIPASS) / "sanityops_cli" / "templates" / "inspect_config.yaml"
         return template_path.read_text(encoding="utf-8")
 
     # Standard importlib.resources for normal Python environments
     import importlib.resources
 
-    template = importlib.resources.files("deeplogic_cli.templates") / "inspect_config.yaml"
+    template = importlib.resources.files("sanityops_cli.templates") / "inspect_config.yaml"
     return template.read_text(encoding="utf-8")

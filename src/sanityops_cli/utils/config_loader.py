@@ -6,14 +6,17 @@ from typing import Any
 
 import yaml
 
-from deeplogic_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.exceptions.base_exceptions import ValidationError
 
 # Reuse excluded directories from validators
-from deeplogic_cli.utils.validators import EXCLUDED_DIRS
+from sanityops_cli.utils.validators import EXCLUDED_DIRS
 
 # Default config file location
-DEFAULT_CONFIG_DIR = ".deeplogic"
+DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
+
+# Placeholder project ID (project not yet bound)
+PROJECT_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
 
 # UUID validation regex (compiled once at module load for efficiency)
 _UUID_RE = re.compile(
@@ -141,7 +144,7 @@ class InspectConfigLoader:
     # ------------------------------------------------------------------
 
     def _resolve_config_path(self, config_path: str | None) -> Path:
-        """Resolve config file path: explicit -> .deeplogic/inspect_config.yaml -> error."""
+        """Resolve config file path: explicit -> .sanityops/inspect_config.yaml -> error."""
         if config_path:
             p = Path(config_path).expanduser()
             if not p.exists():
@@ -157,7 +160,7 @@ class InspectConfigLoader:
 
         raise ValidationError(
             f"Config file not found. Provide --config <path>, "
-            f"or create one at .deeplogic/{DEFAULT_CONFIG_FILE}"
+            f"or create one at .sanityops/{DEFAULT_CONFIG_FILE}"
         )
 
     # ------------------------------------------------------------------
@@ -204,7 +207,7 @@ class InspectConfigLoader:
             if str(project_id) == "00000000-0000-0000-0000-000000000000":
                 raise ValidationError(
                     "'project.id' is still a placeholder. "
-                    "Run 'deeplogic-cli project create <name>' or 'deeplogic-cli project bind <id>'"
+                    "Run 'sanityops-cli project create <name>' or 'sanityops-cli project bind <id>'"
                 )
         else:
             # When not requiring project_id, just check the format if it's set

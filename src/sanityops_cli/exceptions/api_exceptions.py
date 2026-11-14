@@ -1,9 +1,9 @@
-"""API exception definitions for deeplogic CLI."""
+"""API exception definitions for sanityops CLI."""
 
-from deeplogic_cli.exceptions.base_exceptions import deeplogicError
+from sanityops_cli.exceptions.base_exceptions import sanityopsError
 
 
-class APIError(deeplogicError):
+class APIError(sanityopsError):
     """Base exception for API-related errors."""
 
     exit_code: int = 5

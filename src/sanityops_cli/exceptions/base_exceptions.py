@@ -1,13 +1,13 @@
-"""deeplogic CLI Error Definitions"""
+"""sanityops CLI Error Definitions"""
 
 
-class deeplogicError(Exception):
-    """deeplogic CLI Base Exception Class"""
+class sanityopsError(Exception):
+    """sanityops CLI Base Exception Class"""
 
     exit_code: int = 2
 
 
-class ValidationError(deeplogicError):
+class ValidationError(sanityopsError):
     """Validation Error Exception Class"""
 
     exit_code: int = 2

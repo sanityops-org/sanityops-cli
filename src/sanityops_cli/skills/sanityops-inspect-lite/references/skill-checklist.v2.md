@@ -1,39 +1,39 @@
 ---
-title: Skill Inspection Checklist (QD-S, v2 统一引擎版)
+title: Skill Inspection Checklist (QD-S, v2 unified engine edition)
 ---
 
 # Skill Inspection Checklist (QD-S, v2)
 
-> **状态**：v2 统一引擎版。规则语义源自 `inspect/skill.md` v1.1（2026-10）：ID、名称、严重度取值均保持不变；变化的是**组织方式**——全字段 + 正文表格（模型项）+ 程序块（程序项）。
+> **Status**: v2 unified engine edition. Rule semantics derive from `inspect/skill.md` v1.1 (2026-10): IDs, names, and severity values all remain unchanged; what changes is the **organization** — full fields + body tables (model items) + program block (program items).
 >
-> 共享定义（字段模型 / check_engine 映射 / applicability 结构事实门 / severity 记号 / 打分规则）见 [_meta.md](_meta.md)，本文件不重复。本文件只承载 Skill 域检查项本身。
+> Shared definitions (field model / check_engine mapping / applicability structural-fact gate / severity notation / scoring rules) see [_meta.md](_meta.md); not repeated here. This file carries only the Skill-domain check items themselves.
 
-## 1. 域内说明
+## 1. Domain notes
 
-- **L 命名**：本域 severity 表头用 **OR-L1/OR-L2/OR-L3**（operation risk：L1 read-only / L2 reversible write / L3 irreversible；Skill 无工具调用 → L1，有工具调用 → 按所执行操作的最高风险）。Skill 域无 AC-L 维度。
-- **基线门 QD-S-0**（9 项）：平台最小结构校验（能否解析、可检），**pass/fail，不计分**（源 §11.3）。QD-S-0.9 为 SHOULD 级，不计入门。放宽失败处理（v1.1）：仅 QD-S-0.3 完全不可解析才阻断 QD-S-1~5 检查；其余 0 缺陷标记 "baseline not passed" 并继续，结论记 "assessment incomplete (NEEDS_REVIEW)"。
-- **check_engine 分配口径（本域重分类日志）**（源 §6 六步流程 + 设计 §2.8「优先收敛」）：
-  - QD-S-0 结构校验（0.1–0.4、0.6–0.9）→ `program`；0.5（冲突判定，需人审）→ `hybrid`。
-  - 数量边界/无界措辞扫描类（1.1–1.3、2.1–2.4，源 §6 步骤 4 的 keyword scanning）→ `hybrid`（程序关键词初筛 + 模型确认）。
-  - 语义/声明充分性类（1.4–1.5、3.x、4.x、5.x，源 §6 步骤 5）→ `model`。
-- **"缺失声明即缺陷"口径**（源 §1）：规则定义的声明缺位即 FAIL，定义尾部的 "allowing / leading-to …" 是**风险机制**而非附加前提。**QD-S-2.x 例外**：它们检测"已写出的无界措辞"，缺陷是措辞的**存在**（正向检测）。
-- **有效约束与补偿控制**（源 §7.5，跨项 severity 原则）：工件内可追溯约束（Tool Schema 字段、`allowed_operations`、声明 scope/service-account）可影响 severity；外部 Harness/RBAC/platform 控制仅作 `compensating_controls`（影响处置不影响缺陷存在）；证据不足输出 "to-be-verified"，不强制定级。
-- **五态结果**（源 §7.4）：Pass / Defect / N/A / Insufficient Evidence / Not Checked；N/A 必写依据；"Insufficient Evidence" 输出 "to-be-verified"，不评分。
-- **建议/可选项**：QD-S-3.2、3.7 在 L1 为 optional（推荐非必须）；本文件仍列入活跃项，L1 severity 标 ∅（参考级，可追溯 L2/L3 原始 P）。
+- **L naming**: this domain's severity header uses **OR-L1/OR-L2/OR-L3** (operation risk: L1 read-only / L2 reversible write / L3 irreversible; Skill with no tool invocation → L1, with tool invocation → per the highest risk of the operations performed). Skill domain has no AC-L dimension.
+- **Baseline gate QD-S-0** (9 items): platform minimal structural validation (parseable, checkable), **PASS/FAIL, not scored** (source §11.3). QD-S-0.9 is SHOULD level, not counted in the gate. Relaxed failure handling (v1.1): only when QD-S-0.3 is completely unparseable does it block QD-S-1~5 checks; a defect in any other QD-S-0 item is marked "baseline not passed" and checking continues, with the conclusion recorded as "assessment incomplete (NEEDS_REVIEW)".
+- **check_engine assignment convention (this domain's reclassification log)** (source §6 six-step flow + design §2.8 "prioritize convergence"):
+  - QD-S-0 structural validation (0.1–0.4, 0.6–0.9) → `program`; 0.5 (conflict judgment, requires human review) → `hybrid`.
+  - Quantity-boundary/unbounded-wording scanning class (1.1–1.3, 2.1–2.4, keyword scanning in source §6 step 4) → `hybrid` (program keyword pre-screening + model confirmation).
+  - Semantic/declaration-sufficiency class (1.4–1.5, 3.x, 4.x, 5.x, source §6 step 5) → `model`.
+- **"Missing declaration is a defect" convention** (source §1): absence of the declaration required by a rule definition is FAIL; the trailing "allowing / leading-to …" of a definition is a **risk mechanism**, not an additional premise. **Exception for QD-S-2.x**: they detect "unbounded wording already written out"; the defect is the **presence** of the wording (positive detection).
+- **Effective constraints and compensating controls** (source §7.5, cross-item severity principle): traceable constraints within the artifact (Tool Schema fields, `allowed_operations`, declared scope/service-account) can affect severity; external Harness/RBAC/platform controls serve only as `compensating_controls` (affecting disposition, not defect existence); insufficient evidence outputs "to-be-verified", with no forced grading.
+- **Five-state results** (source §7.4): Pass / Defect / N/A / Insufficient Evidence / Not Checked; N/A must state its basis; "Insufficient Evidence" outputs "to-be-verified" and is not scored.
+- **Advisory/optional items**: QD-S-3.2, 3.7 are optional at L1 (recommended, not mandatory); this file still lists them as active items, with L1 severity marked ∅ (reference level, traceable to the original P at L2/L3).
 
-## 2. 检查项索引（33 项 = 9 基线门 + 24 语义项）
+## 2. Check item index (33 items = 9 baseline gate + 24 semantic items)
 
-| ID | name | check_engine | applicability.fact | severity OR-L1/L2/L3 | 计入打分 |
+| ID | name | check_engine | applicability.fact | severity OR-L1/L2/L3 | Counted in scoring |
 |---|---|---|---|---|---|
-| QD-S-0.1 | Required Field Presence | program | is_skill | gate | ✗（基线） |
-| QD-S-0.2 | Field Content Non-Empty | program | is_skill | gate | ✗（基线） |
-| QD-S-0.3 | Syntax Parsability | program | is_skill | gate | ✗（基线） |
-| QD-S-0.4 | Field Type Validity | program | is_skill | gate | ✗（基线） |
-| QD-S-0.5 | No Conflicting Declarations | hybrid | is_skill | gate | ✗（基线） |
-| QD-S-0.6 | Minimum Structural Completeness | program | is_skill | gate | ✗（基线） |
-| QD-S-0.7 | Dependency & Resource Existence | program | is_skill | gate | ✗（基线） |
-| QD-S-0.8 | Metadata Completeness | program | is_skill | gate | ✗（基线） |
-| QD-S-0.9 | description Length Budget | program | is_skill | gate (SHOULD) | ✗（基线） |
+| QD-S-0.1 | Required Field Presence | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.2 | Field Content Non-Empty | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.3 | Syntax Parsability | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.4 | Field Type Validity | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.5 | No Conflicting Declarations | hybrid | is_skill | gate | ✗ (baseline) |
+| QD-S-0.6 | Minimum Structural Completeness | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.7 | Dependency & Resource Existence | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.8 | Metadata Completeness | program | is_skill | gate | ✗ (baseline) |
+| QD-S-0.9 | description Length Budget | program | is_skill | gate (SHOULD) | ✗ (baseline) |
 | QD-S-1.1 | Input Boundary Missing | hybrid | is_skill | P1 / P0 / P0 | ✓ |
 | QD-S-1.2 | Output Size Missing | hybrid | is_skill | P1 / P1 / P1 | ✓ |
 | QD-S-1.3 | Execution Resource Boundary Missing | hybrid | has_tool_invocation | ∅ / P0 / P0 | ✓ |
@@ -59,87 +59,87 @@ title: Skill Inspection Checklist (QD-S, v2 统一引擎版)
 | QD-S-5.3 | Undeclared Environment Boundaries | model | has_environment_access | ∅ / P1 / P0 | ✓ |
 | QD-S-5.4 | Undeclared Chained Invocation Permissions | model | has_skill_chaining | ∅ / P1 / P0 | ✓ |
 
-> 计数说明：9 基线门（QD-S-0，pass/fail 不计分）+ 24 语义项。语义项 severity 为 OR-L 三档（L1=8 项 / L2=23 项 / L3=24 项，源 §4 累计）。`∅` = 该 L 下原规范不分配 P（参考级展示；N/A 由 `applicability.fact` 单独决定，与 L 无关）。`has_tool_invocation`/`has_data_access`/`has_write_semantics`/`has_irreversible_op`/`has_environment_access`/`has_skill_chaining` 为结构事实（观察"工件实际做不做"，非"是否已声明"——防点1悖论）。
+> Count note: 9 baseline gate items (QD-S-0, pass/fail, not scored) + 24 semantic items. Semantic item severity has three OR-L tiers (L1=8 items / L2=23 items / L3=24 items, cumulative per source §4). `∅` = the original specification assigns no P at that L (reference-level display; N/A is determined separately by `applicability.fact`, independent of L). `has_tool_invocation`/`has_data_access`/`has_write_semantics`/`has_irreversible_op`/`has_environment_access`/`has_skill_chaining` are structural facts (observing "whether the artifact actually does it", not "whether it is declared" — point-1-paradox prevention).
 
-## 3. 模型判定要点（definition 凝练 + model_prompt）
+## 3. Model judgment points (condensed definition + model_prompt)
 
-> skill 全模型一次推理；CLI 的 model 项 / hybrid 项确认阶段也读此处。`definition` 取自源 §2 / §5。
+> skill does full-model single-pass reasoning; the CLI's model-item / hybrid-item confirmation phase also reads here. `definition` is taken from source §2 / §5.
 
-### 3.1 纯 model 项（17 项）
+### 3.1 Pure model items (17 items)
 
-| ID | definition（凝练） | model_prompt（判定要点） |
+| ID | definition (condensed) | model_prompt (judgment points) |
 |---|---|---|
-| QD-S-1.4 | 无 read/write/delete 区分、无 prohibited-operation 声明 | 判工件是否有数据操作，且未区分读/改/删作用域、未声明禁止操作 |
-| QD-S-1.5 | 无 permitted/prohibited 数据源；LLM 可从 history/外部系统取数 | 判工件是否访问数据源（history/外部），且未声明允许/禁止来源 |
-| QD-S-3.1 | 触发条件过宽；多个无关意图可触发 | 判 allowed_when/forbidden_when 是否过宽、是否存在歧义触发 |
-| QD-S-3.2 | 未声明 Skill 何时不应触发 | 判是否缺 forbidden_when / 停用条件 |
-| QD-S-3.3 | 未声明对不完整/畸形输入的处理；LLM 自动补全 | 判缺 on_empty_input/on_insufficient_input，是否默认自动补全或推断 |
-| QD-S-3.4 | 缺 non_goals；LLM 自行扩展边界 | 判缺 non_goals、任务范围是否被过度声明 |
-| QD-S-3.5 | 关键分支（空输入/格式错/数据不足）无定义处理 | 判关键分支是否无默认行为定义 |
-| QD-S-3.6 | name/description 过宽、不准、与 body 不一致 | 判元数据是否夸大/偏离/矛盾于正文实际行为 |
-| QD-S-3.7 | 输出格式/必填字段/空结果表示未声明；LLM 自选结构 | 判缺输出结构契约（格式、字段、空结果表示），注意与 1.2（尺寸）、2.3（开放枚举）区分 |
-| QD-S-4.1 | 未声明执行失败处理；LLM 探索替代路径 | 判缺失败处理策略，是否允许模型自行改道 |
-| QD-S-4.2 | 未声明"部分完成是否可接受" | 判缺 partial_result_allowed 声明 |
-| QD-S-4.3 | 未声明失败后禁止的行为 | 判缺 forbidden_behaviors（禁止自动补全/推断/扩界） |
-| QD-S-4.4 | 未定义逐异常恢复路径 | 判缺 per-exception 恢复路径；"safe-terminate-and-report" 是合法处置 |
-| QD-S-5.1 | 操作数据未区分 read/modify/delete 作用域 | 判数据操作是否混淆读/改/删 |
-| QD-S-5.2 | 不可逆操作（删/覆写/外泄/支付）无确认门 | 判不可逆操作是否缺 require_user_confirmation_for 确认门 |
-| QD-S-5.3 | 未声明是否禁止生产、允许哪些环境 | 判缺环境边界声明（禁止 production / 允许环境清单） |
-| QD-S-5.4 | 调用其他 Skill 未声明允许/禁止下游范围 | 判链式调用是否缺 allowed_downstream_skills / 范围声明 |
+| QD-S-1.4 | No read/write/delete distinction, no prohibited-operation declaration | Judge whether the artifact has data operations and does not distinguish read/modify/delete scopes nor declare prohibited operations |
+| QD-S-1.5 | No permitted/prohibited data sources; LLM may fetch data from history/external systems | Judge whether the artifact accesses data sources (history/external) and does not declare allowed/prohibited sources |
+| QD-S-3.1 | Trigger conditions too broad; multiple unrelated intents can trigger | Judge whether allowed_when/forbidden_when are too broad and whether ambiguous triggers exist |
+| QD-S-3.2 | Does not declare when the Skill should not trigger | Judge whether forbidden_when / deactivation conditions are missing |
+| QD-S-3.3 | Handling of incomplete/malformed input not declared; LLM auto-completes | Judge whether on_empty_input/on_insufficient_input are missing and whether it defaults to auto-completion or inference |
+| QD-S-3.4 | Missing non_goals; LLM expands boundaries on its own | Judge whether non_goals are missing and whether the task scope is over-declared |
+| QD-S-3.5 | Key branches (empty input/malformed format/insufficient data) have no defined handling | Judge whether key branches lack default behavior definitions |
+| QD-S-3.6 | name/description too broad, inaccurate, inconsistent with body | Judge whether metadata exaggerates/deviates from/contradicts the body's actual behavior |
+| QD-S-3.7 | Output format/required fields/empty-result representation not declared; LLM chooses the structure itself | Judge whether the output structure contract is missing (format, fields, empty-result representation), noting the distinction from 1.2 (size) and 2.3 (open enumeration) |
+| QD-S-4.1 | Execution failure handling not declared; LLM explores alternative paths | Judge whether a failure-handling strategy is missing and whether the model may reroute on its own |
+| QD-S-4.2 | "Whether partial completion is acceptable" not declared | Judge whether the partial_result_allowed declaration is missing |
+| QD-S-4.3 | Behaviors prohibited after failure not declared | Judge whether forbidden_behaviors are missing (no auto-completion/inference/scope expansion) |
+| QD-S-4.4 | Per-exception recovery paths undefined | Judge whether per-exception recovery paths are missing; "safe-terminate-and-report" is a legitimate disposition |
+| QD-S-5.1 | Data operations do not distinguish read/modify/delete scopes | Judge whether data operations conflate read/modify/delete |
+| QD-S-5.2 | Irreversible operations (delete/overwrite/exfiltration/payment) have no confirmation gate | Judge whether irreversible operations lack the require_user_confirmation_for confirmation gate |
+| QD-S-5.3 | Does not declare whether production is prohibited and which environments are allowed | Judge whether environment boundary declarations are missing (prohibited production / allowed environment list) |
+| QD-S-5.4 | Calling other Skills does not declare allowed/prohibited downstream scope | Judge whether chained invocation lacks allowed_downstream_skills / scope declarations |
 
-### 3.2 hybrid 项的模型确认部分
+### 3.2 Model-confirmation portion of hybrid items
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**「程序仅检…／程序仅做…」描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为"已筛过"，也不得据此判 N/A。
+> **On the skill side: this section is the complete set of judgment points; there is no program pre-screening upstream.** "program only checks… / program only does…" describes the CLI / platform pre-screening path; skill reasons with the full model, does not execute §4, must complete the semantic judgment itself, must not treat it as "already screened", and must not use it to mark N/A.
 
-| ID | model_prompt（确认要点） |
+| ID | model_prompt (confirmation points) |
 |---|---|
-| QD-S-0.5 | 确认 body/examples/failure/permission 声明间冲突是否真实存在，并同时报告冲突双方（不偏袒宽松或严格侧） |
-| QD-S-1.1 | 确认输入数量/尺寸上限是否真缺失（关键词命中 ≠ 已声明；需语义核实） |
-| QD-S-1.2 | 确认输出尺寸上限是否真缺失 |
-| QD-S-1.3 | 确认重试/调用次数/超时边界是否真缺失 |
-| QD-S-2.1 | 确认无界量词（all/every/entire/complete）是否确无数量上限 |
-| QD-S-2.2 | 确认 keep trying/until success 等措辞是否确无终止条件 |
-| QD-S-2.3 | 确认 etc./and others/such as 是否确实放任模型自行添加条目 |
-| QD-S-2.4 | 确认 manage/handle 等宽泛动词是否确无 non_goals 约束 |
+| QD-S-0.5 | Confirm whether conflicts among body/examples/failure/permission declarations truly exist, and report both sides of the conflict (favoring neither the lenient nor the strict side) |
+| QD-S-1.1 | Confirm whether input quantity/size upper bounds are truly missing (a keyword hit ≠ declared; semantic verification required) |
+| QD-S-1.2 | Confirm whether the output size upper bound is truly missing |
+| QD-S-1.3 | Confirm whether retry/invocation-count/timeout boundaries are truly missing |
+| QD-S-2.1 | Confirm whether unbounded quantifiers (all/every/entire/complete) truly have no quantity cap |
+| QD-S-2.2 | Confirm whether wording such as keep trying/until success truly has no termination condition |
+| QD-S-2.3 | Confirm whether etc./and others/such as truly leave the model free to add entries itself |
+| QD-S-2.4 | Confirm whether broad verbs such as manage/handle truly have no non_goals constraint |
 
-## 4. 程序判定项（program-check 代码块）
+## 4. Program-judgment items (program-check code block)
 
-> **CLI / platform 专用：skill 不解析、不执行本代码块**（skill 全模型推理，不消费 `check_engine` 与 `program_rule`）。程序引擎只 parse 本代码块。`rule` 字段为**判定语义示意**（非最终可执行定义，程序级实现后续补）。涵盖纯 program 项（QD-S-0 基线）+ hybrid 项的初筛规则。
+> **CLI / platform only: the skill does not parse or execute this code block** (the skill performs full-model reasoning and does not consume `check_engine` or `program_rule`). The program engine only parses this code block. The `rule` field is a **semantic illustration of judgment** (not a final executable definition; the program-level implementation follows later). Covers pure program items (QD-S-0 baseline) + pre-screening rules for hybrid items.
 
 <!-- program-check -->
 ```json
 {
   "domain": "skill",
   "version": "v2",
-  "note": "程序判定项（QD-S-0 基线）+ hybrid 初筛规则。rule 为语义示意。",
+  "note": "Program-judgment items (QD-S-0 baseline) + hybrid pre-screening rules. rule is a semantic illustration.",
   "checks": [
-    { "id": "QD-S-0.1", "summary": "必需字段（name/description 等）缺失" },
-    { "id": "QD-S-0.2", "summary": "必需字段为空或纯空白" },
-    { "id": "QD-S-0.3", "summary": "YAML frontmatter / Markdown 结构不可解析" },
-    { "id": "QD-S-0.4", "summary": "字段值类型不符（enum/boolean/number/list）" },
-    { "id": "QD-S-0.5", "summary": "检测 body/examples/failure/permission 潜在冲突（真实性由模型确认）" },
-    { "id": "QD-S-0.6", "summary": "无可定位最小结构（可引用位置/可检单元）" },
-    { "id": "QD-S-0.7", "summary": "引用脚本/模板/下游 Skill 不存在或不解析（凭证/异常URL/PII→EX 交叉引用）" },
-    { "id": "QD-S-0.8", "summary": "version/owner/changelog 缺失或不可追溯" },
-    { "id": "QD-S-0.9", "summary": "description 超出 token 预算（SHOULD）" },
-    { "id": "QD-S-1.1", "summary": "未检出输入上限关键词（max_items/max_chars/limit，真缺失由模型确认）" },
-    { "id": "QD-S-1.2", "summary": "未检出输出上限关键词（max_total_chars，真缺失由模型确认）" },
-    { "id": "QD-S-1.3", "summary": "未检出执行边界（max_tool_calls/max_retries/timeout_seconds）" },
-    { "id": "QD-S-2.1", "summary": "检出无界量词 all/every/entire/complete（是否配 cap 由模型确认）" },
-    { "id": "QD-S-2.2", "summary": "检出 keep trying/until success/ensure complete/persist until（有无终止由模型确认）" },
-    { "id": "QD-S-2.3", "summary": "检出 etc./and others/such as" },
-    { "id": "QD-S-2.4", "summary": "检出 manage/handle/coordinate/automate/process/address（是否配 non_goals 由模型确认）" }
+    { "id": "QD-S-0.1", "summary": "Required fields (name/description etc.) missing" },
+    { "id": "QD-S-0.2", "summary": "Required field empty or pure whitespace" },
+    { "id": "QD-S-0.3", "summary": "YAML frontmatter / Markdown structure unparseable" },
+    { "id": "QD-S-0.4", "summary": "Field value type mismatch (enum/boolean/number/list)" },
+    { "id": "QD-S-0.5", "summary": "Detects potential conflicts in body/examples/failure/permission (authenticity confirmed by model)" },
+    { "id": "QD-S-0.6", "summary": "No locatable minimal structure (referenceable location / checkable unit)" },
+    { "id": "QD-S-0.7", "summary": "Referenced script/template/downstream Skill does not exist or does not parse (credentials/abnormal URL/PII → EX cross-reference)" },
+    { "id": "QD-S-0.8", "summary": "version/owner/changelog missing or untraceable" },
+    { "id": "QD-S-0.9", "summary": "description exceeds the token budget (SHOULD)" },
+    { "id": "QD-S-1.1", "summary": "No input limit keywords detected (max_items/max_chars/limit; true absence confirmed by model)" },
+    { "id": "QD-S-1.2", "summary": "No output limit keywords detected (max_total_chars; true absence confirmed by model)" },
+    { "id": "QD-S-1.3", "summary": "No execution boundaries detected (max_tool_calls/max_retries/timeout_seconds)" },
+    { "id": "QD-S-2.1", "summary": "Unbounded quantifiers all/every/entire/complete detected (whether a cap is paired confirmed by model)" },
+    { "id": "QD-S-2.2", "summary": "keep trying/until success/ensure complete/persist until detected (whether termination exists confirmed by model)" },
+    { "id": "QD-S-2.3", "summary": "etc./and others/such as detected" },
+    { "id": "QD-S-2.4", "summary": "manage/handle/coordinate/automate/process/address detected (whether non_goals are paired confirmed by model)" }
   ]
 }
 ```
 <!-- /program-check -->
 
-## 5. Tombstone 记录
+## 5. Tombstone records
 
-无。Skill 域源规范未包含 merged / transferred 项（QD-S-3.2、3.7 为 L1 可选，仍为活跃项，非 tombstone）。
+None. The Skill domain source specification contains no merged / transferred items (QD-S-3.2, 3.7 are L1 optional and remain active items, not tombstones).
 
-## 6. 打分字段说明（platform 专用）
+## 6. Scoring field notes (platform only)
 
-- 源 §8 **固定扣分**：P0=25、P1=15、P2=5（保持 5:3:1，不随项数变化）。Score = max(100 − 总扣分, 0)；**存在任一 P0 时封顶 60 且 Gate=FAIL**。同源去重（§11.6）：同一根因/同一危害路径只记一次。
-- 分母为 tier 相关（L1=8 / L2=23 / L3=24）；`计入打分` 列 = ✓ 的语义项进入对应 tier 分母，✗（QD-S-0 基线）与 tombstone 不计入。
-- skill / CLI 不激活打分，但 score_weight 信息在索引表保留，供 platform 使用；Gate 是 Inspect 局部结论（非框架级发布决策）。
+- Source §8 **fixed deductions**: P0=25, P1=15, P2=5 (maintaining 5:3:1, independent of item count). Score = max(100 − total deductions, 0); **the presence of any P0 caps it at 60 and Gate=FAIL**. Same-source deduplication (§11.6): the same root cause / same harm path is recorded only once.
+- The denominator is tier-dependent (L1=8 / L2=23 / L3=24); semantic items with ✓ in the `Counted in scoring` column enter the corresponding tier denominator; ✗ (QD-S-0 baseline) and tombstones are not counted.
+- skill / CLI do not activate scoring, but score_weight information is retained in the index table for platform use; Gate is an Inspect-local conclusion (not a framework-level release decision).

@@ -1,406 +1,406 @@
 ---
 name: pre-inspect-extract
 version: 1.3.1
-owner: DeepLogic AI Labs
-description: 触发词：pre-inspect-extract / deeplogic-extract / artifact extraction / 工件提取 / 只提取。运行于 deeplogic-inspect-lite 之前的预检查提取层。在用户提交的任意文档中查找逻辑工件（System Prompt / Skill / Tool Schema），逐一切分，剥离承载它们的代码或标记外壳，必要时从源码逐字段重建 Schema，使用逐字证据标注每个工件的完整度，并判定每个工件的 L（AC-L / OR-L）。只提取，不判断缺陷。输出两层 IR（对象 + 引用）供检查阶段使用。当你需要先从文档中提取逻辑工件再进行缺陷检查时使用。
+owner: Sanity AI Labs
+description: Trigger words: pre-inspect-extract / sanityops-extract / artifact extraction / extract only / 工件提取 / 只提取. Pre-inspection extraction layer that runs before sanityops-inspect-lite. Finds logic artifacts (System Prompt / Skill / Tool Schema) in any user-submitted document, segments them one by one, strips the code/markup shell that carries them, reconstructs the schema field-by-field from source when necessary, labels each artifact's completeness level with verbatim evidence, and determines each artifact's L (AC-L / OR-L). Extract-only, never judges defects. Outputs a two-layer IR (objects + references) for the inspection stage. Use when you need to first extract logic artifacts from a document before inspecting them.
 license: CC BY-SA 4.0
-changelog: http://192.168.1.199:8080/deeplogic/deeplogic-inspect-lite/releases
+changelog: https://github.com/sanityops-org/sanityops-inspect-lite/releases
 ---
 
-# 预检查提取层（pre-inspect-extract）
+# Pre-Inspection Extraction Layer (pre-inspect-extract)
 
-## 0. 术语表（先读本节）
+## 0. Glossary (read this first)
 
-本文件中的词语严格采用以下含义，不作其他解释。
+The words in this file mean exactly the following. Nothing else.
 
-| 术语 | 含义 |
+| Term | Meaning |
 |---|---|
-| **工件（artifact）** | Agent 运行时可以加载的三类对象之一：System Prompt、Skill、Tool Schema |
-| **载体（carrier）** | 包裹工件的代码或标记，例如 `f"""..."""`、反引号模板字符串、``` 围栏 |
-| **脚手架（scaffolding）** | 文档中的非工件内容：元数据、评估维度、备注等 |
-| **逐字复制（verbatim copy）** | 逐字复制原文，只去掉外层代码壳 |
-| **组装（assembly）** | 没有以可加载 JSON 形式存在的 Schema；从源码逐字段复制并组装 JSON Schema |
-| **完整原文（full original）** | 通过逐字复制得到的完整文本，可直接检查 |
-| **原文 · 变量未展开** | 通过逐字复制得到，但 Prompt 中存在会展开为规则的未展开变量 |
-| **组装件（assembled）** | 从代码组装出的 Schema，不是逐字原文 |
-| **不完整件（incomplete）** | 工件缺少其类型所需的基础字段——Tool 缺少 `inputSchema`、Skill 缺少正文，或 Prompt 无法形成完整指令 |
-| **摘要（summary）** | 经过总结 / 转写 / 截断，无法与原文完整匹配 |
-| **不可检查（not inspectable）** | 无法提取；跳过并记录原因 |
-| **完整度层级** | 上述六个标签的统称 |
-| **跳过检查** | 因数据不可靠，本次不判定某项检查（不是 FAIL） |
-| **AC-L** | Agent 复杂度等级——Agent 有多复杂（L1 单轮 / L2 多轮 / L3 复杂；L4 多 Agent 保留）。决定 Prompt 域的严重度（P）。 |
-| **OR-L** | 操作风险等级——操作风险有多高（L1 只读 / L2 可恢复写入 / L3 不可逆）。决定 Skill/Tool 域的严重度（P）。 |
-| **提取类别（extraction class）** | E1 直接可读 / E2 包裹在代码中 / E3 需要组装 / EX 无法识别——表示工件如何被承载，由 §5 判定。 |
-| **L 判定** | 逐工件分类为 AC-L / OR-L，在此一次性完成并向下传递。L 只决定严重度（P），绝不决定“是否检查”。 |
-| **IR** | 中间表示（Intermediate Representation）——本层结构化输出：对象层 + 引用层，并带 L 标签；宿主可写文件时落盘，同时保留在上下文中。 |
-| **对象层** | IR 两层之一——实际提取出且带完整签名的工件（多少个 P / S / T）。 |
-| **引用层** | IR 两层之一——被提及 / 依赖但尚未形成提取对象的引用。 |
+| **artifact** | One of the three things an Agent runtime can load: System Prompt, Skill, Tool Schema |
+| **carrier** | Code or markup that wraps an artifact, e.g. `f"""..."""`, backtick template strings, ``` fences |
+| **scaffolding** | Non-artifact content in a document: Metadata, Evaluation Dimensions, Notes, etc. |
+| **verbatim copy** | Copy the original text word-for-word, dropping only the outer code shell |
+| **assembly** | There is no schema in loadable JSON form; copy fields out of the source one by one and assemble a JSON Schema |
+| **full original** | Obtained by verbatim copy, complete, directly inspectable |
+| **original · variable unexpanded** | Obtained by verbatim copy, but the prompt has unexpanded variables that expand into rules |
+| **assembled** | A schema assembled from code, not the verbatim original |
+| **incomplete** | The artifact is missing a base field its type requires — a Tool without `inputSchema`, a Skill without a body, a Prompt that cannot form a complete instruction |
+| **summary** | Summarized / transcribed / truncated; cannot be matched to the original in full |
+| **not inspectable** | Cannot be extracted; skip and record the reason |
+| **completeness level** | The umbrella term for the six labels above |
+| **skip a check** | Because the data is unreliable, a specific check is not judged this time (this is not a FAIL) |
+| **AC-L** | Agent Complexity Level — how complex the agent is (L1 single-turn / L2 multi-turn / L3 complex; L4 multi-agent reserved). Feeds the Prompt-domain severity (P). |
+| **OR-L** | Operation Risk Level — how risky the operations are (L1 read-only / L2 reversible write / L3 irreversible). Feeds the Skill/Tool-domain severity (P). |
+| **extraction class** | E1 directly readable / E2 wrapped in code / E3 assembly-needed / EX unrecognizable — how the artifact is carried, decided in §5. |
+| **L determination** | The per-artifact classification into AC-L / OR-L, done once here and handed down. It feeds severity (P) only, never "whether to check". |
+| **IR** | Intermediate Representation — this layer's structured output: two layers (object + reference) plus L tagging, materialized to a file when the host can write one and also kept in-context. |
+| **object layer** | One of the two IR layers — artifacts actually extracted with a full signature (how many P / S / T). |
+| **reference layer** | One of the two IR layers — things mentioned / depended on but not formed as an extracted object. |
 
-## 1. 本 Skill 的定位
+## 1. What this is
 
-这是一个纯 Prompt、零依赖的**预检查提取** Skill，运行于 `deeplogic-inspect-lite` 之前。它将用户提交的任意文档转换为“可检查工件 + 逐字证据”。
+A pure-prompt, zero-dependency **pre-inspection extraction** skill that runs before `sanityops-inspect-lite`. It turns any user-submitted document into "inspectable artifacts + verbatim evidence".
 
-它只提取、只分类、只标注完整度。**不判断缺陷**——PASS/FAIL 属于后续七阶段检查的职责。
+It only extracts, only classifies, only labels completeness. **It does not judge defects** — PASS/FAIL is the job of the seven-stage inspection that follows.
 
-四项不可违反的原则：
+Three inviolable principles:
 
-1. **来源文档只读。** 绝不重写输入。
-2. **宁可检查不了，也不强行判定。** 无法识别时标为“不可检查”并记录原因；绝不编造字段、猜测缺失内容，绝不把载体误当成工件。
-3. **可靠性来自逐字复制与对照原文自证**，而不是解析器（本 Skill 无脚本）。
-4. **确定性优先。** E1（直接可读）必须无歧义地逐字提取；只有 E2/E3 允许模型判断，且每次判断都必须记录为证据。相同输入必须能通过忠实逐字复制复现，并对照来源证据自检；不声称字节级确定性（无校验和、无行号——§9）。
+1. **The source document is read-only.** Never rewrite the input.
+2. **Rather not inspect than force a verdict.** If something is unrecognizable, label it "not inspectable" and record the reason; never fabricate fields, never guess missing content, never mistake a carrier for an artifact.
+3. **Reliability comes from verbatim copy and self-evidence against the original**, not from a parser (this skill has no scripts).
+4. **Determinism first.** E1 (directly readable) must be extracted word-for-word with no ambiguity; only E2/E3 allow model judgment, and every judgment must be recorded as evidence. The same input must be reproduced by faithful verbatim copy, self-checked against the source evidence; byte-level determinism is not claimed (no checksums, no line numbers — §9).
 
-## 2. 输入与输出
+## 2. Input and output
 
-**输入**：用户提交的一份文档；文档大小受与检查阶段相同的单次运行总预算约束——最多 200,000 tokens（这是估算值，模型无法精确计数；宿主窗口较小时按比例缩减）。超限时应拆成多轮提取，或只提取完整可读部分并标记为“摘要”。
+**Input**: one user-submitted document; document size is bounded by the same run-total budget as the inspection stage — up to 200,000 tokens (an estimate, since a model cannot count tokens exactly; scale down proportionally on smaller host windows). If over the limit, split the extraction across rounds, or extract only the fully-readable part and label it "summary".
 
-**输出**：两层中间表示（IR），规模与输入工件数量成正比（每个工件一个块），不得额外膨胀。宿主可写文件时，IR **落盘为文件**（供审计及 CLI / platform 复用；无写权限时的降级方式见 §11），同时**保留在上下文中**（供串联检查立即读取）。
+**Output**: a two-layer Intermediate Representation (IR), sized in proportion to the number of input artifacts (one block per artifact), with no extra inflation. The IR is **materialized to a file** when the host can write one (for audit and reuse by CLI / platform; §11 defines the no-write fallback) and also **kept in-context** (for the chained inspection to read immediately).
 
-当文档中**没有任何工件**（全部为引用文件 / 脚手架）时，输出空对象层与完整引用层，将摘要标记为 `no artifact extracted`，并令 `ir-core.objects = []`。这是正常结果，不是失败。
+When a document contains **zero artifacts** (all reference files / scaffolding), output an empty object layer plus the full reference layer, mark the summary `no artifact extracted`, and set `ir-core.objects = []`. This is a normal result, not a failure.
 
-- **提取摘要**（顶部）：Agent 归属声明（单 Agent / 待确认）、工件总数、按类型计数、不可检查数量及逐项原因、完整度分布、L 分布。
-- **对象层**：每个提取工件一个块，包含类型、名称、完整度、**L**、提取类别、来源位置、提取方法、逐字证据。
-- **引用层**：被提及 / 依赖但未形成提取对象的内容。
-- **`ir-core` 块**：对象层与引用层的机器可读核心，采用冻结的 ir-core v1 结构（§11：`ir_version`、`objects[].{type,name,completeness,L,source,mismatch}`、`not_inspectable[]`、`references[].{name,referenced_by,relationship}`），以固定 JSON 块承载，便于 CLI / platform 直接解析。
+- **Extraction summary** (top): agent membership declaration (single agent / pending confirmation), total artifact count, count by type, not-inspectable count and per-item reasons, completeness-level distribution, and L distribution.
+- **Object layer**: one block per extracted artifact, each carrying type, name, completeness level, **L**, extraction class, source location, extraction method, and verbatim evidence.
+- **Reference layer**: the things mentioned / depended on but not formed as extracted objects.
+- **`ir-core` block**: the machine-readable core of the object + reference layers, in the frozen ir-core v1 shape (§11: `ir_version`, `objects[].{type,name,completeness,L,source,mismatch}`, `not_inspectable[]`, `references[].{name,referenced_by,relationship}`), carried in a fixed JSON block so CLI / platform can parse it directly.
 
-## 3. 文档内容的四种类别
+## 3. Things in a document fall into four categories
 
-| 类别 | 是什么 | 如何处理 |
+| Category | What it is | What to do |
 |---|---|---|
-| **工件** | 本身是 Prompt / Skill / Tool Schema | 送入检查 |
-| **载体** | 包裹工件的代码或标记 | 剥离外壳，逐字复制内容 |
-| **脚手架** | 元数据、评估维度、评分标准、测试建议、备注等 | 丢弃 |
-| **引用文件** | 纯代码或纯数据，不含可提取工件 | 跳过 |
+| **artifact** | Itself a Prompt / Skill / Tool Schema | Send to inspection |
+| **carrier** | Code or markup that wraps an artifact | Strip the shell, copy the content verbatim |
+| **scaffolding** | Metadata, Evaluation Dimensions, Scoring Criteria, Test Suggestions, Notes, etc. | Discard |
+| **reference file** | Pure code or pure data, contains no extractable artifact | Skip |
 
-> 载体不是工件。`def f(...): return f"""..."""` 是载体；其中的字符串才是工件。
+> A carrier is not an artifact. `def f(...): return f"""..."""` is a carrier; the string inside is the artifact.
 
-## 4. 七步流程
+## 4. Seven-step flow
 
-```text
-切分 → 判定类型 → 判定提取类别 → 提取 → 判定完整度 → 判定层级（L）→ 记录证据
+```
+Segment → classify type → classify extraction class → extract → determine completeness → determine level (L) → record evidence
 ```
 
-### 4.1 切分
+### 4.1 Segmentation
 
-切分为候选对象，丢弃脚手架。
+Cut into candidate objects, discard scaffolding.
 
-- 脚手架标题按**语义**匹配，而非精确英文串——`## 元数据` 等同于 `## Metadata`，其余同理：`## Metadata`、`## Evaluation Dimensions`、`## Scoring Criteria`、`## Test Suggestions`、`## Notes`、`## Source Profile`。
-- 每个 `### N. xxx`、每段具有结构签名的文本、每个顶层代码围栏块，都是一个候选对象。**单个围栏仍可能承载多个工件**（包含多个工具的 JSON 数组、包含多个 `Tool(...)` 调用的 `.py`）：切出围栏后，若其中存在多个独立工件，按元素再次切分，并在摘要计数中逐一报告。
+- Scaffolding headings (match by meaning, not by exact English string — a heading localized into another language still counts as `## Metadata`, etc.): `## Metadata`, `## Evaluation Dimensions`, `## Scoring Criteria`, `## Test Suggestions`, `## Notes`, `## Source Profile`.
+- Each `### N. xxx`, each text passage with a structural signature, and each top-level code fence block is one candidate object. **A single fence may still hold multiple artifacts** (a JSON array with several tools, a `.py` with several `Tool(...)` calls): after cutting out the fence, re-split by element when it contains more than one independent artifact, and report each in the summary count.
 
-**“结构签名”的最小定义。** 文本块至少出现以下一项时，才是候选对象：
-  - 指令语义（祈使句 / 规则 / 角色指令）→ Prompt；
-  - `name` + `description`，或 `parameters` / `inputSchema` / `input_schema` / `function.parameters` → Tool；
-  - 带 `name` + `description` 的 front matter，且其后有正文 → Skill。
+**"Structural signature" — the minimal definition.** A text block is a candidate object when it shows at least one of:
+  - instructional semantics (imperatives / rules / role instructions) → Prompt;
+  - `name` + `description`, or `parameters` / `inputSchema` / `input_schema` / `function.parameters` → Tool;
+  - front matter with `name` + `description` followed by a body → Skill.
 
-文档式文本**不是**候选对象：`## Skills` 列表（例如 `- browser: search docs`）只是*描述*能力，裸函数调用（例如 `await fetchTickets({...})`）只是*调用*工具——二者都不是可加载工件。将此类文本记录为输入说明并跳过，绝不切分成 Prompt。
+Documentation-style text is **not** a candidate object: a `## Skills` list (e.g. `- browser: search docs`) only *describes* a capability, and a bare function call (e.g. `await fetchTickets({...})`) only *invokes* a tool — neither is loadable as an artifact. Record such text as an input note and skip it; never segment it into a Prompt.
 
-**必须报告工件数量**：切分后明确说明“本文件有 N 个候选对象”，并逐一命名。一个文件经常包含多个工件（一个 `.py` 中两个 `Tool(...)`、一个 `.ts` 中两个 prompt 常量，都是两个工件）。**漏掉一个片段就是漏掉一次检查。** 不得使用“若干”或“多个”含糊表述。
+**Must report the artifact count**: after segmentation, state explicitly "this file has N candidate objects" and name each one. A file often contains multiple artifacts (two `Tool(...)` in one `.py`, two prompt constants in one `.ts`, are two artifacts). **A missed segment is a missed inspection.** Do not accept "several" or "multiple".
 
-**切分时检测跨对象引用（引用层）**：记录 Prompt / Skill 提及为依赖、但自身没有形成对象的每个具名内容。记录四类引用：
-  1. **tool call**——Prompt/Skill 调用逐字工具名，但未提供该 Tool Schema（例如 `call search_tool`）；
-  2. **skill dep**——Prompt/Skill 调用另一个逐字 Skill 名，但未提供该 Skill；
-  3. **prompt var**——会展开为规则的变量（见 §5 E2），且其定义位于输入中；
-  4. **file ref**——工件依赖的具名文件（例如“参见 rules.md”）。
-这些内容进入**引用层**（§11 输出），供后续跨对象检查捕获“被引用但缺失”。像“query the database”这样的泛化文本**不**进入引用层——只有具体、具名的依赖才算。
+**Detect cross-object references (reference layer)** while segmenting: record every named thing a prompt / skill mentions as a dependency but that is not itself present as a formed object. Four reference kinds are recorded:
+  1. **tool call** — a prompt/skill calls a verbatim tool name with no tool schema present (e.g. `call search_tool`);
+  2. **skill dep** — a prompt/skill invokes another verbatim skill name with no skill present;
+  3. **prompt var** — a variable that expands into rules (see §5 E2) whose definition lives in the input;
+  4. **file ref** — a named file the artifact depends on (e.g. "see rules.md").
+These go to the **reference layer** (output in §11) so the downstream cross-object checks can catch "referenced but missing". Generic prose like "query the database" is **not** a reference-layer entry — only a concrete, named dependency counts.
 
-### 4.2 先判类型，再判提取类别（本小节承载七步中的两步）
+### 4.2 Classify type, then extraction class (this subsection carries two of the seven steps)
 
-对每个候选对象，先按结构签名（§4.1）判定其**类型**（Prompt / Skill / Tool Schema），再判定其**提取类别**（E1 / E2 / E3 / EX，§5），并分别说明依据（观察到的结构特征）。
+For each candidate object, first determine its **type** (Prompt / Skill / Tool Schema) by structural signature (§4.1), then determine its **extraction class** (E1 / E2 / E3 / EX, §5), and state the basis (the structural feature you saw) for each.
 
-当一个文本块命中多个签名时，按以下顺序处理并记录最终决定者：带 `name` + `description` 且有正文的 front matter（`---`）→ Skill；schema 形态（`parameters` / `inputSchema` / `input_schema` / `function.parameters` / `type: object` + `properties`）→ Tool；否则为指令性文本 → Prompt。首个匹配者生效。
+When a block matches more than one signature, apply them in this order and record which one decided it: front matter (`---`) carrying `name` + `description` and followed by a body → Skill; a schema form (`parameters` / `inputSchema` / `input_schema` / `function.parameters` / `type: object` + `properties`) → Tool; otherwise instructional prose → Prompt. The first match wins.
 
-### 4.3 提取
+### 4.3 Extraction
 
-两种方法：**逐字复制**与**组装**，见 §6。
+Two methods: **verbatim copy** and **assembly**, see §6.
 
-### 4.4 判定完整度
+### 4.4 Determine completeness
 
-判断是否可送入检查，以及应标记为哪个完整度标签，见 §7。
+Decide whether it can be sent to inspection and which label to apply, see §7.
 
-### 4.5 判定层级（L）
+### 4.5 Determine level (L)
 
-对每个成功提取的工件判定其 L（Prompt 用 AC-L，Skill/Tool 用 OR-L），见 §8。只有具备可用提取结果的工件才获得 L；“不可检查”对象不获得 L。
+For each extracted artifact, determine its L (AC-L for Prompt, OR-L for Skill/Tool), see §8. Only artifacts with a usable extraction get an L; "not inspectable" objects get none.
 
-### 4.6 记录证据
+### 4.6 Record evidence
 
-见 §9。
+See §9.
 
-## 5. 提取类别
+## 5. Extraction classes
 
-### E1——可直接读取
+### E1 — directly readable
 
-工件以可加载形式存在：
+The artifact exists in a loadable form:
 
-- ` ```markdown ` / ` ```text ` / ` ```json ` 围栏中的完整工件。
-- 无围栏但**按类型**结构完整：Skill = `name` + `description` front matter，**且其后有正文**；Tool = `type: object` + `properties` + `required`（或 `parameters` / `inputSchema` / `input_schema` / `function.parameters`）。
-- JS/TS 对象字面量 `{ name: "...", description: "...", inputSchema: {...} }`、`input_schema: {...}` 或 `parameters: {...}`，且其值已是 **JSON 字面量**（双引号字符串、`true` / `false` / `null`）。
-- 纯 JSON Schema（无 `name` → 记录 `name = (unnamed)`，注明“来源未提供名称”；绝不编造名称）。
-- YAML 形式 Schema，或 JSON 对象中的 `"system": "..."` 字符串字段（字段值才是工件）。
+- A complete artifact inside ` ```markdown ` / ` ```text ` / ` ```json ` fences.
+- No fence but structurally complete **by type**: a Skill = `name` + `description` front matter **followed by a body**; a Tool = `type: object` + `properties` + `required` (or `parameters` / `inputSchema` / `input_schema` / `function.parameters`).
+- JS/TS object literal `{ name: "...", description: "...", inputSchema: {...} }` or `input_schema: {...}` or `parameters: {...}` **whose values are already JSON literals** (double-quoted strings, `true` / `false` / `null`).
+- A pure JSON Schema (no `name` → record `name = (unnamed)`, note "source has no name"; never invent one).
+- A YAML-form schema, or a `"system": "..."` string field inside a JSON object (the field value is the artifact).
 
-Python `Tool(name=..., description=..., inputSchema={...})` 调用或裸 Python dict 字面量**不属于** E1：Python 字面量语法（`'...'`、`True` / `None`、尾随逗号）不是 JSON，因此该 dict 必须按 §6.1 的逐字段转写处理——那属于 E3，不是逐字复制。
+A Python `Tool(name=..., description=..., inputSchema={...})` call or a bare Python dict literal is **not** E1: Python literal syntax (`'...'`, `True` / `None`, trailing commas) is not JSON, so the dict must go through the field-by-field transcription in §6.1 — that is E3, not verbatim copy.
 
-**Skill 正文边界。** Skill 正文是 front matter 之后的全部内容，直到文件末尾或下一个 front matter 块。只有 front matter（无正文）属于**不完整** Skill，不是完整原文。
+**Skill body boundary.** A Skill's body is everything after the front matter, up to the end of the file or the next front-matter block. A front matter alone (no body) is an **incomplete** Skill, not a full original.
 
-→ **逐字复制**。
+→ **verbatim copy**.
 
-### E2——包裹在代码中
+### E2 — wrapped in code
 
-由代码承载的字符串，**只有**可识别为三类工件之一时才是工件（§4.1 结构签名）：指令语义 → Prompt；`name`+`description` / `parameters` / `inputSchema` / `input_schema` / `function.parameters` → Tool；front matter + 正文 → Skill。日志字符串、错误消息、配置字符串和普通返回值属于**引用文件**——跳过。存在载体 ≠ 存在工件。
+A string carried by code is an artifact **only if it is recognizable as one of the three types** (§4.1 structural signature): instructional semantics → Prompt; `name`+`description` / `parameters` / `inputSchema` / `input_schema` / `function.parameters` → Tool; front matter + body → Skill. Log strings, error messages, config strings, and ordinary return values are **reference files** — skip them. Carrier presence ≠ artifact presence.
 
-当承载文本确为工件时，它是被代码包裹的完整文本。**不要枚举语法；只判断文本是否由代码承载**：
+When the carried text is an artifact, it is complete text wrapped in code. **Do not enumerate syntax; only judge whether the text is carried by code**:
 
-- Python：`f"""..."""`、`"""..."""`、普通 `"..."`、**docstring**（如 `dspy.Signature` 类 docstring）、**函数返回的字符串**。
-- TypeScript / JavaScript：反引号模板字符串、普通引号字符串、箭头函数返回的字符串、对象属性中的字符串。
-- Jinja 模板（`{{ }}` 是运行时插值；模板文本本身才是工件）。
-- Go raw string（反引号）、Ruby heredoc、Java text block——同一规则：字符串内容才是工件，外壳应剥离。
+- Python: `f"""..."""`, `"""..."""`, plain `"..."`, **docstring** (e.g. a `dspy.Signature` class docstring), **a string returned by a function**.
+- TypeScript / JavaScript: backtick template strings, plain quoted strings, a string returned by an arrow function, a string in an object property.
+- Jinja templates (`{{ }}` is runtime interpolation; the template text itself is the artifact).
+- Go raw strings (backticks), Ruby heredocs, Java text blocks — same rule: the string content is the artifact, the shell is stripped.
 
-→ **逐字复制**：取字符串内容，去掉赋值语句、函数签名、`return`、反引号；反转义；变量保持原样。
+→ **verbatim copy**: take the string content, drop the assignment statement, function signature, `return`, backticks; unescape; keep variables as-is.
 
-> 不要逐种语法枚举。`f"""`、反引号、`"..."`、docstring、`return` 的区别只在外壳如何剥离，而不在是否属于 E2。此前枚举语法曾导致 docstring 与普通字符串情形被漏掉。
+> Do not enumerate syntax case by case. `f"""`, backticks, `"..."`, docstring, `return` differ only in which shell to strip, not in whether this is E2. Enumerating syntax once caused docstring and plain-string cases to be missed.
 
-**检查每个变量**（包括 Jinja `{{ }}`）。判断依据**不是变量名**，而是变量定义能否在输入中定位，以及其内容是否为指令：
+**Examine each variable** (Jinja `{{ }}` included). The test is **not the variable name** — it is whether the variable's definition is locatable in the input and whether its content is instructional:
 
-| 情形 | 处理方式 |
+| Situation | How to handle |
 |---|---|
-| 内容是运行时数据（`{local_tz}`、`{date.today()}`、`{context}`、`{question}`）——无论定义能否定位 | 原样保留，标记“完整原文” |
-| 定义**可定位**，且内容是规则句（`{reference_prompt}`、`{tone_prompt}`） | 追踪定义；将其作为“待展开规则”记录到**引用层**（§4.1）。工件本身已逐字完整复制，因此完整度保持**完整原文**——展开内容位于引用层，不进入完整度标签 |
-| 定义**不可定位**，但变量名可观察地表示规则——名称包含 `rule` / `policy` / `instruction` / `prompt`，或变量直接插值进指令句 | 标记“原文 · 变量未展开”，说明是哪个变量以及会展开成多少条指令 |
-| 定义**不可定位**，且没有任何规则信号 | 原样保留，标记“完整原文” |
+| The content is runtime data (`{local_tz}`, `{date.today()}`, `{context}`, `{question}`) — whether or not its definition is locatable | Keep as-is, label "full original" |
+| Definition **locatable** and the content is a rule sentence (`{reference_prompt}`, `{tone_prompt}`) | Trace the definition; record it as a "rule to expand" in the **reference layer** (§4.1). The artifact itself was copied verbatim and in full, so its completeness stays **full original** — the expansion lives in the reference layer, not in the label |
+| Definition **not locatable** but the name observably signals rules — the name contains `rule` / `policy` / `instruction` / `prompt`, or the variable is interpolated directly into an instruction sentence | Label "original · variable unexpanded", state which variable and how many instructions it expands into |
+| Definition **not locatable** and nothing signals rules | Keep as-is, label "full original" |
 
-写在变量内的规则不存在于字面字符串中。能追踪定义时就追踪（完整度保持“完整原文”）；只有无法追踪且名称可观察地表示规则时（上述关键词测试），才降级为“原文 · 变量未展开”。未追踪却标为“完整原文”，会让“未声明参考规范”等检查错误失败，尽管来源文档实际已声明。
+Rules written inside a variable are absent from the literal string. Trace the definition when you can (completeness stays "full original"); only when you cannot and the name observably signals rules (the keyword test above), downgrade to "original · variable unexpanded". Labeling "full original" without tracing would wrongly fail checks like "reference specification not declared" even though the source did declare it.
 
-### E3——Schema 只存在于代码中
+### E3 — schema exists only as code
 
-需要**组装**后才能成为可加载工件。**E3 只有一个判定规则**：参数类型、描述与约束全部以字面量形式存在于来源中时，才可组装；若它们在运行时推断，或藏在无法转写的标签中，则属于 EX。
+Needs **assembly** to become a loadable artifact. **One rule decides E3**: an object qualifies for assembly when its parameter types, descriptions, and constraints all exist as literals in the source. If they do, assemble; if they are inferred at runtime or hidden in a tag you cannot transcribe, it is EX.
 
-| 来源形式 | 特征 |
+| Source form | Characteristic |
 |---|---|
-| Zod `z.object({...})` | 约束写在链式调用中；`.refine()` 无法转换为 JSON Schema |
-| Python `Tool(...)` + `inputSchema={...}` / `parameters={...}` dict 字面量 | Schema 只以 Python 字面量存在，不是 JSON——按 §6.2 逐字段转写 |
-| Python 装饰器 `@mcp.tool()` + 类型注解 + docstring | 类型来自注解、默认值来自签名、描述来自 `Args:` 段 |
-| Go builder `mcp.NewTool(...)` + `WithString/Required/DefaultString/Description` | 参数均为字面量 |
+| Zod `z.object({...})` | Constraints written in chained calls; `.refine()` cannot be converted to JSON Schema |
+| Python `Tool(...)` + `inputSchema={...}` / `parameters={...}` dict literal | The schema exists only as a Python literal, not as JSON — literal field-by-field transcription per §6.2 |
+| Python decorator `@mcp.tool()` + type annotations + docstring | Types from annotations, defaults from the signature, descriptions from the `Args:` section |
+| Go builder `mcp.NewTool(...)` + `WithString/Required/DefaultString/Description` | Parameters are all literals |
 
-→ **组装**，见 §6.2。
+→ **assembly**, see §6.2.
 
-### EX——无法识别
+### EX — unrecognizable
 
-- 没有结构签名、没有围栏，无法判断是否包含工件。
-- 动态注册，没有字面 Schema（`server.tool(func, name=..., output_schema=...)`）。
-- 只有注册列表（`{"fn": "...", "tags": [...]}`、`manifest.json` 条目），没有 `inputSchema` / `parameters`。
-- Go `type Xxx struct` + tags——若字段类型与 validate tags 均为字面量且形式已在 §6.2 列出，则可**组装**；只有类型靠推断或标签无法转写时，才是 EX（不可检查）。
+- No structural signature, no fence, cannot tell whether it contains an artifact.
+- Dynamic registration, no literal schema (`server.tool(func, name=..., output_schema=...)`).
+- Only a registration list (`{"fn": "...", "tags": [...]}`, `manifest.json` entries), no `inputSchema` / `parameters`.
+- Go `type Xxx struct` + tags — assembly **if** the field types and the validate tags are literal and their forms are listed in §6.2; EX (not inspectable) only when types are inferred or the tags cannot be transcribed.
 
-→ 标记“不可检查”，记录原因。
+→ label "not inspectable", record the reason.
 
-**例外**：候选对象有 `name` + `description`，但缺少其类型其余基础字段时，不属于“无法识别”，而是**不完整**工件。标记“不完整件”，提取已有字段，并说明缺失内容（Tool：“文档未提供 schema”；Skill：“无正文”）。有 `name` 但缺 `description` 的候选对象同样属于**不完整件**——Tool 必须先有 `description` 才能运行 QD-T 检查。没有 `name` 的纯 JSON Schema 不是不完整件：它仍是完整原文，且 `name = (unnamed)`（§5 E1）。缺失的基础字段只记录为文档层面事实，不判为产品缺陷。对 Prompt 而言，“不完整件”表示文本完全不含指令（例如仅有裸占位符或变量），或由多个片段组装而成但输入中缺少组装逻辑（§10）。
+**Exception**: a candidate with `name` + `description` but missing the rest of its type's base field is not "unrecognizable" — it is an **incomplete** artifact. Label "incomplete", extract the available fields, and state what is missing ("schema not provided with the document" for a Tool; "no body" for a Skill). A candidate with `name` but missing `description` is likewise **incomplete** — a Tool must carry `description` before the QD-T checks can run. A pure JSON Schema with no `name` is not incomplete: it stays a full original with `name = (unnamed)` (§5 E1). The missing base field is recorded only as a document-level fact, not judged as a product defect. For a Prompt, "incomplete" means the text carries no instruction at all (e.g. a bare placeholder or variable) or is assembled from several fragments whose assembly logic is absent from the input (§10).
 
-## 6. 提取规则
+## 6. Extraction rules
 
-### 6.1 逐字复制
+### 6.1 Verbatim copy
 
-适用于 E1 与 E2。
+Applies to E1 and E2.
 
-**目标格式。** 逐字复制保留来源自身语法，只去掉外壳；它**不**承诺结果一定是合法 JSON。当目标为 JSON Schema、但来源尚非 JSON（带单引号键的 Python dict 或 JS 对象字面量、`True`/`None`、尾随逗号等）时，该来源形式属于提取类别 E3——转到 §6.2 做逐字段字面量转写。
+**Target format.** Verbatim copy preserves the source's own syntax and drops only the shell; it does **not** promise valid JSON. When the target is a JSON Schema but the source is not already JSON (a Python dict or JS object literal with single-quoted keys, `True`/`None`, or trailing commas), that source form is extraction class E3 — go to §6.2 for the literal field-by-field transcription.
 
-1. 逐字复制；不重写、不润色、不补全。
-2. 只去外壳（赋值语句、函数定义行、`return`、围栏标记、`export const X =`、反引号）；外壳内部内容保持不变。Python 多行字符串应去除公共缩进（dedent）。嵌套围栏只剥最外层，内层围栏标记作为工件文本保留。
-3. **仅在字符串字面量语义要求时**反转义（`\n` → 换行）；在 raw string / regex 中保留字面 `\n`。变量（`{var}`、`{{ var }}`）原样保留，不替换。
-4. 结果必须与原文完整匹配；不匹配 → 标记“摘要”。
-5. 按 §5 E2 的“检查每个变量”规则检查每个占位符。
+1. Copy word-for-word; do not rewrite, polish, or complete.
+2. Drop only the shell (assignment statement, function definition line, `return`, fence markers, `export const X =`, backticks); the content inside the shell is untouched. For a Python multiline string, strip the common indentation (dedent). For nested fences, strip only the outermost layer and keep the inner fence markers as artifact text.
+3. Unescape (`\n` → newline) **only** where string-literal semantics call for it; in a raw string / regex keep `\n` literal. Variables (`{var}`, `{{ var }}`) are kept as-is, not substituted.
+4. The result must match the original in full. If it does not → label "summary".
+5. Check every placeholder per the "examine each variable" rule in §5 E2.
 
-### 6.2 组装
+### 6.2 Assembly
 
-适用于 E3。**只重组，不翻译。**
+Applies to E3. **Reorganize only, do not translate.**
 
-**非 JSON 字面量的逐字段转写。** 当目标为 JSON Schema、但来源是 Python dict 或 JS 对象字面量且尚非 JSON（例如使用单引号键的 `inputSchema={...}`、`True`/`None`、尾随逗号）时，逐字段转写为 JSON：单引号 → 双引号，`True`/`None` → `true`/`null`，去掉尾随逗号；非字面量值标记为“来源值，非 schema 值”。记录 `method = assembly`，不是 `verbatim copy`。
+**Literal field-by-field transcription (non-JSON literals).** When the target is a JSON Schema but the source is a Python dict or JS object literal that is not already JSON (`inputSchema={...}` written with single-quoted keys, `True`/`None`, or trailing commas), transcribe it field by field into JSON: single quotes → double quotes, `True`/`None` → `true`/`null`, drop trailing commas; a non-literal value is marked "in source, not a schema value". Record `method = assembly`, not `verbatim copy`.
 
-1. 逐字段复制源码中所有已有字面内容：`name`、`description` / `.describe("...")`、每个参数的键与描述、`enum` 值、`required` 列表、`default` 值。
-2. 按下列规则转换约束：
+1. Copy, field by field, everything already literal in the source: `name`, `description` / `.describe("...")`, each parameter's key and description, `enum` values, the `required` list, `default` values.
+2. Convert constraints by rule:
 
-| 来源形式 | JSON Schema |
+| Source form | JSON Schema |
 |---|---|
-| 字符串上的 Zod `.max(n)` / `.min(n)` | `maxLength` / `minLength` |
-| 数字上的 Zod `.max(n)` / `.min(n)` | `maximum` / `minimum` |
-| 数组上的 Zod `.max(n)` / `.min(n)` | `maxItems` / `minItems` |
+| Zod `.max(n)` / `.min(n)` on a string | `maxLength` / `minLength` |
+| Zod `.max(n)` / `.min(n)` on a number | `maximum` / `minimum` |
+| Zod `.max(n)` / `.min(n)` on an array | `maxItems` / `minItems` |
 | Zod `.int()` | `type: integer` |
 | Zod `.enum([...])` | `enum` |
-| Zod `.optional()` | 不放入 `required` |
+| Zod `.optional()` | not in `required` |
 | Zod `.default(v)` | `default` |
 | Zod `.regex(re)` | `pattern` |
 | Zod `.email()` / `.url()` / `.uuid()` | `format: email` / `uri` / `uuid` |
 | Zod `z.record(k, v)` | `type: object` + `additionalProperties` |
-| Zod `z.tuple([...])` | `type: array` + 固定 `items` |
-| Zod `z.union([...])` / `z.literal(v)` | 所有备选均为字面量时转为 `enum` / `const`；否则标记“union 无法表达，仅存在于来源” |
-| Zod `z.any()` / `z.unknown()` | 不写 `type` 关键字 |
-| 字段内的嵌套 `z.object({...})` | 递归处理：该字段成为带自身 `properties` 的嵌套 `type: object` |
-| Python `str/int/float/bool` 注解 | `string/integer/number/boolean` |
-| Python `List[X]` 注解 | `type: array` + `items` |
-| Python `= None` 默认值 | 不放入 `required` |
-| 无默认值的 Python `Optional[X]` | 放入 `required`（可为 null） |
+| Zod `z.tuple([...])` | `type: array` + fixed `items` |
+| Zod `z.union([...])` / `z.literal(v)` | `enum` / `const` when all alternatives are literals; otherwise "union not expressible, in source only" |
+| Zod `z.any()` / `z.unknown()` | no `type` keyword |
+| Nested `z.object({...})` inside a field | recurse: the field becomes a nested `type: object` with its own `properties` |
+| Python `str/int/float/bool` annotation | `string/integer/number/boolean` |
+| Python `List[X]` annotation | `type: array` + `items` |
+| Python `= None` default | not in `required` |
+| Python `Optional[X]` without default | in `required` (nullable) |
 | Python `Literal[a, b]` | `enum` |
 | Python `Dict[str, X]` | `type: object` + `additionalProperties` |
 | Python `Set[X]` | `type: array` + `uniqueItems: true` |
-| Python `Tuple[X, Y]` | `type: array` + 固定 `items` |
-| Python `Union[X, Y]` / `X \| Y` | 简单情形用 `anyOf`；否则标记“union 无法表达，仅存在于来源” |
-| Python `Any` | 不写 `type` 关键字 |
-| Python 无默认值 / 有默认值 | 放入 `required` / 记录 `default` |
-| Python docstring 首段（`Args:` 之前） | Tool 顶层 `description` |
-| Python docstring 的 `Args:` 段 | 对应参数的 `description` |
+| Python `Tuple[X, Y]` | `type: array` + fixed `items` |
+| Python `Union[X, Y]` / `X \| Y` | `anyOf` when simple; otherwise "union not expressible, in source only" |
+| Python `Any` | no `type` keyword |
+| Python no default / has default | in `required` / record `default` |
+| Python docstring first paragraph (before `Args:`) | the Tool's top-level `description` |
+| Python docstring `Args:` section | the corresponding parameter's `description` |
 | Go `WithString/WithNumber/WithBoolean` | `type` |
 | Go `WithArray(...)` / `WithEnum(...)` / `WithObject(...)` | `type: array` / `enum` / `type: object` |
-| Go `WithArray(WithString(...))` | `type: array` + `items: { type: string }`（元素类型跟随内层 builder） |
-| Go `WithObject(...)` 子字段 | 带自身 `properties` 的嵌套 `type: object` |
-| Go `Required()` | 放入 `required` |
+| Go `WithArray(WithString(...))` | `type: array` + `items: { type: string }` (element type follows the inner builder) |
+| Go `WithObject(...)` child fields | a nested `type: object` with its own `properties` |
+| Go `Required()` | in `required` |
 | Go `DefaultString/DefaultNumber` | `default` |
 | Go `Description(...)` | `description` |
-| Go `json:"name"` 标签 | 属性键 |
-| Go `validate:"required"` / `validate:"omitempty"` | 放入 `required` / 不放入 `required` |
-| Go `validate:"min=N,max=N"` | 数值字段 → `minimum` / `maximum`；字符串字段 → `minLength` / `maxLength`（按字段的 Go 字面类型判断） |
+| Go `json:"name"` tag | the property key |
+| Go `validate:"required"` / `validate:"omitempty"` | in `required` / not in `required` |
+| Go `validate:"min=N,max=N"` | `minimum` / `maximum` on a numeric field, `minLength` / `maxLength` on a string field (decide by the field's literal Go type) |
 | Go `validate:"oneof=a b"` | `enum` |
 | Go `validate:"email"` / `validate:"url"` | `format: email` / `format: uri` |
-| Go 字段类型 `string/int/int64/float64/bool` | `string/integer/integer/number/boolean` |
-| Go 字段类型 `[]T` / `map[string]T` | `type: array` + `items` / `type: object` + `additionalProperties` |
-| Go 指针字段 `*T` | 不放入 `required`，除非标签为 `validate:"required"` |
+| Go field type `string/int/int64/float64/bool` | `string/integer/integer/number/boolean` |
+| Go field type `[]T` / `map[string]T` | `type: array` + `items` / `type: object` + `additionalProperties` |
+| Go pointer field `*T` | not in `required` unless the tag says `validate:"required"` |
 
-> 上表未列出的来源约束一律**不进入 schema**——记录为证据，绝不为它编造关键字。
+> Any source constraint not listed above stays **out of the schema** — record it as evidence, never invent a keyword for it.
 
-3. 包装为 `{ "type": "object", "properties": {...}, "required": [...] }`。
-4. **不得添加源码中不存在的字段级约束。** 若源码未为某属性写 `type`，不得为该属性添加 `type` 关键字。（规则 3 中的根 `"type": "object"` 是组装外壳，不是来源字段。）
-5. `.refine()` / `.superRefine()` / 自定义校验无法转换为 JSON Schema；**不得编造等价约束**——写明“源码中通过 refine 实现，未进入 schema”。
-6. 框架注入参数不是用户参数，**必须移除**：Python MCP `ctx: Context`、FastAPI `Depends(...)`、LangChain `InjectedToolArg`、`self` / `cls`，以及运行时配置对象。
-7. 为每个字段附上来源片段。
+3. Wrap into `{ "type": "object", "properties": {...}, "required": [...] }`.
+4. **Add no field-level constraint that is absent from the source.** If the source does not write a `type` for a property, do not add a `type` keyword for that property. (The root `"type": "object"` in rule 3 is the assembly wrapper, not a source field.)
+5. `.refine()` / `.superRefine()` / custom validation cannot be converted to JSON Schema; **do not fabricate an equivalent constraint** — write "implemented in source via refine, not entered into the schema".
+6. Framework-injected parameters are not user parameters and **must be removed**: Python MCP `ctx: Context`, FastAPI `Depends(...)`, LangChain `InjectedToolArg`, `self` / `cls`, and runtime config objects.
+7. Attach the source fragment for each field.
 
-### 6.3 description 字段不得丢失
+### 6.3 The description field must not be lost
 
-`description` / `.describe()` / docstring 是 Tool Schema 检查的核心依据，也是组装过程中最容易丢失的内容。
+`description` / `.describe()` / docstring is the core basis of Tool Schema inspection, and is the easiest thing to lose during assembly.
 
-- 来源有描述、结果没有 → 将整个工件标为“组装件”，并写明“description 字段有丢失风险”。
-- 来源无描述 → 结果也不得有描述；**不得自行编写**。
+- Source has a description, result does not → label the whole thing "assembled" and write "description field at risk of loss".
+- Source has no description → the result must not have one either; **do not write one**.
 
-## 7. 完整度层级
+## 7. Completeness levels
 
-六个标签作用于整个工件，不按字段细分。它们构成全序（越靠前越可检查）：
+Six labels, applied to the whole artifact, not subdivided by field. They form a total order (top = most inspectable):
 
-```text
-完整原文  >  原文 · 变量未展开  >  组装件  >  不完整件  >  摘要  >  不可检查
+```
+full original  >  original · variable unexpanded  >  assembled  >  incomplete  >  summary  >  not inspectable
 ```
 
-“将完整度下降一级”（§9）表示沿此顺序向下移动一步。
+"Drop the completeness level by one" (§9) means move down this order by one step.
 
-| 标签 | 含义 | 可执行检查 |
+| Label | Meaning | Which checks can run |
 |---|---|---|
-| **完整原文** | 逐字复制且完整 | 全部 |
-| **原文 · 变量未展开** | 逐字复制，但存在会展开为规则的未展开变量 | 除依赖这些变量的检查外全部执行 |
-| **组装件** | 从代码组装的 Schema | 结构与矛盾检查全部执行；“字段缺少某约束”逐字段判断（见下文） |
-| **不完整件** | 工件缺少基础字段 | 只检查实际提供的字段 |
-| **摘要** | 经过总结 / 转写 / 与原文不匹配 | 只检查矛盾，不检查“缺少什么” |
-| **不可检查** | 无法提取 | 不检查，仅记录原因 |
+| **full original** | Verbatim copy, complete | All |
+| **original · variable unexpanded** | Verbatim copy, but has unexpanded variables that expand into rules | All except checks that depend on those variables |
+| **assembled** | Schema assembled from code | Structure and contradiction checks all run; "a field is missing some constraint" is judged per field (see below) |
+| **incomplete** | Artifact incomplete, missing base fields | Only checks on the fields actually provided |
+| **summary** | Summarized / transcribed / does not match the original | Only contradiction checks, not "what is missing" |
+| **not inspectable** | Cannot be extracted | No checks; only record the reason |
 
-**“组装件”如何判断缺失约束**：查看证据。
+**How "assembled" judges a missing constraint**: look at the evidence.
 
-| 证据情况 | 结论 |
+| Evidence situation | Conclusion |
 |---|---|
-| 来源片段覆盖字段的完整写法（完整链式调用 / 完整签名 / 完整 builder 调用 / 完整 struct 定义） | 可判定。来源确实没写 → 真正缺失 |
-| 来源片段只覆盖部分，或边界不清晰 | 跳过该检查，标记“不确定” |
+| The source fragment covers the field's complete writing (whole chained call / full signature / full builder call / full struct definition) | Judgeable. The source really did not write it → truly missing |
+| The source fragment covers only part, or the boundary is unclear | Skip that check, mark "uncertain" |
 
-是否执行检查取决于该字段是否被完整复制，而不是是否属于组装件。
+Whether a check runs depends on whether that field was copied fully, not on whether it is an assembled artifact.
 
-**`.refine()` 单独观察**：`.refine()` 通常不会进入运行时生成的 JSON Schema。因此，若 description 承诺某约束（例如“最多 50 个词”）但 schema 中没有对应关键字，这是**候选 QD-T-4.5，应移交检查阶段**（仅记录证据——本层绝不输出 PASS/FAIL），不得以“无法组装”为由抹除。措辞示例：“description 声明 X，schema 无对应约束；源码中 X 通过 refine 实现，通常不会进入 JSON Schema。”
+**`.refine()` is looked at separately**: `.refine()` generally does not enter the runtime-generated JSON Schema. So when the description promises a constraint (e.g. "at most 50 words") but the schema has no corresponding keyword, this is a **candidate QD-T-4.5 check to hand off** (recorded as evidence for the inspection stage — this layer never emits PASS/FAIL) and must not be erased as "cannot be assembled". Wording: "description declares X, schema has no corresponding constraint; in source X is implemented via refine, which usually does not enter the JSON Schema."
 
-## 8. 层级判定（L）
+## 8. L determination
 
-本层一次性判定**每个工件的 L**（复杂度 / 操作风险层级）并向下传递。L 是分类，不是缺陷等级。它只决定后续检查的严重度（P），**不决定是否执行检查**（后者由后续结构事实门决定，而非 L）。
+This layer determines **L** — the complexity / operation-risk level of each artifact — once, and hands it down. L is a classification, not a defect grade. It feeds only the severity (P) of the downstream checks; it does **not** decide whether a check runs (that is the downstream structural-fact gate's job, not L's).
 
-### 8.1 两个维度保持独立
+### 8.1 Two dimensions, kept separate
 
-| 维度 | 判断内容 | 层级 | 适用对象 |
+| Dimension | Judges | Levels | Applies to |
 |---|---|---|---|
-| **AC-L** | Agent 有多复杂 | L1 单轮 / L2 多轮 / L3 复杂（L4 多 Agent 保留） | System Prompt |
-| **OR-L** | 操作风险有多高 | L1 只读 / L2 可恢复写入 / L3 不可逆 | Skill、Tool Schema |
+| **AC-L** | how complex the agent is | L1 single-turn / L2 multi-turn / L3 complex (L4 multi-agent reserved) | System Prompt |
+| **OR-L** | how risky the operations are | L1 read-only / L2 reversible write / L3 irreversible | Skill, Tool Schema |
 
-两个维度**在引擎层保持独立**——绝不合并为一个数字，因为合并会破坏严重度查询（例如“AC-L1 + OR-L3”无法表达为单一层级）。
+The two dimensions are **kept separate at the engine level** — they are never merged into one number, because merging would break severity lookup (e.g. "AC-L1 + OR-L3" cannot be expressed as a single level).
 
-### 8.2 AC-L 判定（Prompt）
+### 8.2 AC-L determination (Prompt)
 
-读取 Prompt 内容并判断复杂度。多轮与单轮在静态 Prompt 中往往**不可见**——只依据可观察信号判断：
+Read the prompt content and judge its complexity. Multi-turn vs. single-turn is often **not visible in a static prompt** — judge by observable signals only:
 
-- **AC-L1（单轮）**：一问一答；无工具、无多轮状态。
-- **AC-L2（多轮）**：多轮对话；每轮可独立理解。可观察信号：`history` / `turn` / `session` 变量、“previous messages”字段，或明确的往返交互契约。
-- **AC-L3（复杂）**：跨步骤规划 / 反思 / 工具编排。可观察信号：工具调用循环、plan→execute→reflect 指令，或显式多步骤编排。
-- **L4（多 Agent）**保留；多 Agent 规模确定前不得输出 L4。
-- **无可观察信号**表明多轮 / 复杂度 → 输出 `L = undetermined`；不得猜测。
+- **AC-L1 (single-turn)**: one question, one answer; no tools, no multi-turn state.
+- **AC-L2 (multi-turn)**: a multi-turn dialogue; each turn is self-contained. Observable signals: variables for `history` / `turn` / `session`, a "previous messages" field, or a stated back-and-forth contract.
+- **AC-L3 (complex)**: planning / reflection / tool orchestration across steps. Observable signals: a tool-call loop, plan→execute→reflect instructions, or explicit multi-step orchestration.
+- **L4 (multi-agent)** is reserved; do not emit L4 until the multi-agent scale is finalized.
+- **No observable signal** for multi-turn / complexity → emit `L = undetermined`; do not guess.
 
-### 8.3 OR-L 判定（Skill / Tool）
+### 8.3 OR-L determination (Skill / Tool)
 
-读取 Skill/Tool 内容，按其可执行的最危险操作判断操作风险：
+Read the skill/tool content and judge its operation risk by the most dangerous operation it can perform:
 
-- **OR-L1（只读）**：查询 / 搜索 / 读取；无写入。
-- **OR-L2（可恢复写入）**：创建 / 更新 / 发送，且可纠正或撤销。
-- **OR-L3（不可逆）**：删除 / 转移 / 不可逆的外部通知。
+- **OR-L1 (read-only)**: query / search / read; no write.
+- **OR-L2 (reversible write)**: create / update / send that can be corrected or undone.
+- **OR-L3 (irreversible)**: delete / transfer / irreversible external notification.
 
-**绝不静默降级为 OR-L1。** 未声明工具调用的 Skill/Tool **不会自动**成为 OR-L1：先扫描其正文与 schema 语义中的写操作动词（delete / transfer / send / overwrite / deploy / write）。任何写命中 → 按其中最高风险操作判定。只有存在正向读动词（query / search / read）且**没有**写动词时，才是 OR-L1。完全没有任何动词的 Skill/Tool 保持 `undetermined`（§8.5）。
+**Never silently downgrade to OR-L1.** A Skill/Tool with no declared tool invocation is **not** automatically OR-L1: first scan its prose and schema semantics for write verbs (delete / transfer / send / overwrite / deploy / write). Any write hit → judge by the highest such operation. Only a positive read verb (query / search / read) with **no** write verb is OR-L1. A Skill/Tool with no verb of any kind stays `undetermined` (§8.5).
 
-### 8.4 产品层：一个统一标签
+### 8.4 Product layer: one unified label
 
-面向用户输出时，将两个维度折叠为**每个工件一个统一标签**（合并只发生在展示层，不发生在计算层）：
+For the user-facing output, collapse the two dimensions into **one unified label per artifact** (the merged view happens in how it is shown, not in how it is computed):
 
-- Prompt → 展示其 AC-L。
-- Skill / Tool → 展示其 OR-L。
-- （Permission 是横切关注点，由后续流程逐权限项处理——不在本层处理。）
+- Prompt → show its AC-L.
+- Skill / Tool → show its OR-L.
+- (Permission, a cross-cutting concern, is handled downstream per permission item — not here.)
 
-### 8.5 不确定时
+### 8.5 When uncertain
 
-- 若无法从现有内容判断 L（例如“摘要”保真度），输出 `L = undetermined`，由后续结构事实门决定“是否检查”；后续按 `_meta.md` §4 将严重度报告为 `—`（参考级），并记录“L 未定”，不得随意选择 L 列。
-- L **不**决定“是否检查”，但**会**决定结果是否进入缺陷分级：`∅`（该 L 不分配 P）与 `undetermined`（后续报告为 `—`）都会将发现降为参考级。因此错误的 L **可能压制缺陷**——L1 误判可把 P0/P1 发现变成不参与分级的参考备注。绝不把错误 L 描述为无害。
+- If L cannot be judged from the available content (e.g. "summary" fidelity), emit `L = undetermined` and let the downstream structural-fact gate decide "whether to check"; the downstream then reports severity as `—` (reference level) per `_meta.md` §4, and records "L undetermined" in the report rather than picking an L column.
+- L does **not** decide "whether to check", but it **does** decide whether a result enters the defect grade: `∅` (this L assigns no P) and `undetermined` (reported as `—` downstream) both drop a finding to reference level. A wrong L therefore **can** suppress a defect — an L1 misjudgment can turn a P0/P1 finding into a non-graded reference note. Never present a wrong L as harmless.
 
-## 9. 证据
+## 9. Evidence
 
-不要使用行号（模型引用不可靠）或校验和（无脚本）。使用**摘录自证**。
+Do not use line numbers (models cite them unreliably) or checksums (no scripts). Use **excerpt self-evidence**.
 
-每项输出包含：
+Each output carries:
 
-- **位置**：来源文件 + 章节标题（如 `## Original Artifact Content` / `### 2. Input schema`）。
-- **方法**：逐字复制 / 组装 / 摘要。
-- **逐字摘录**：逐字复制情形给出首尾片段；组装情形给出每个字段的来源片段（`name` → 来源、`description` → 来源、每个参数 → 来源）。
+- **Location**: source file + section heading (e.g. `## Original Artifact Content` / `### 2. Input schema`).
+- **Method**: verbatim copy / assembly / summary.
+- **Verbatim excerpt**: verbatim-copy cases give the head and tail fragments **plus a `#### Full verbatim body` block carrying the complete artifact text word-for-word**; assembly cases give the source fragment per field (`name` → source, `description` → source, each parameter → source).
 
-自证标准：不了解上下文的人仅凭证据就能在原文中找到每个要点。做不到时，将完整度下降一级（按 §7 顺序）。
+Self-evidence standard: a person who does not know the context can find every point in the original using only the evidence. If not, drop the completeness level by one (down the §7 order).
 
-**正确性标记（独立于完整度）。** 完整度说明*提取了多少*；正确性说明*提取结果是否可能出错*。当证据无法逐字段与原文匹配时，附加正确性标记——`verbatim mismatch`（逐字复制发生漂移）或 `assembly mismatch`（组装字段与来源不一致）——即使完整度标签仍为“完整原文”。这样审计才能区分“提取错误”与“检查错误”。
+**Correctness mark (independent of completeness).** Completeness says *how much* was extracted; correctness says *whether the extraction may be wrong*. When the evidence cannot be matched field-by-field to the original, attach a correctness mark — `verbatim mismatch` (a verbatim copy that drifts) or `assembly mismatch` (an assembled field that does not match its source) — even if the completeness label stays `full original`. This is what lets an audit tell "extraction error" apart from "inspection error".
 
-## 10. 文档内的 Agent 归属
+## 10. Agent membership within a document
 
-**默认：一份文档 = 一个 Agent 的工件集。**
+**By default, one document = one agent's artifact set.**
 
-- 一份文档可包含同一 Agent 的多个工件（一个 Prompt + 多个 Tool）。
-- 检测到多个 Agent 形态时（例如 6 个角色的套件），**不自动拆分，也不自动退回**：标记“Agent 归属待确认”，说明检测依据，并给用户两个确认选项——(a) 确认属于同一 Agent → 继续；(b) 声明它们是一组无关工件 → 交给检查阶段以集合模式逐个执行单工件检查。pre-inspect 不为用户做决定。
+- One document may contain multiple artifacts of the same agent (one prompt + several tools).
+- If multiple agent forms are detected (e.g. a suite of 6 roles), **do not auto-split and do not auto-bounce**: label "agent membership pending confirmation", state the detection basis, and output two options for the user to confirm — (a) confirm they are one agent → continue; (b) declare them an unrelated artifact collection → hand to inspect in collection mode for per-artifact single checks. pre-inspect does not decide for the user.
 
-### 其余情形的处理
+### How to handle the remaining cases
 
-| 情形 | 处理 |
+| Case | Handling |
 |---|---|
-| 围栏未闭合 | 不猜结尾；标记“摘要” |
-| 变量是运行时数据（`{local_tz}`） | 保留变量，标记“完整原文” |
-| 变量会展开为规则，且定义可定位（输入中已定义 `{reference_prompt}`） | 保持“完整原文”，追踪定义，列出变量，并作为 `prompt var` 加入引用层 |
-| 变量会展开为规则，且定义不可定位（输入中未定义 `{reference_prompt}`） | 标记“原文 · 变量未展开”，列出变量 |
-| 多个片段由代码组装成最终 Prompt | 标记“不完整件”，写明“未提供组装逻辑” |
-| 组装时字段与来源不匹配 | 将整体标为“组装件”，附加 `assembly mismatch` 正确性标记，并注明字段 |
-| 怀疑 description 字段丢失 | 不执行相关检查，记录证据 |
-| 怀疑存在多个 Agent | 标记“Agent 归属待确认”，输出确认选项 |
-| 已总结 / 转写 / 无法干净切分 | 标记“摘要”或“不可检查” |
+| Fence not closed | Do not guess the ending; label "summary" |
+| Variable is runtime data (`{local_tz}`) | Keep the variable, label "full original" |
+| Variable expands into rules, definition locatable (`{reference_prompt}` defined in the input) | Keep "full original", trace the definition, list the variable, and add it to the reference layer as `prompt var` |
+| Variable expands into rules, definition not locatable (`{reference_prompt}` undefined in the input) | Label "original · variable unexpanded", list the variable |
+| Multiple fragments assembled by code into a final prompt | Label "incomplete", write "assembly logic not provided" |
+| A field does not match the source during assembly | Label the whole thing "assembled", attach the `assembly mismatch` correctness mark, and note the field |
+| Description field suspected lost | The related checks do not run, evidence noted |
+| Suspected multiple agents | Label "agent membership pending confirmation", output confirmation options |
+| Summarized / transcribed / cannot cut cleanly | Label "summary" or "not inspectable" |
 
-## 11. 输出格式
+## 11. Output format
 
-输出一份 Markdown 清单，结构为两层 IR：
+One Markdown inventory, structured as a two-layer IR:
 
-1. **提取摘要**（顶部）：Agent 归属声明（单 Agent / 待确认）、工件总数、按类型计数、不可检查数量及逐项原因、完整度分布、L 分布。归属声明使用固定措辞，便于后续消费者可靠读取：`agent membership: single agent` 或 `agent membership: pending confirmation`（绝不使用自由改写）。
-2. **对象层**：每个提取工件一个块：工件名称、类型、完整度、**L**、提取类别、来源位置、提取方法、逐字证据。“原文 · 变量未展开”必须列出未展开变量及内容摘要。
-3. **引用层**：§4.1 检测到的每个跨对象引用：`引用名称 | 被谁引用 | 关系（tool call / skill dep / prompt var / file ref）`；泛化文本不进入此层。定义可定位的 `prompt var` 条目还必须携带**展开后的规则**——追踪到的定义文本，或指向其定义位置的锚点——使检查阶段能读取展开内容，而不只是变量名。
-4. **不可检查列表**：单独列出，每项写明原因，不产生缺陷结论。
-5. **`ir-core` JSON 块**：对象层、引用层与不可检查列表的机器可读核心（见下文），供 CLI / platform 解析。
+1. **Extraction summary** (top): agent membership declaration (single agent / pending confirmation), total artifact count, count by type, not-inspectable count and per-item reasons, completeness-level distribution, and L distribution. The membership declaration uses a fixed phrasing so downstream consumers can read it reliably: `agent membership: single agent` or `agent membership: pending confirmation` (never a free-form paraphrase).
+2. **Object layer** — one block per extracted artifact: artifact name, type, completeness level, **L**, extraction class, source location, extraction method, verbatim evidence, and a **`#### Full verbatim body` block carrying the complete artifact text word-for-word** (the head/tail excerpts alone are not enough — the downstream inspection must read the full body to judge "missing / not declared" checks). "original · variable unexpanded" must list the unexpanded variables and a content summary.
+3. **Reference layer** — every cross-object reference detected in §4.1: `referenced name | referenced by | relationship (tool call / skill dep / prompt var / file ref)`; generic prose does not enter here. A `prompt var` entry whose definition is locatable (§5 E2) additionally carries the **expanded rules** — the traced definition text, or a location anchor pointing to where it is defined — so the inspection stage can read the expanded content, not just the variable name.
+4. **Not-inspectable list** — listed separately, each with a reason, producing no defect conclusion.
+5. **`ir-core` JSON block** — the machine-readable core of layers 2, 3 and 4 — objects, references, and the not-inspectable list (see below), for CLI / platform to parse.
 
-### ir-core 块（机器可读核心）
+### ir-core block (machine-readable core)
 
-将 IR 落盘为文件，并在文件中嵌入一个 `<!-- ir-core -->` JSON 块，只包含机器可读字段，使程序引擎无需读取人类证据即可解析 IR。
+Materialize the IR to a file and, inside it, embed one `<!-- ir-core -->` JSON block carrying only the machine-readable fields, so a program engine can parse the IR without reading the human evidence.
 
-**ir-core v1 契约。** `ir_version` 为 `"1"`。`completeness` 是 §7 六个标签之一；`L` 是 `AC-L1` / `AC-L2` / `AC-L3` / `OR-L1` / `OR-L2` / `OR-L3` / `undetermined` 之一。`objects[]` 携带 `type` / `name` / `completeness` / `L` / `source` / `mismatch`；`source` 是章节标题（§9 位置），`mismatch` 是正确性标记或 null。“不可检查”对象**不**放入 `objects[]`——它们进入独立的 `not_inspectable[].{name,reason}`。`references[].relationship` 为 `tool call` / `skill dep` / `prompt var` / `file ref` 之一。
+**ir-core v1 contract.** `ir_version` is `"1"`. `completeness` is one of the six labels (§7); `L` is one of `AC-L1` / `AC-L2` / `AC-L3` / `OR-L1` / `OR-L2` / `OR-L3` / `undetermined`. `objects[]` carries `type` / `name` / `completeness` / `L` / `source` / `mismatch`; `source` is the section heading (§9 Location), `mismatch` is a correctness mark or null. "not inspectable" objects are **not** in `objects[]` — they go in a separate `not_inspectable[].{name,reason}`. `references[].relationship` is one of `tool call` / `skill dep` / `prompt var` / `file ref`.
 
 <!-- ir-core -->
 ```json
@@ -418,21 +418,21 @@ Python `Tool(name=..., description=..., inputSchema={...})` 调用或裸 Python 
 ```
 <!-- /ir-core -->
 
-**落盘**：由宿主模型（本 Skill 无脚本）将 IR 写为 Markdown 文件（默认名 `{input_basename}.ir.md`，放在输入文件旁或用户指定的输出目录），**同时**在上下文中保留副本供串联检查使用。文件是持久审计检查点；上下文副本是工作交接载体。若宿主无法写文件（无写权限 / 无文件系统），只保留上下文副本并将摘要标记为 `not materialized`——落盘**不是**成功提取的前置条件。
+**Materialization**: the host model (this skill has no scripts) writes the IR as a Markdown file (default name `{input_basename}.ir.md`, next to the input or in the user-specified output directory) **and** keeps a copy in-context for the chained inspection. The file is the durable audit checkpoint; the in-context copy is the working handoff. If the host cannot write the file (no write permission / no filesystem), keep only the in-context copy and mark the summary `not materialized` — materialization is **not** a precondition for a successful extraction.
 
-## 12. 本 Skill 不做什么
+## 12. What this does NOT do
 
-- 不重写、不修复、不规范化工件文本。
-- 不判断 PASS / FAIL / 严重度（P0/P1/P2）。判定 L（AC-L / OR-L）是 L 分类，不是缺陷等级。
-- 不跨 Agent 拆分或混合。
-- 不编造字段、不编造约束、不编写缺失描述。
-- 不把载体当工件，也不把脚手架当工件。
-- 不将框架注入参数写成 Tool 参数（Python MCP `ctx: Context`、FastAPI `Depends(...)`、LangChain `InjectedToolArg`、`self` / `cls`）。
+- Do not rewrite, repair, or normalize artifact text.
+- Do not judge PASS / FAIL / severity (P0/P1/P2). Determining L (AC-L / OR-L) is an L classification, not a defect grade.
+- Do not split or mix across agents.
+- Do not fabricate fields, invent constraints, or write missing descriptions.
+- Do not treat a carrier as an artifact, or scaffolding as an artifact.
+- Do not write framework-injected parameters (Python MCP `ctx: Context`, FastAPI `Depends(...)`, LangChain `InjectedToolArg`, `self` / `cls`) as tool parameters.
 
-## 13. 交接给 deeplogic-inspect-lite
+## 13. Handoff to sanityops-inspect-lite
 
-```text
-原始文档 → [预检查提取层] → 两层 IR（对象 + 引用，每个对象带 L 标签）→ [七阶段检查]
+```
+Original document → [pre-inspection extraction layer] → two-layer IR (objects + references, each object tagged with L) → [seven-stage inspection]
 ```
 
-预检查层不改变七阶段逻辑，只改变送入检查的内容——两层 IR（带 L 标签）替代扁平工件列表。IR 同时以上下文和工作区文件两种形式交接。“不可检查”对象会在最终报告中列为输入说明，不产生缺陷结论。
+The pre-inspection layer does not change the seven-stage logic; it only changes what is fed into it — the two-layer IR (with L tagging) replaces the flat artifact list. The IR is handed down both in-context and as a materialized file. "Not inspectable" objects are listed in the final report as input notes, producing no defect conclusion.

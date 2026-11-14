@@ -1,9 +1,9 @@
-"""Logging module for deeplogic-cli.
+"""Logging module for sanityops-cli.
 
 Provides structured logging for command execution.
 
 Usage:
-    from deeplogic_cli.logging import LogManager, LogConfig
+    from sanityops_cli.logging import LogManager, LogConfig
 
     config = LogConfig(enabled=True, level="INFO")
     manager = LogManager(config, command="inspect")
@@ -12,8 +12,8 @@ Usage:
     manager.end_session("success", {"duration": 30.5})
 """
 
-from deeplogic_cli.logging.config import LogConfig, load_log_config
-from deeplogic_cli.logging.manager import LogManager
+from sanityops_cli.logging.config import LogConfig, load_log_config
+from sanityops_cli.logging.manager import LogManager
 
 __all__ = [
     "LogConfig",

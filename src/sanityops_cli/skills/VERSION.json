@@ -1,24 +1,24 @@
 {
   "source": {
-    "url": "http://192.168.1.199:8080/deeplogic/deeplogic-inspect-lite",
-    "commit": "fd61cb4702f2503dbd652219648cdd042cbc5d47",
-    "synced_at": "2026-11-10T09:32:37+00:00"
+    "url": "https://github.com/sanityops-org/sanityops-inspect-lite.git",
+    "commit": "036e6233a95e1c725cde2237cb31912c4879516e",
+    "synced_at": "2026-11-14T09:37:01+00:00"
   },
   "items": {
-    "deeplogic-inspect-lite": {
+    "sanityops-inspect-lite": {
       "type": "synced",
       "version": "1.3.1",
-      "sha256": "52e142d0f2fcdcf89478a869246817dea3935dd6d3fa11b9973c4e6fca4bba9f"
+      "sha256": "58383974a42b6219ce7499801ee9a921c671c569ace88332c902ab90e40b721f"
     },
     "code-contract-checklist.v2": {
       "type": "synced",
       "version": "v2",
-      "sha256": "4cf6caa677c158f79c3fef44753e86ea42e75d9cc4ac2316298c60b7b3088b6f"
+      "sha256": "2655bb59c607d064f310be2c70f217ebcc76e72b7c63a8c3ff5f844b920d4003"
     },
     "pre-inspect-extract": {
       "type": "synced",
       "version": "1.3.1",
-      "sha256": "374b6dff5264405a805e76a5bd5ab51ede7bf467901e99750f6bacf74ad764b3"
+      "sha256": "7183d9d84fd4a32698166550d19c6522b7767ed8d26bc6ea4cafb3af3cb884d4"
     }
   }
 }

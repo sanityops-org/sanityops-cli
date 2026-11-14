@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import ClassVar
 
-from aidynamic_agent.tools.base import Tool, ToolResult
+from sanityops_agent.tools.base import Tool, ToolResult
 
 
 class StoreRepairsTool(Tool):
@@ -10,7 +10,7 @@ class StoreRepairsTool(Tool):
 
     The agent calls `store_repair` once per defective artifact with the fully
     rewritten content; the CLI flushes everything into a single markdown
-    report under `.deeplogic/repairs/`.
+    report under `.sanityops/repairs/`.
     """
 
     name = "store_repair"

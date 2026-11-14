@@ -1,7 +1,7 @@
 """
 FileReadTool - A comprehensive file reading tool.
 
-Adapted for the deeplogic-cli agent framework.
+Adapted for the sanityops-cli agent framework.
 
 This module provides functionality to read various file types including:
 - Text files (with line numbers and offset/limit support)
@@ -15,7 +15,7 @@ import json
 import os
 from pathlib import Path
 
-from aidynamic_agent.tools.base import Tool, ToolResult
+from sanityops_agent.tools.base import Tool, ToolResult
 
 # =============================================================================
 # Constants
@@ -669,7 +669,7 @@ Large files exceeding the size limit will return an error with instructions to u
             max_tokens: Maximum estimated tokens for text content
             allowed_root: Optional directory boundary to sandbox reads within
         """
-        from aidynamic_agent.tools.context import ToolContext
+        from sanityops_agent.tools.context import ToolContext
 
         super().__init__(context=ToolContext())
         self.max_size_bytes = max_size_bytes

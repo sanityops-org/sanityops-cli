@@ -1,9 +1,9 @@
-"""inspect command — deeplogic CLI Tool.
+"""inspect command — sanityops CLI Tool.
 
 Skill-based two-agent pipeline (design 2026-11-05):
   Step 1  QC lint (17-item checklist v2, program channel + hybrid pre-screen)
   Step 2  ExtractAgent (skill pre-inspect-extract, store_artifacts protocol)
-  Step 3  InspectAgent (skill deeplogic-inspect-lite, seven-stage flow)
+  Step 3  InspectAgent (skill sanityops-inspect-lite, seven-stage flow)
   Step 4  CLI render + persist + exit code matrix (design §9)
 """
 
@@ -24,18 +24,18 @@ from rich.status import Status
 from rich.table import Table
 from rich.text import Text
 
-from deeplogic_cli.code_contract_checker.models import DefectStatus
-from deeplogic_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
-from deeplogic_cli.constants.exit_codes import EXIT_DEFECTS_FOUND, EXIT_FAILURE, EXIT_SUCCESS
-from deeplogic_cli.exceptions.base_exceptions import ValidationError
-from deeplogic_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW, estimate_tokens
-from deeplogic_cli.logging import LogConfig, LogManager, load_log_config
-from deeplogic_cli.utils.config_loader import (
+from sanityops_cli.code_contract_checker.models import DefectStatus
+from sanityops_cli.constants.config_defaults import DEFAULT_SERVER_BASE_URL
+from sanityops_cli.constants.exit_codes import EXIT_DEFECTS_FOUND, EXIT_FAILURE, EXIT_SUCCESS
+from sanityops_cli.exceptions.base_exceptions import ValidationError
+from sanityops_cli.inspect_pipeline.token_estimator import DEFAULT_CONTEXT_WINDOW, estimate_tokens
+from sanityops_cli.logging import LogConfig, LogManager, load_log_config
+from sanityops_cli.utils.config_loader import (
     InspectConfigLoader,
     read_file_with_encoding_fallback,
 )
-from deeplogic_cli.utils.config_resolver import ConfigResolver
-from deeplogic_cli.utils.llm_config import resolve_llm_config
+from sanityops_cli.utils.config_resolver import ConfigResolver
+from sanityops_cli.utils.llm_config import resolve_llm_config
 
 console = Console()
 inspect_app = typer.Typer()
@@ -199,7 +199,7 @@ def _load_inspect_settings(config_path: Path) -> dict:
 
 def _build_provider_config(llm_config: dict[str, str], enable_thinking: bool | None = None):
     """Build aidynamic-agent ProviderConfig, forwarding enable_thinking only when explicitly set."""
-    from aidynamic_agent.config import ProviderConfig
+    from sanityops_agent.config import ProviderConfig
 
     kwargs: dict = {
         "PROVIDER": llm_config["llm_provider"],
@@ -219,7 +219,7 @@ def _create_provider(provider_config, timeout: float = DEFAULT_LLM_TIMEOUT):
     their 120s default. The underlying client is created lazily on first use,
     so overriding the attribute here takes effect before any request.
     """
-    from aidynamic_agent.llm.factory import ProviderFactory
+    from sanityops_agent.llm.factory import ProviderFactory
 
     provider = ProviderFactory.create(provider_config)
     if hasattr(provider, "timeout"):
@@ -280,21 +280,21 @@ def _print_error_from_exception(
             _print_user_error(
                 "Configuration Error",
                 "LLM API key is missing or invalid.",
-                hint="Set LLM_API_KEY environment variable or configure api_key in .deeplogic/inspect_config.yaml",
+                hint="Set LLM_API_KEY environment variable or configure api_key in .sanityops/inspect_config.yaml",
                 log_path=log_path,
             )
         elif "model" in exc_msg.lower():
             _print_user_error(
                 "Configuration Error",
                 "LLM model configuration is incomplete.",
-                hint="Configure model.provider and model.model_id in .deeplogic/inspect_config.yaml",
+                hint="Configure model.provider and model.model_id in .sanityops/inspect_config.yaml",
                 log_path=log_path,
             )
         else:
             _print_user_error(
                 "Configuration Error",
                 f"Failed to load configuration: {exc_msg}",
-                hint="Check .deeplogic/inspect_config.yaml for syntax errors or missing fields",
+                hint="Check .sanityops/inspect_config.yaml for syntax errors or missing fields",
                 log_path=log_path,
             )
         return
@@ -419,10 +419,10 @@ def _extract_without_agent(
     the deterministic tool-registry expansion runs exactly as in the agent
     path. No upload is triggered downstream.
     """
-    from deeplogic_cli.agents.extract_agent.tools.tool_registry import (
+    from sanityops_cli.agents.extract_agent.tools.tool_registry import (
         extract_tool_candidates,
     )
-    from deeplogic_cli.inspect_pipeline.models import (
+    from sanityops_cli.inspect_pipeline.models import (
         ExtractedArtifact,
         ExtractionResult,
     )
@@ -543,7 +543,7 @@ def _merge_qc_findings(parsed, qc_result) -> None:
     stay consistent with the panels (EX → risk_explicit, everything else →
     inspect; Explicit·P0 is a risk signal, never a defect count).
     """
-    from deeplogic_cli.inspect_pipeline.report_parser import counts_from_findings
+    from sanityops_cli.inspect_pipeline.report_parser import counts_from_findings
 
     qc_findings, _ = _qc_findings_and_candidates(qc_result)
     parsed.findings.extend(qc_findings)
@@ -578,7 +578,7 @@ def _resolve_attribution(settings: dict, extraction_result):
     contract appendix. ``collection`` mode maps to ``pending`` — the skill
     red line then skips Stage B / Stage C-D / Stage E NL-B.
     """
-    from deeplogic_cli.inspect_pipeline.models import Attribution
+    from sanityops_cli.inspect_pipeline.models import Attribution
 
     configured = settings.get("attribution", "auto")
     reported = extraction_result.attribution or Attribution(status="pending", note="")
@@ -643,20 +643,20 @@ def _auto_upload(
         extraction_result: ExtractionResult from the extract stage.
         config_path: Resolved inspect_config.yaml path used for this run.
     """
-    from deeplogic_cli.api.client import DeeplogicClient
-    from deeplogic_cli.commands.project import (
+    from sanityops_cli.api.client import SanityopsClient
+    from sanityops_cli.commands.project import (
         _get_project_config_path,
         _read_project_config,
         _write_project_config,
     )
-    from deeplogic_cli.utils.artifact_packer import pack_extracted
+    from sanityops_cli.utils.artifact_packer import pack_extracted
 
     effective_config_path = config_path or _get_project_config_path()
 
     # No API key configured -> cannot upload, skip silently
     api_key = ConfigResolver(
         "server.api_key",
-        "DEEPLOGIC_API_KEY",
+        "SANITYOPS_API_KEY",
         project_config_path=effective_config_path,
     ).resolve()
     if not api_key:
@@ -666,13 +666,13 @@ def _auto_upload(
     base_url = (
         ConfigResolver(
             "server.base_url",
-            "DEEPLOGIC_BASE_URL",
+            "SANITYOPS_BASE_URL",
             DEFAULT_SERVER_BASE_URL,
             project_config_path=effective_config_path,
         ).resolve()
         or DEFAULT_SERVER_BASE_URL
     )
-    client = DeeplogicClient(base_url, api_key)
+    client = SanityopsClient(base_url, api_key)
 
     console.print("\n[bold]Packing artifacts...[/]")
     try:
@@ -700,7 +700,7 @@ def _auto_upload(
         configured_name = raw_project.get("name") if isinstance(raw_project, dict) else None
         project_root = (
             effective_config_path.parent.parent
-            if effective_config_path.parent.name == ".deeplogic"
+            if effective_config_path.parent.name == ".sanityops"
             else effective_config_path.parent
         )
         default_name = (
@@ -715,7 +715,7 @@ def _auto_upload(
             _print_user_error(
                 "Project Creation Failed",
                 f"Could not create project: {e}",
-                hint="Check your DEEPLOGIC_API_KEY and network connectivity",
+                hint="Check your SANITYOPS_API_KEY and network connectivity",
             )
             raise
 
@@ -778,7 +778,7 @@ def inspect(
         None,
         "--config",
         "-c",
-        help="Path to inspect_config.yaml. If omitted, looks for .deeplogic/inspect_config.yaml in cwd.",
+        help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -893,7 +893,7 @@ def inspect(
         _print_user_error(
             "Configuration Error",
             f"Configuration validation failed: {e}",
-            hint="Check .deeplogic/inspect_config.yaml for syntax errors or missing required fields",
+            hint="Check .sanityops/inspect_config.yaml for syntax errors or missing required fields",
             log_path=log_manager.log_file,
         )
         log_manager.end_session("failed", {"error": "config_validation"})
@@ -929,7 +929,7 @@ def inspect(
     # Step 2: Display resolved artifacts
     if verbose:
         project_root = loader.config_path.parent
-        if project_root.name == ".deeplogic":
+        if project_root.name == ".sanityops":
             project_root = project_root.parent
         table = Table(title="[bold]Inspect Artifacts[/]", border_style="blue")
         table.add_column("Type", style="bold cyan", no_wrap=True)
@@ -963,8 +963,8 @@ def inspect(
     # Step 3: QC lint (program channel + hybrid pre-screen; design §7)
     qc_result = None
     if not skip_qc_lint:
-        from deeplogic_cli.code_contract_checker.checker import CodeContractChecker
-        from deeplogic_cli.code_contract_checker.renderer import QCRenderer
+        from sanityops_cli.code_contract_checker.checker import CodeContractChecker
+        from sanityops_cli.code_contract_checker.renderer import QCRenderer
 
         qc_checker = CodeContractChecker(
             verbose=verbose,
@@ -1039,7 +1039,7 @@ def inspect(
         console.print()
         console.print(
             "Configure the provider, api_key, model_id and base_url in "
-            ".deeplogic/inspect_config.yaml."
+            ".sanityops/inspect_config.yaml."
         )
         raise typer.Exit(code=EXIT_FAILURE)
 
@@ -1054,7 +1054,7 @@ def inspect(
     provider = _create_provider(provider_config)
 
     # Step 5: Materialize vendored skills (design §10)
-    from deeplogic_cli.inspect_pipeline.skill_runtime import (
+    from sanityops_cli.inspect_pipeline.skill_runtime import (
         materialize_skills,
         validate_vendor,
     )
@@ -1070,7 +1070,7 @@ def inspect(
         _print_user_error(
             "Skill Runtime Error",
             f"Could not materialize vendored skills: {e}",
-            hint="Reinstall the package so src/deeplogic_cli/skills is intact",
+            hint="Reinstall the package so src/sanityops_cli/skills is intact",
         )
         log_manager.end_session("failed", {"error": "skill_materialize"})
         raise typer.Exit(code=EXIT_FAILURE) from None
@@ -1084,7 +1084,7 @@ def inspect(
         extraction_result = _extract_without_agent(prompt_files, tool_files, skill_files)
         extract_elapsed = 0.0
     else:
-        from deeplogic_cli.agents.extract_agent.agent import (
+        from sanityops_cli.agents.extract_agent.agent import (
             ExtractAgent,
             IncompleteExtractionError,
         )
@@ -1195,7 +1195,7 @@ def inspect(
     run_id: str | None = None
     ir_batch_dir: Path | None = None
     try:
-        from deeplogic_cli.inspect_pipeline.ir_writer import (
+        from sanityops_cli.inspect_pipeline.ir_writer import (
             allocate_run_id,
             write_ir_files,
         )
@@ -1232,11 +1232,11 @@ def inspect(
 
     # Step 9: InspectAgent over the extraction IR (design §6)
     flow_status.update("Preparing inspection...")
-    from deeplogic_cli.agents.inspect_agent.agent import (
+    from sanityops_cli.agents.inspect_agent.agent import (
         InspectAgent,
         InspectionFailedError,
     )
-    from deeplogic_cli.inspect_pipeline.ir_writer import render_injection_payload
+    from sanityops_cli.inspect_pipeline.ir_writer import render_injection_payload
 
     injection_payload = render_injection_payload(extraction_result)
     injection_payload += "\n\n" + _qc_payload_block(qc_result, qc_skipped=qc_result is None)
@@ -1255,10 +1255,10 @@ def inspect(
             f"using {INSPECT_TOKEN_BUDGET_FLOOR}.[/yellow]"
         )
 
-    from deeplogic_cli import __version__
+    from sanityops_cli import __version__
 
     header_data = {
-        "cli": f"deeplogic-cli v{__version__}",
+        "cli": f"sanityops-cli v{__version__}",
         "framework": "DeepLogic Framework v1.1",
         "model": llm_config["llm_model_id"],
         "date": datetime.now().strftime("%Y-%m-%d"),
@@ -1305,10 +1305,10 @@ def inspect(
         report_path = None
         if partial is not None:
             try:
-                from deeplogic_cli.inspect_pipeline.markdown_reporter import (
+                from sanityops_cli.inspect_pipeline.markdown_reporter import (
                     save_inspection_report,
                 )
-                from deeplogic_cli.inspect_pipeline.report_parser import (
+                from sanityops_cli.inspect_pipeline.report_parser import (
                     extract_tail_block,
                     parse_summary,
                 )
@@ -1355,9 +1355,9 @@ def inspect(
     flow_status.stop()
 
     # Step 10: Parse tail JSON (fail-closed ladder), merge QC, render, persist
-    from deeplogic_cli.inspect_pipeline.markdown_reporter import save_inspection_report
-    from deeplogic_cli.inspect_pipeline.renderer import render_inspection_summary
-    from deeplogic_cli.inspect_pipeline.report_parser import (
+    from sanityops_cli.inspect_pipeline.markdown_reporter import save_inspection_report
+    from sanityops_cli.inspect_pipeline.renderer import render_inspection_summary
+    from sanityops_cli.inspect_pipeline.report_parser import (
         extract_tail_block,
         parse_summary,
     )
@@ -1547,14 +1547,14 @@ def repair(
         "-r",
         help=(
             "Path to the inspection report (.md) to repair from. "
-            "If omitted, uses the newest .deeplogic/results/inspect-*.md."
+            "If omitted, uses the newest .sanityops/results/inspect-*.md."
         ),
     ),
     config: str | None = typer.Option(
         None,
         "--config",
         "-c",
-        help="Path to inspect_config.yaml. If omitted, looks for .deeplogic/inspect_config.yaml in cwd.",
+        help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
     ),
     verbose: bool = typer.Option(
         False,
@@ -1598,7 +1598,7 @@ def repair(
 
     Reads the latest inspection report (or --report), asks a local repair
     agent to rewrite every defective artifact, and writes the repaired
-    content to `.deeplogic/repairs/repair-<timestamp>.md`. Nothing is
+    content to `.sanityops/repairs/repair-<timestamp>.md`. Nothing is
     uploaded and no source file is modified.
     """
     if log_level and log_level.upper() not in {"DEBUG", "INFO", "WARNING", "ERROR"}:
@@ -1638,7 +1638,7 @@ def repair(
         report_path = _find_latest_report(results_dir)
         if report_path is None:
             console.print(f"[red]✗ No inspection report found in {results_dir}[/red]")
-            console.print("  Run `deeplogic-cli inspect` first, or pass --report <path>.")
+            console.print("  Run `sanityops-cli inspect` first, or pass --report <path>.")
             raise typer.Exit(code=EXIT_FAILURE)
 
     # Step 3: Setup logging
@@ -1668,7 +1668,7 @@ def repair(
     if not llm_config.get("llm_api_key", "").strip():
         console.print("[red]✗ LLM configuration is incomplete (missing API key).[/red]")
         console.print(
-            "  Configure model.provider/api_key/model_id in .deeplogic/inspect_config.yaml."
+            "  Configure model.provider/api_key/model_id in .sanityops/inspect_config.yaml."
         )
         raise typer.Exit(code=EXIT_FAILURE)
 
@@ -1679,8 +1679,8 @@ def repair(
     provider = _create_provider(provider_config, timeout=llm_timeout)
 
     # Step 5: Run the repair agent
-    from deeplogic_cli.agents.repair_agent.agent import RepairAgent, _is_rate_limit_error
-    from deeplogic_cli.agents.repair_agent.tools.store_repairs_tool import StoreRepairsTool
+    from sanityops_cli.agents.repair_agent.agent import RepairAgent, _is_rate_limit_error
+    from sanityops_cli.agents.repair_agent.tools.store_repairs_tool import StoreRepairsTool
 
     # Clear any leftover state from previous invocations (ClassVar persistence).
     StoreRepairsTool.clear()
@@ -1744,7 +1744,7 @@ def repair(
             log_manager.end_session("success", {"repairs": 0})
         return
 
-    # Step 6: Persist repairs to .deeplogic/repairs/
+    # Step 6: Persist repairs to .sanityops/repairs/
     repairs_dir = loader.config_path.parent / "repairs"
     try:
         out_path = _write_repairs_markdown(
@@ -1849,14 +1849,14 @@ def cover(
         "-r",
         help=(
             "Path to the repair report (.md) to apply. "
-            "If omitted, uses the newest .deeplogic/repairs/repair-*.md."
+            "If omitted, uses the newest .sanityops/repairs/repair-*.md."
         ),
     ),
     config: str | None = typer.Option(
         None,
         "--config",
         "-c",
-        help="Path to inspect_config.yaml. If omitted, looks for .deeplogic/inspect_config.yaml in cwd.",
+        help="Path to inspect_config.yaml. If omitted, looks for .sanityops/inspect_config.yaml in cwd.",
     ),
     dry_run: bool = typer.Option(
         False,
@@ -1872,12 +1872,12 @@ def cover(
 ) -> None:
     """Overwrite local artifacts with repaired content from a repair report.
 
-    Takes the newest repair-*.md in .deeplogic/repairs/ (or --report), and for
+    Takes the newest repair-*.md in .sanityops/repairs/ (or --report), and for
     each entry writes the repaired content back to the source artifact path,
     backing up the original to <path>.bak first. Prompts for confirmation
     unless --yes is given.
     """
-    # Step 1: Resolve config (for the .deeplogic dir location)
+    # Step 1: Resolve config (for the .sanityops dir location)
     try:
         loader = InspectConfigLoader(config, require_project_id=False)
         loader.load()
@@ -1899,7 +1899,7 @@ def cover(
         report_path = candidates[-1] if candidates else None
         if report_path is None:
             console.print(f"[red]✗ No repair report found in {repairs_dir}[/red]")
-            console.print("  Run `deeplogic-cli inspect repair` first, or pass --report <path>.")
+            console.print("  Run `sanityops-cli inspect repair` first, or pass --report <path>.")
             raise typer.Exit(code=EXIT_FAILURE)
 
     # Step 3: Parse entries
