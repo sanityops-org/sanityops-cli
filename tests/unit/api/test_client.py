@@ -7,10 +7,10 @@ import pytest
 
 from sanityops_cli.api.client import SanityopsClient
 from sanityops_cli.exceptions.api_exceptions import (
-    APIValidationError,
     AuthenticationError,
     NetworkError,
     ProjectNotFoundError,
+    ValidationError,
 )
 
 
@@ -83,7 +83,7 @@ class TestCreateProject:
         mock_response = httpx.Response(422, json={"detail": "Name too long"})
         mock_post.return_value = mock_response
 
-        with pytest.raises(APIValidationError):
+        with pytest.raises(ValidationError):
             self.client.create_project("x" * 300)  # Too long name
 
 

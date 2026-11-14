@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import ClassVar
 
-from aidynamic_agent.tools.base import Tool, ToolResult
+from sanityops_agent.tools.base import Tool, ToolResult
 
 
 class StoreRepairsTool(Tool):

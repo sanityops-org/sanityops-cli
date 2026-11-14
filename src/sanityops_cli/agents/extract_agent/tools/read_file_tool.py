@@ -11,7 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from aidynamic_agent.tools.base import Tool, ToolResult
+from sanityops_agent.tools.base import Tool, ToolResult
 
 from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
 

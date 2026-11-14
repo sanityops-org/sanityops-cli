@@ -15,6 +15,9 @@ from sanityops_cli.utils.validators import EXCLUDED_DIRS
 DEFAULT_CONFIG_DIR = ".sanityops"
 DEFAULT_CONFIG_FILE = "inspect_config.yaml"
 
+# Placeholder project ID (project not yet bound)
+PROJECT_ID_PLACEHOLDER = "00000000-0000-0000-0000-000000000000"
+
 # UUID validation regex (compiled once at module load for efficiency)
 _UUID_RE = re.compile(
     r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}" r"-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"

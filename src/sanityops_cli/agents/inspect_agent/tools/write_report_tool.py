@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from aidynamic_agent.tools.base import Tool, ToolResult
+from sanityops_agent.tools.base import Tool, ToolResult
 
 from sanityops_cli.inspect_pipeline.report_parser import MODULE_STAGE, SEVERITY_RANK, STAGE_SECTIONS
 

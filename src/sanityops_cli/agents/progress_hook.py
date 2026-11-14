@@ -64,7 +64,7 @@ class LoggingProgressHook:
     def _get_events(self):
         """Lazy import of HookEvent."""
         if self._events is None:
-            from aidynamic_agent.hooks.base import HookEvent
+            from sanityops_agent.hooks.base import HookEvent
 
             self._events = HookEvent
         return self._events

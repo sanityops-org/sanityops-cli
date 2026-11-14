@@ -199,7 +199,7 @@ def _load_inspect_settings(config_path: Path) -> dict:
 
 def _build_provider_config(llm_config: dict[str, str], enable_thinking: bool | None = None):
     """Build aidynamic-agent ProviderConfig, forwarding enable_thinking only when explicitly set."""
-    from aidynamic_agent.config import ProviderConfig
+    from sanityops_agent.config import ProviderConfig
 
     kwargs: dict = {
         "PROVIDER": llm_config["llm_provider"],
@@ -219,7 +219,7 @@ def _create_provider(provider_config, timeout: float = DEFAULT_LLM_TIMEOUT):
     their 120s default. The underlying client is created lazily on first use,
     so overriding the attribute here takes effect before any request.
     """
-    from aidynamic_agent.llm.factory import ProviderFactory
+    from sanityops_agent.llm.factory import ProviderFactory
 
     provider = ProviderFactory.create(provider_config)
     if hasattr(provider, "timeout"):

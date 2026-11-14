@@ -18,10 +18,10 @@ import tempfile
 from importlib import resources
 from pathlib import Path
 
-from aidynamic_agent.managers.skill import SkillManager
-from aidynamic_agent.tools.base import ToolResult
-from aidynamic_agent.tools.builtins.skill import SkillTool
-from aidynamic_agent.tools.registry import ToolRegistry
+from sanityops_agent.managers.skill import SkillManager
+from sanityops_agent.tools.base import ToolResult
+from sanityops_agent.tools.builtins.skill import SkillTool
+from sanityops_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 

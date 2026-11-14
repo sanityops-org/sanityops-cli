@@ -13,11 +13,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import anyio
-from aidynamic_agent.agents import AgentFactory
-from aidynamic_agent.core.agent import AgentConfig, TerminationReason
-from aidynamic_agent.core.message import Message, Role
-from aidynamic_agent.hooks.base import HookExecutor
-from aidynamic_agent.tools.registry import ToolRegistry
+from sanityops_agent.agents import AgentFactory
+from sanityops_agent.core.agent import AgentConfig, TerminationReason
+from sanityops_agent.core.message import Message, Role
+from sanityops_agent.hooks.base import HookExecutor
+from sanityops_agent.tools.registry import ToolRegistry
 
 from sanityops_cli.agents.extract_agent.tools.read_file_tool import ScopedReadFileTool
 from sanityops_cli.agents.inspect_agent.prompts import (

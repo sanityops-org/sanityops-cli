@@ -1,32 +1,32 @@
 ---
-title: Code Contract Inspection Checklist (QC, v2 统一引擎版)
+title: Code Contract Inspection Checklist (QC, v2 unified engine edition)
 ---
 
 # Code Contract Inspection Checklist (QC, v2)
 
-> **状态**：v2 统一引擎版。规则语义源自 `quality/code-contract.md` v1.0：ID、名称、严重度取值均保持不变；变化的是**组织方式**——全字段 + 正文表格（模型项）+ 程序块（程序项）。
+> **Status**: v2 unified engine edition. Rule semantics originate from `quality/code-contract.md` v1.0: IDs, names, and severity values all remain unchanged; what changes is the **organization** — all fields + body tables (model items) + program blocks (program items).
 >
-> 共享定义（字段模型 / check_engine 映射 / applicability 结构事实门 / severity 记号 / 打分规则）见 [_meta.md](_meta.md)，本文件不重复。本文件只承载 Code Contract 域检查项本身。
+> Shared definitions (field model / check_engine mapping / applicability structural-fact gate / severity notation / scoring rules) are in [_meta.md](_meta.md); this file does not repeat them. This file only carries the Code Contract domain check items themselves.
 
-## 1. 域内说明
+## 1. Domain notes
 
-- **范围**（源 §1）：仅检 Logic Artifact 内嵌的代码片段（System Prompt / Skill 描述与步骤 / Tool Schema 的 description·default·example 字段）。**不检完整源码文件**（用标准 linter）。
-- **L 维度**：无。本域 severity 为**扁平 P0/P1/P2**（无 OR-L / AC-L 维度），索引表 severity 列仅一档。
-- **基线门 QC-0**（5 项）：entry gate，QC-1~4 检查前 MUST 通过。
-- **依赖上下文规则**（源 §1）：QC-1.2（Invalid Import）、QC-1.3（Deprecated API）依赖**外部输入**（声明依赖清单 + API 版本库），不在 Logic Artifact 内。外部输入缺失（lite 默认）时记 `Not Executed`，**绝不记 FAIL**；仅当片段内自证缺陷（如 import 明显不存在的模块）或自相矛盾时才记 FAIL。
-- **示意片段规则**（源 §1）：外层文本标记为示意/伪码（"example"/"pseudo"、用 `...` 省略）的片段，豁免 QC-0.1 / QC-0.3 的解析完整性要求；省略或缺 import 不构成 FAIL。
-- **check_engine 分配口径（本域重分类日志）**：源 Method 列 `Automated`→program、`Semi-automated`→hybrid、`Pattern match`→program（确定性模式匹配，程序可执行）；QC-0 无 Method 列，按 Appendix 检测策略映射（0.4 fence 匹配→program，0.5 语言-内容关键词匹配→hybrid）。本域**无纯 model 项**（lint 型）。
-- **跨域交叉引用**（源 §5 注）：QC-3.3（Hardcoded Demo Value）与 NR-S-9（Hardcoded Credential）重叠——真实凭证由 NR-S-9 优先；QC-3.3 覆盖弱/演示模式（"123456"、"xxx"、"changeme"、本地路径、内网 IP），不匹配凭证检测器。
+- **Scope** (source §1): only code snippets embedded in Logic Artifacts are checked (System Prompt / Skill description and steps / Tool Schema's description·default·example fields). **Complete source files are not checked** (use a standard linter).
+- **L dimension**: none. Severity in this domain is **flat P0/P1/P2** (no OR-L / AC-L dimensions); the severity column in the index table has only one tier.
+- **Baseline gate QC-0** (5 items): entry gate; MUST pass before the QC-1 through QC-4 checks.
+- **Context-dependent rules** (source §1): QC-1.2 (Invalid Import) and QC-1.3 (Deprecated API) depend on **external input** (declared dependency list + API version database), which is not in the Logic Artifact. When external input is missing (the lite default), record `Not Executed`, **never FAIL**; record FAIL only when a defect is self-evident within the snippet (e.g., importing a clearly nonexistent module) or the snippet contradicts itself.
+- **Illustrative snippet rules** (source §1): snippets whose outer text marks them as illustrative/pseudocode ("example"/"pseudo", omission via `...`) are exempt from the parse-completeness requirements of QC-0.1 / QC-0.3; omissions or missing imports do not constitute FAIL.
+- **check_engine assignment convention (reclassification log for this domain)**: source Method column `Automated`→program, `Semi-automated`→hybrid, `Pattern match`→program (deterministic pattern matching, executable by a program); QC-0 has no Method column and is mapped per the Appendix detection strategy (0.4 fence matching→program, 0.5 language-content keyword matching→hybrid). This domain has **no pure model items** (lint type).
+- **Cross-domain cross-references** (source §5 note): QC-3.3 (Hardcoded Demo Value) overlaps NR-S-9 (Hardcoded Credential) — NR-S-9 takes precedence for actual credentials; QC-3.3 covers weak/demo patterns ("123456", "xxx", "changeme", local paths, internal IPs) that fall outside credential detectors.
 
-## 2. 检查项索引（17 项 = 5 基线门 + 12 检查项）
+## 2. Check item index (17 items = 5 baseline gates + 12 check items)
 
-| ID | name | check_engine | applicability.fact | severity | 计入打分 |
+| ID | name | check_engine | applicability.fact | severity | Counted in scoring |
 |---|---|---|---|---|---|
-| QC-0.1 | Syntax Parsability | program | has_code_snippet | P0 | ✗（基线） |
-| QC-0.2 | Language Declaration | program | has_code_snippet | P1 | ✗（基线） |
-| QC-0.3 | Structural Completeness | program | has_code_snippet | P1 | ✗（基线） |
-| QC-0.4 | Fence Integrity | program | has_code_snippet | P1 | ✗（基线） |
-| QC-0.5 | Language-Content Mismatch | hybrid | has_code_snippet | P2 | ✗（基线） |
+| QC-0.1 | Syntax Parsability | program | has_code_snippet | P0 | ✗ (baseline) |
+| QC-0.2 | Language Declaration | program | has_code_snippet | P1 | ✗ (baseline) |
+| QC-0.3 | Structural Completeness | program | has_code_snippet | P1 | ✗ (baseline) |
+| QC-0.4 | Fence Integrity | program | has_code_snippet | P1 | ✗ (baseline) |
+| QC-0.5 | Language-Content Mismatch | hybrid | has_code_snippet | P2 | ✗ (baseline) |
 | QC-1.1 | Undefined Name Reference | program | has_code_snippet | P1 | ✓ |
 | QC-1.2 | Invalid Import | program | has_import | P2 | ✓ |
 | QC-1.3 | Deprecated API Usage | hybrid | has_api_call | P2 | ✓ |
@@ -40,66 +40,66 @@ title: Code Contract Inspection Checklist (QC, v2 统一引擎版)
 | QC-4.1 | Snippet-Artifact Declaration Mismatch | hybrid | has_code_snippet | P1 | ✓ |
 | QC-4.2 | Snippet-Body Version/API Drift | hybrid | has_code_snippet | P2 | ✓ |
 
-> 计数说明：5 基线门（QC-0，entry gate）+ 12 检查项（QC-1~4）。`has_code_snippet` = 工件内嵌代码片段（本域存在性前提）；`has_import`/`has_api_call`/`has_file_handle`/`has_network_conn`/`has_high_risk_op`/`has_literal` 为片段内构造事实（观察"片段里有没有该构造"，非"是否已声明"，防点1悖论）。QC-1.2/1.3 受依赖上下文规则约束（外部输入缺→Not Executed）。
+> Count note: 5 baseline gates (QC-0, entry gate) + 12 check items (QC-1 through QC-4). `has_code_snippet` = code snippet embedded in the artifact (the existence precondition for this domain); `has_import`/`has_api_call`/`has_file_handle`/`has_network_conn`/`has_high_risk_op`/`has_literal` are construction facts within the snippet (observing "whether the snippet contains that construct", not "whether it has been declared" — point-1-paradox prevention). QC-1.2/1.3 are constrained by the context-dependent rules (external input missing → Not Executed).
 
-## 3. 模型判定要点
+## 3. Model judgment points
 
-> 本域**无纯 model 项**。hybrid 项的模型确认部分见下。
+> This domain has **no pure model items**. The model-confirmation portion of hybrid items is below.
 
-### 3.1 纯 model 项
+### 3.1 Pure model items
 
-无。
+None.
 
-### 3.2 hybrid 项的模型确认部分
+### 3.2 Model-confirmation portion of hybrid items
 
-> **skill 端：本节即完整判定要点，无程序初筛前置。**“程序仅检…／程序仅做…”描述的是 CLI / platform 的初筛路径；skill 全模型推理、不执行 §4，必须自行完成语义判定，不得视为“已筛过”，也不得据此判 N/A。
+> **Skill side: this section is the complete judgment points, with no program pre-screening upstream.** Descriptions such as "keyword matching is a fuzzy signal" describe the CLI / platform pre-screen path; the skill performs full model reasoning, does not execute §4, must complete the semantic judgment itself, and must not treat it as "already screened" nor judge N/A on that basis.
 
-| ID | model_prompt（确认要点） |
+| ID | model_prompt (confirmation points) |
 |---|---|
-| QC-0.5 | 确认 fence 声明语言与片段内容语法是否真不匹配（关键词匹配是模糊信号，需语义核实） |
-| QC-1.3 | 对照 API 版本库确认该调用是否确属 deprecated/removed；版本库缺失时记 Not Executed |
-| QC-4.1 | 确认片段调用/参数与所属工件自身声明（Tool properties/required、Skill/Prompt 字段名）是否真矛盾 |
-| QC-4.2 | 确认片段与所属工件声明的 version/dependency/API 是否真漂移（陈旧示例） |
+| QC-0.5 | Confirm whether the fence-declared language truly mismatches the snippet content syntax (keyword matching is a fuzzy signal and requires semantic verification) |
+| QC-1.3 | Check against the API version database whether the call is indeed deprecated/removed; record Not Executed when the version database is missing |
+| QC-4.1 | Confirm whether the snippet's calls/parameters truly contradict the owning artifact's own declarations (Tool properties/required, Skill/Prompt field names) |
+| QC-4.2 | Confirm whether the snippet truly drifts from the version/dependency/API declared by the owning artifact (stale example) |
 
-## 4. 程序判定项（program-check 代码块）
+## 4. Program-judgment items (program-check code block)
 
-> **CLI / platform 专用：skill 不解析、不执行本代码块**（skill 全模型推理，不消费 `check_engine` 与 `program_rule`）。程序引擎只 parse 本代码块。`rule` 字段为**判定语义示意**（非最终可执行定义，程序级实现后续补）。涵盖纯 program 项 + hybrid 项的初筛规则。
+> **CLI / platform only: the skill does not parse or execute this code block** (the skill performs full model reasoning and does not consume `check_engine` or `program_rule`). The program engine only parses this code block. The `rule` field is **a semantic illustration of judgment** (not the final executable definition; program-level implementation to be added later). Covers pure program items + the pre-screen rules for hybrid items.
 
 <!-- program-check -->
 ```json
 {
   "domain": "code-contract",
   "version": "v2",
-  "note": "程序判定项 + hybrid 初筛规则。rule 为语义示意。",
+  "note": "Program-judgment items + hybrid pre-screen rules. rule is a semantic illustration of the judgment.",
   "checks": [
-    { "id": "QC-0.1", "summary": "片段无法按声明语言解析（语法错误）" },
-    { "id": "QC-0.2", "summary": "代码块缺语言标识（如 ```python）" },
-    { "id": "QC-0.3", "summary": "片段缺必要 import 或函数体被 ... 截断（示意片段豁免）" },
-    { "id": "QC-0.4", "summary": "代码围栏开/闭不匹配，或被代码内容吞掉闭合围栏" },
-    { "id": "QC-0.5", "summary": "围栏声明语言与内容关键词不符（是否真不匹配由模型确认）" },
-    { "id": "QC-1.1", "summary": "AST 解析 + 名称解析：引用未定义名称" },
-    { "id": "QC-1.2", "summary": "import 语句引用的模块不在标准库/依赖清单（依赖清单缺失→Not Executed）" },
-    { "id": "QC-1.3", "summary": "API 签名命中 deprecated 版本库（版本库缺失→Not Executed，确认由模型）" },
-    { "id": "QC-1.4", "summary": "字面量类型推断：参数类型明显不兼容" },
-    { "id": "QC-2.1", "summary": "open()/plumber.open() 无 with 或 close()" },
-    { "id": "QC-2.2", "summary": "连接构造器（HTTPSConnection 等）无 context manager 或 close()" },
-    { "id": "QC-2.3", "summary": "高风险调用（file/network/DB）无 try/except 块" },
-    { "id": "QC-3.1", "summary": "import 提取 vs 引用计数：import 了但从未引用" },
-    { "id": "QC-3.2", "summary": "引用提取 vs import 匹配：引用了但未 import" },
-    { "id": "QC-3.3", "summary": "弱凭证/机器特定值模式（连续数字/xxx/changeme/本地路径/内网IP）" },
-    { "id": "QC-4.1", "summary": "片段符号提取 vs 所属工件字段/property 匹配（是否矛盾由模型确认）" },
-    { "id": "QC-4.2", "summary": "片段 API/版本引用 vs 工件正文声明匹配（是否漂移由模型确认）" }
+    { "id": "QC-0.1", "summary": "The snippet cannot be parsed as the declared language (syntax error)" },
+    { "id": "QC-0.2", "summary": "The code block lacks a language identifier (e.g., ```python)" },
+    { "id": "QC-0.3", "summary": "The snippet lacks necessary imports or the function body is truncated by ... (illustrative snippets exempt)" },
+    { "id": "QC-0.4", "summary": "Code fence open/close mismatch, or the closing fence is swallowed by code content" },
+    { "id": "QC-0.5", "summary": "The fence-declared language does not match content keywords (whether it truly mismatches is confirmed by the model)" },
+    { "id": "QC-1.1", "summary": "AST parsing + name resolution: reference to an undefined name" },
+    { "id": "QC-1.2", "summary": "The module referenced by the import statement is not in the standard library/dependency list (dependency list missing → Not Executed)" },
+    { "id": "QC-1.3", "summary": "The API signature matches the deprecated version database (version database missing → Not Executed; confirmation by the model)" },
+    { "id": "QC-1.4", "summary": "Literal type inference: parameter types are clearly incompatible" },
+    { "id": "QC-2.1", "summary": "open()/plumber.open() without with or close()" },
+    { "id": "QC-2.2", "summary": "Connection constructor (HTTPSConnection etc.) without a context manager or close()" },
+    { "id": "QC-2.3", "summary": "High-risk call (file/network/DB) without a try/except block" },
+    { "id": "QC-3.1", "summary": "import extraction vs reference counting: imported but never referenced" },
+    { "id": "QC-3.2", "summary": "reference extraction vs import matching: referenced but not imported" },
+    { "id": "QC-3.3", "summary": "Weak credential/machine-specific value patterns (consecutive digits/xxx/changeme/local path/internal IP)" },
+    { "id": "QC-4.1", "summary": "Snippet symbol extraction vs owning artifact field/property matching (the model confirms whether they are contradictory)" },
+    { "id": "QC-4.2", "summary": "Snippet API/version references vs artifact body declarations matching (the model confirms whether it has drifted)" }
   ]
 }
 ```
 <!-- /program-check -->
 
-## 5. Tombstone 记录
+## 5. Tombstone records
 
-无。Code Contract 域源规范未包含 merged / transferred 项。
+None. The Code Contract domain source specification contains no merged / transferred items.
 
-## 6. 打分字段说明（platform 专用）
+## 6. Scoring field notes (platform only)
 
-- 本域源规范**无显式打分章节**；severity 为扁平 P0/P1/P2，沿用 `_meta.md` 全局权重 `P0:P1:P2 = 5:3:1`。
-- `计入打分` 列 = ✓ 的检查项进入分母；✗（QC-0 基线门）不计入。
-- skill / CLI 不激活打分，但 score_weight 信息在索引表保留，供 platform 使用。
+- This domain's source specification has **no explicit scoring section**; severity is flat P0/P1/P2, following the global weight `P0:P1:P2 = 5:3:1` in `_meta.md`.
+- Check items with `✓` in the `Counted in scoring` column enter the denominator; `✗` (QC-0 baseline gates) are not counted.
+- skill / CLI do not activate scoring, but the score_weight information is retained in the index table for platform use.

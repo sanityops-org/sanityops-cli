@@ -24,8 +24,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from aidynamic_agent.tools.base import Tool, ToolResult
 from pydantic import ValidationError
+from sanityops_agent.tools.base import Tool, ToolResult
 
 from sanityops_cli.inspect_pipeline.models import (
     ARTIFACT_TYPES,

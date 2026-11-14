@@ -21,7 +21,7 @@ console = Console()
 class RepairAgent:
     """Runs an LLM agent that rewrites defective artifacts using the report.
 
-    Mirrors ScannerAgent: builds an aidynamic_agent parent agent with a tool
+    Mirrors ScannerAgent: builds an sanityops_agent parent agent with a tool
     registry (read + store_repair), feeds it the inspection report plus the
     artifact paths, and collects repairs via the shared-memory
     StoreRepairsTool.
@@ -88,10 +88,10 @@ class RepairAgent:
         project_root: str,
     ) -> list[dict]:
         """Single repair attempt (see repair() for the retry wrapper)."""
-        from aidynamic_agent.agents import AgentFactory
-        from aidynamic_agent.core.agent import AgentConfig, TerminationReason
-        from aidynamic_agent.hooks.base import HookExecutor
-        from aidynamic_agent.tools import ToolRegistry
+        from sanityops_agent.agents import AgentFactory
+        from sanityops_agent.core.agent import AgentConfig, TerminationReason
+        from sanityops_agent.hooks.base import HookExecutor
+        from sanityops_agent.tools import ToolRegistry
 
         from sanityops_cli.agents.repair_agent.prompts import REPAIR_AGENT_PROMPT
         from sanityops_cli.agents.repair_agent.tools.store_repairs_tool import (

@@ -10,7 +10,7 @@ from sanityops_cli.utils.config_loader import read_file_with_encoding_fallback
 
 # Import ProviderConfig with safe fallback for sanityops-agent packaging quirks.
 try:
-    from aidynamic_agent.config import ProviderConfig
+    from sanityops_agent.config import ProviderConfig
 except ModuleNotFoundError:
     import importlib
 
@@ -25,7 +25,7 @@ except ModuleNotFoundError:
             )
     except Exception as _e:
         raise ModuleNotFoundError(
-            f"Failed to import ProviderConfig from aidynamic_agent.config: {_e}"
+            f"Failed to import ProviderConfig from sanityops_agent.config: {_e}"
         ) from _e
 
 # Default config file location
