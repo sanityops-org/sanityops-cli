@@ -1,55 +1,259 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """Artifact packer — prepare artifacts for upload.
 
 This module handles:
 - Merging multiple prompt files into a single text
 - Merging multiple tool schema files into a JSON array
 - Packing skill directories/files into a ZIP archive
-- Packing from ScannerAgent findings (extracted content)
+- Packing from ExtractionResult records (skill-based pipeline)
 """
 
 from __future__ import annotations
 
 import json
-import warnings
 import zipfile
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-from sanityops_cli.agents.scanner_agent.models.finding import (
-    Finding,
-    PromptContent,
-    SkillContent,
-    ToolContent,
+import yaml
+
+from sanityops_cli.inspect_pipeline.models import ExtractedArtifact, ExtractionResult
+
+_EXCLUDED_DIR_NAMES = frozenset({"__pycache__", "node_modules", ".git"})
+_SKILL_RESOURCE_DIRS = frozenset(
+    {"references", "scripts", "assets", "resources", "templates", "examples", "tools"}
 )
+_SKILL_METADATA_FILES = ("skill.yaml", "skill.yml")
+_TOOL_LIST_KEYS = ("tools", "tool_schema", "tool_schemas")
 
-# Module-level exclusion set for files/dirs skipped when packing skill directories.
-EXCLUDED_DIRS = {"__pycache__", "node_modules", ".git"}
+
+def _read_text_utf8_gbk(path: Path) -> str:
+    """Read text file using UTF-8 (with BOM handling) and GBK fallback."""
+    try:
+        return path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        return path.read_text(encoding="gbk")
 
 
-def _is_excluded_path(file_path: Path) -> bool:
-    """Return True if any path component is an excluded directory.
+def _extract_tool_parameters(schema: dict[str, Any]) -> Any:
+    """Extract parameters supporting parameters, inputSchema, input_schema, and flat schemas."""
+    if not isinstance(schema, dict):
+        return {}
 
-    Compares directory names (not just the final filename), so paths like
-    ``project/__pycache__/module.pyc`` are correctly skipped even though
-    ``file_path.name`` is ``module.pyc``.
+    # 1. Prefer non-empty explicit parameter containers
+    for key in ("parameters", "inputSchema", "input_schema"):
+        val = schema.get(key)
+        if isinstance(val, dict) and val:
+            return val
+
+    # 2. Check flat schema where properties is defined at root (e.g. {"name": "...", "properties": {...}})
+    if "properties" in schema and isinstance(schema["properties"], dict):
+        flat = {k: v for k, v in schema.items() if k not in ("name", "description", "function")}
+        if "type" not in flat:
+            flat["type"] = "object"
+        return flat
+
+    # 3. Explicit container even if empty (e.g. tool with no arguments: parameters={})
+    for key in ("parameters", "inputSchema", "input_schema"):
+        if key in schema and schema[key] is not None:
+            return schema[key]
+
+    # 4. Pure object schema without explicit container (e.g. {"type": "object"})
+    if schema.get("type") == "object":
+        return {k: v for k, v in schema.items() if k not in ("name", "description", "function")}
+
+    return {}
+
+
+def _normalize_tool_definition(
+    tool_def: dict[str, Any],
+    *,
+    strict_neutral: bool = False,
+    fallback_name: str | None = None,
+) -> dict[str, Any] | None:
+    """Normalize OpenAI / Anthropic / MCP / flat tool schemas to neutral form."""
+    fn = tool_def.get("function")
+    unwrapped = isinstance(fn, dict) and (
+        "name" not in tool_def or tool_def.get("type") == "function"
+    )
+    payload: dict[str, Any] = fn if unwrapped and isinstance(fn, dict) else tool_def
+
+    name = payload.get("name") or (fallback_name if strict_neutral else None)
+    if not name:
+        return None
+
+    if strict_neutral or unwrapped:
+        return {
+            "name": name,
+            "description": payload.get("description", ""),
+            "parameters": _extract_tool_parameters(payload),
+        }
+
+    normalized = dict(payload)
+    if normalized.get("type") == "function":
+        normalized.pop("type", None)
+    has_alternate = "inputSchema" in normalized or "input_schema" in normalized
+    if has_alternate and not normalized.get("parameters"):
+        normalized["parameters"] = _extract_tool_parameters(normalized)
+    normalized.pop("inputSchema", None)
+    normalized.pop("input_schema", None)
+    return normalized
+
+
+def _is_excluded_rel_path(rel_path: Path) -> bool:
+    """Return True if any path segment inside a skill root is hidden or excluded."""
+    return any(part.startswith(".") or part in _EXCLUDED_DIR_NAMES for part in rel_path.parts)
+
+
+def _safe_skill_archive_prefix(name: str, fallback: str) -> str:
+    """Sanitize skill archive directory name against path traversal."""
+    cleaned = name.replace("\\", "/").strip("/")
+    if not cleaned or cleaned in (".", "..") or ".." in Path(cleaned).parts:
+        return fallback
+    return cleaned.replace("/", "_")
+
+
+def _pack_skill_dir_tree(
+    zf: zipfile.ZipFile,
+    skill_dir: Path,
+    archive_prefix: str,
+) -> int:
+    """Pack all non-excluded files under a skill directory under archive_prefix."""
+    added = 0
+    for file_path in sorted(skill_dir.rglob("*")):
+        if not file_path.is_file():
+            continue
+        rel_path = file_path.relative_to(skill_dir)
+        if _is_excluded_rel_path(rel_path):
+            continue
+        try:
+            zf.writestr(f"{archive_prefix}/{rel_path.as_posix()}", file_path.read_bytes())
+            added += 1
+        except OSError:
+            continue
+    return added
+
+
+def _pack_sibling_skill_resources(
+    zf: zipfile.ZipFile,
+    skill_dir: Path,
+    archive_prefix: str,
+) -> int:
+    """Pack skill.yaml/yml metadata and standard resource subdirs adjacent to SKILL.md."""
+    if (skill_dir / ".sanityops").exists():
+        return 0
+    added = 0
+    for meta_name in _SKILL_METADATA_FILES:
+        meta_path = skill_dir / meta_name
+        if meta_path.is_file():
+            try:
+                zf.writestr(f"{archive_prefix}/{meta_name}", meta_path.read_bytes())
+                added += 1
+            except OSError:
+                continue
+    for subdir_name in sorted(_SKILL_RESOURCE_DIRS):
+        subdir = skill_dir / subdir_name
+        if subdir.is_dir():
+            added += _pack_skill_dir_tree(zf, subdir, f"{archive_prefix}/{subdir_name}")
+    return added
+
+
+def pack_extracted(result: ExtractionResult) -> dict[str, Any]:
+    """Pack an ExtractionResult (agent-store records) for upload.
+
+    Same server contract as the path-based ``ArtifactPacker.pack``:
+    ``prompt_content`` / ``tools_schema`` / ``skill_file``. Not-inspectable
+    artifacts contribute nothing (they have no content by definition).
     """
-    return any(part in EXCLUDED_DIRS for part in file_path.parts)
+    inspectable = [a for a in result.artifacts if a.completeness != "not inspectable"]
+
+    prompt_parts = [a.content.strip() for a in inspectable if a.type == "prompt" and a.content]
+    prompt_content = "\n\n".join(prompt_parts) or None
+
+    tools_by_name: dict[str, dict[str, Any]] = {}
+    for artifact in inspectable:
+        if artifact.type != "tool":
+            continue
+        schema_obj = artifact.schema_object
+        if not schema_obj and artifact.content:
+            try:
+                parsed = json.loads(artifact.content.strip())
+                if isinstance(parsed, dict):
+                    schema_obj = parsed
+            except Exception:
+                pass
+        if not schema_obj:
+            continue
+        normalized = _normalize_tool_definition(
+            schema_obj,
+            strict_neutral=True,
+            fallback_name=artifact.name,
+        )
+        if normalized is None:
+            continue
+        tools_by_name[normalized["name"]] = normalized
+    tools_schema = (
+        json.dumps(list(tools_by_name.values()), ensure_ascii=False) if tools_by_name else None
+    )
+
+    skill_file = _pack_skills_from_extracted([a for a in inspectable if a.type == "skill"])
+
+    return {
+        "prompt_content": prompt_content,
+        "tools_schema": tools_schema,
+        "skill_file": skill_file,
+    }
+
+
+def _pack_skills_from_extracted(
+    skills: list[ExtractedArtifact],
+) -> tuple[str, bytes] | None:
+    """ZIP skill records: extracted SKILL.md content, or the source dir tree.
+
+    When the skill's source is an existing directory the whole tree is
+    packed (references/assets/scripts travel with it); otherwise the
+    extracted verbatim content becomes ``<skill>/SKILL.md`` along with any
+    adjacent skill metadata/resource subdirectories when source points to a
+    standalone ``SKILL.md`` file.
+    """
+    if not skills:
+        return None
+
+    buffer = BytesIO()
+    added = 0
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        used_names: set[str] = set()
+        for i, artifact in enumerate(skills):
+            raw_name = artifact.name or f"skill_{i}"
+            skill_name = _safe_skill_archive_prefix(raw_name, f"skill_{i}")
+            base = skill_name
+            suffix = 2
+            while skill_name in used_names:
+                skill_name = f"{base}_{suffix}"
+                suffix += 1
+            used_names.add(skill_name)
+
+            source = Path(artifact.source) if artifact.source else None
+            if source is not None and source.is_dir():
+                added += _pack_skill_dir_tree(zf, source, skill_name)
+                continue
+
+            if artifact.content:
+                zf.writestr(f"{skill_name}/SKILL.md", artifact.content.encode("utf-8"))
+                added += 1
+            elif source is not None and source.is_file() and source.name.lower() == "skill.md":
+                try:
+                    zf.writestr(f"{skill_name}/{source.name}", source.read_bytes())
+                    added += 1
+                except OSError:
+                    continue
+
+            if source is not None and source.is_file() and source.name.lower() == "skill.md":
+                added += _pack_sibling_skill_resources(zf, source.parent, skill_name)
+
+    if added == 0:
+        return None
+    return ("skills.zip", buffer.getvalue())
 
 
 class ArtifactPacker:
@@ -59,6 +263,9 @@ class ArtifactPacker:
     - prompt_content: Single text string (merged from all prompt files)
     - tools_schema: JSON string of tool definitions array
     - skill_file: ZIP file containing skill directories/files
+
+    Packs from configured file paths (``project push``); the inspect pipeline
+    uses :func:`pack_extracted` instead.
     """
 
     def __init__(
@@ -70,16 +277,16 @@ class ArtifactPacker:
         """Initialize the packer with artifact file paths.
 
         Args:
-            prompts: List of absolute paths to prompt files.
-            tools: List of absolute paths to tool schema files.
-            skills: List of absolute paths to skill files or directories.
+            prompts: List of prompt file paths.
+            tools: List of tool schema file paths.
+            skills: List of skill directory/file paths.
         """
         self.prompts = prompts
         self.tools = tools
         self.skills = skills
 
     def pack(self) -> dict[str, Any]:
-        """Pack all artifacts into upload format.
+        """Pack artifacts from file paths.
 
         Returns:
             Dict with keys:
@@ -94,17 +301,19 @@ class ArtifactPacker:
         result: dict[str, Any] = {}
 
         # Pack prompts
-        result["prompt_content"] = self._pack_prompts()
+        result["prompt_content"] = self._pack_prompts_from_paths()
 
         # Pack tools
-        result["tools_schema"] = self._pack_tools()
+        result["tools_schema"] = self._pack_tools_from_paths()
 
         # Pack skills
-        result["skill_file"] = self._pack_skills()
+        result["skill_file"] = self._pack_skills_from_paths()
 
         return result
 
-    def _pack_prompts(self) -> str | None:
+    # ========== File path-based methods ==========
+
+    def _pack_prompts_from_paths(self) -> str | None:
         """Merge all prompt files into a single text.
 
         Each file's content is separated by a marker comment.
@@ -116,9 +325,9 @@ class ArtifactPacker:
             return None
 
         parts: list[str] = []
-        for path_str in self.prompts:
-            path = Path(path_str)
-            content = path.read_text(encoding="utf-8")
+        for item in self.prompts:
+            path = Path(item)
+            content = _read_text_utf8_gbk(path)
 
             # Add a header comment to identify the source file
             filename = path.name
@@ -129,12 +338,14 @@ class ArtifactPacker:
 
         return "\n".join(parts).strip() if parts else None
 
-    def _pack_tools(self) -> str | None:
-        """Merge all tool schema files into a JSON array.
+    def _pack_tools_from_paths(self) -> str | None:
+        """Merge all tool schema files (JSON or YAML) into a JSON array.
 
-        Handles both:
+        Handles:
         - Single tool definition objects
         - Arrays of tool definitions
+        - Wrapped mappings ({tools / tool_schema / tool_schemas: [...]})
+        - OpenAI function calling wrapper, Anthropic input_schema, MCP inputSchema
 
         Tools are deduplicated by 'name' field.
 
@@ -142,26 +353,38 @@ class ArtifactPacker:
             JSON string of tools array, or None if no tools.
 
         Raises:
-            ValueError: If a tool file contains invalid JSON.
-            ValueError: If tool definitions conflict on name.
+            ValueError: If a tool file contains invalid JSON/YAML.
         """
         if not self.tools:
             return None
 
         all_tools: dict[str, dict[str, Any]] = {}  # name -> definition
 
-        for path_str in self.tools:
-            path = Path(path_str)
-            content = path.read_text(encoding="utf-8")
+        for item in self.tools:
+            path = Path(item)
+            content = _read_text_utf8_gbk(path)
 
-            try:
-                data = json.loads(content)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Invalid JSON in tool file {path}: {e}") from e
+            if path.suffix.lower() in (".yaml", ".yml"):
+                try:
+                    data = yaml.safe_load(content)
+                except yaml.YAMLError as e:
+                    raise ValueError(f"Invalid YAML in tool file {path}: {e}") from e
+            else:
+                try:
+                    data = json.loads(content)
+                except json.JSONDecodeError as e:
+                    raise ValueError(f"Invalid JSON in tool file {path}: {e}") from e
 
-            # Handle both single object and array
+            # Handle both single object, wrapper dicts, and array
             if isinstance(data, dict):
-                tools_list = [data]
+                tools_list = None
+                for key in _TOOL_LIST_KEYS:
+                    candidate = data.get(key)
+                    if isinstance(candidate, list):
+                        tools_list = candidate
+                        break
+                if tools_list is None:
+                    tools_list = [data]
             elif isinstance(data, list):
                 tools_list = data
             else:
@@ -171,35 +394,20 @@ class ArtifactPacker:
             for tool_def in tools_list:
                 if not isinstance(tool_def, dict):
                     continue
-                # Normalize OpenAI function calling format to the flat,
-                # provider-neutral form. Both upload paths (push via paths and
-                # inspect via findings) must produce the same structure: the
-                # CLI does not know which provider the project will use, so the
-                # backend converts to the selected provider format when a model
-                # endpoint is actually configured.
-                if "name" not in tool_def and isinstance(tool_def.get("function"), dict):
-                    fn = tool_def["function"]
-                    if fn.get("name"):
-                        tool_def = {
-                            "name": fn.get("name"),
-                            "description": fn.get("description", ""),
-                            "parameters": fn.get("parameters", {}),
-                        }
-                name = tool_def.get("name")
-                if not name:
+                normalized = _normalize_tool_definition(tool_def, strict_neutral=False)
+                if normalized is None:
                     continue
-
-                all_tools[name] = tool_def
+                all_tools[normalized["name"]] = normalized
 
         if not all_tools:
             return None
 
         return json.dumps(list(all_tools.values()), ensure_ascii=False)
 
-    def _pack_skills(self) -> tuple[str, bytes] | None:
+    def _pack_skills_from_paths(self) -> tuple[str, bytes] | None:
         """Pack skill directories/files into a ZIP archive.
 
-        The ZIP preserves the directory structure relative to the skill root.
+        The ZIP preserves the directory structure under the skill directory name.
         If multiple skills are provided, they're all packed into one ZIP.
 
         Returns:
@@ -211,26 +419,23 @@ class ArtifactPacker:
         buffer = BytesIO()
 
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            for skill_path_str in self.skills:
-                skill_path = Path(skill_path_str)
+            for item in self.skills:
+                skill_path = Path(item)
 
                 if skill_path.is_file():
-                    # Single skill file
-                    self._add_file_to_zip(zf, skill_path, skill_path.name)
+                    # Single skill file: prefix with the parent directory name to
+                    # avoid duplicate archive names when several skill .md files
+                    # (e.g. <skill-dir>/SKILL.md) are configured as individual files.
+                    prefix = _safe_skill_archive_prefix(
+                        skill_path.parent.name, skill_path.stem or "skill"
+                    )
+                    self._add_file_to_zip(zf, skill_path, f"{prefix}/{skill_path.name}")
+                    if skill_path.name.lower() == "skill.md":
+                        _pack_sibling_skill_resources(zf, skill_path.parent, prefix)
 
                 elif skill_path.is_dir():
-                    # Skill directory - add all files recursively
-                    for file_path in skill_path.rglob("*"):
-                        if file_path.is_file():
-                            # Skip hidden files and excluded directories
-                            if any(part.startswith(".") for part in file_path.parts):
-                                continue
-                            if _is_excluded_path(file_path):
-                                continue
-
-                            # Preserve relative path from skill directory
-                            rel_path = file_path.relative_to(skill_path)
-                            self._add_file_to_zip(zf, file_path, str(rel_path))
+                    prefix = _safe_skill_archive_prefix(skill_path.name, "skill")
+                    _pack_skill_dir_tree(zf, skill_path, prefix)
 
         # Return ZIP with a descriptive name
         return ("skills.zip", buffer.getvalue())
@@ -247,178 +452,6 @@ class ArtifactPacker:
         try:
             content = file_path.read_bytes()
             zf.writestr(archive_name, content)
-        except OSError as e:
-            warnings.warn(f"Could not read file for ZIP archive: {file_path}: {e}", stacklevel=2)
-
-
-def pack_from_findings(
-    skills: list[Finding],
-    tools: list[Finding],
-    prompts: list[Finding],
-) -> dict[str, Any]:
-    """Pack artifacts from ScannerAgent findings (extracted content).
-
-    This function uses the content already extracted by ScannerAgent,
-    avoiding redundant file reads. It supports:
-    - Prompts extracted from YAML/Python files (e.g., system_prompt field)
-    - Tools extracted from code or schema files
-    - Skills from directories or SKILL.md files
-
-    Args:
-        skills: List of skill findings from ScannerAgent.
-        tools: List of tool findings from ScannerAgent.
-        prompts: List of prompt findings from ScannerAgent.
-
-    Returns:
-        Dict with keys:
-            - prompt_content: str or None
-            - tools_schema: str (JSON) or None
-            - skill_file: tuple(filename, bytes) or None
-    """
-    result: dict[str, Any] = {}
-
-    # Pack prompts from findings
-    result["prompt_content"] = _pack_prompts_from_findings(prompts)
-
-    # Pack tools from findings
-    result["tools_schema"] = _pack_tools_from_findings(tools)
-
-    # Pack skills from findings
-    result["skill_file"] = _pack_skills_from_findings(skills)
-
-    return result
-
-
-def _pack_prompts_from_findings(prompts: list[Finding]) -> str | None:
-    """Merge prompt content from findings.
-
-    Returns:
-        Merged prompt text, or None if no prompts.
-    """
-    if not prompts:
-        return None
-
-    parts: list[str] = []
-    for finding in prompts:
-        if finding.content is None:
-            continue
-        if not isinstance(finding.content, PromptContent):
-            continue
-
-        content = finding.content.content
-        if not content:
-            continue
-
-        # Add source identifier
-        source = Path(finding.relative).name
-        parts.append(f"<!-- BEGIN: {source} -->")
-        parts.append(content.strip())
-        parts.append(f"<!-- END: {source} -->")
-        parts.append("")
-
-    return "\n".join(parts).strip() if parts else None
-
-
-def _pack_tools_from_findings(tools: list[Finding]) -> str | None:
-    """Merge tool schemas from findings into the provider-neutral tool format.
-
-    The CLI cannot know which model provider will be configured after the
-    project is uploaded. Keep the scanner's normalized tool contract here;
-    the backend converts it to the selected provider format only when a model
-    endpoint is actually used.
-
-    Output format:
-    [
-      {
-        "name": "...",
-        "description": "...",
-        "parameters": {...}
-      }
-    ]
-
-    Returns:
-        JSON string of tools array, or None if no tools.
-    """
-    if not tools:
-        return None
-
-    all_tools: list[dict[str, Any]] = []
-    for finding in tools:
-        if finding.content is None:
-            continue
-        if not isinstance(finding.content, ToolContent):
-            continue
-
-        # Keep the normalized, provider-neutral representation. Do not add
-        # an OpenAI ``type``/``function`` wrapper here because the CLI does
-        # not know which provider the project will use later.
-        tool_def = {
-            "name": finding.content.name,
-            "description": finding.content.description,
-            "parameters": finding.content.parameters,
-        }
-        all_tools.append(tool_def)
-
-    if not all_tools:
-        return None
-
-    return json.dumps(all_tools, ensure_ascii=False)
-
-
-def _pack_skills_from_findings(skills: list[Finding]) -> tuple[str, bytes] | None:
-    """Pack skills from findings.
-
-    For skill findings with content (from analyze_files mode), creates a
-    SKILL.md file in the ZIP. For directory findings (from scan mode),
-    reads files from disk.
-
-    Returns:
-        Tuple of (filename, bytes) for the ZIP, or None if no skills.
-    """
-    if not skills:
-        return None
-
-    buffer = BytesIO()
-
-    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for i, finding in enumerate(skills):
-            skill_path = Path(finding.relative)
-
-            # Determine skill name
-            if finding.content and isinstance(finding.content, SkillContent):
-                skill_name = finding.content.name
-            else:
-                skill_name = skill_path.name if skill_path.is_dir() else f"skill_{i}"
-
-            if skill_path.is_file():
-                # Single skill file - read from disk
-                try:
-                    text_content = skill_path.read_text(encoding="utf-8")
-                    zf.writestr(f"{skill_name}/SKILL.md", text_content)
-                except OSError as e:
-                    warnings.warn(
-                        f"Could not read skill file for ZIP archive: {skill_path}: {e}",
-                        stacklevel=2,
-                    )
-
-            elif skill_path.is_dir():
-                # Skill directory - add all files recursively
-                for file_path in skill_path.rglob("*"):
-                    if file_path.is_file():
-                        # Skip hidden files and excluded directories
-                        if any(part.startswith(".") for part in file_path.parts):
-                            continue
-                        if _is_excluded_path(file_path):
-                            continue
-
-                        rel_path = file_path.relative_to(skill_path)
-                        try:
-                            binary_content = file_path.read_bytes()
-                            zf.writestr(f"{skill_name}/{rel_path}", binary_content)
-                        except OSError as e:
-                            warnings.warn(
-                                f"Could not read file for ZIP archive: {file_path}: {e}",
-                                stacklevel=2,
-                            )
-
-    return ("skills.zip", buffer.getvalue())
+        except OSError:
+            # Skip files that can't be read
+            pass

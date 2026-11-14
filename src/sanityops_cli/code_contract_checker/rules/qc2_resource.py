@@ -1,17 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """QC-2 Resource Management rules."""
 
 from __future__ import annotations
@@ -26,31 +12,27 @@ if TYPE_CHECKING:
 
 
 #: Call names that open files and should be closed or used as context manager.
-FILE_OPEN_CALLS = frozenset({"open", "io.open", "builtins.open", "pdfplumber.open"})
+FILE_OPEN_CALLS = {"open", "io.open", "builtins.open", "pdfplumber.open"}
 
 #: Call names that create network connections needing close/context manager.
-NETWORK_CONN_CALLS = frozenset(
-    {
-        "http.client.HTTPSConnection",
-        "http.client.HTTPConnection",
-        "socket.socket",
-        "urllib.request.urlopen",
-        "aiohttp.ClientSession",
-    }
-)
+NETWORK_CONN_CALLS = {
+    "http.client.HTTPSConnection",
+    "http.client.HTTPConnection",
+    "socket.socket",
+    "urllib.request.urlopen",
+    "aiohttp.ClientSession",
+}
 
 #: High-risk operation call names that should be wrapped in try/except.
-HIGH_RISK_CALLS = frozenset(
-    {
-        "open",
-        "requests.get",
-        "requests.post",
-        "urllib.request.urlopen",
-        "connect",
-        "cursor",
-        "execute",
-    }
-)
+HIGH_RISK_CALLS = {
+    "open",
+    "requests.get",
+    "requests.post",
+    "urllib.request.urlopen",
+    "connect",
+    "cursor",
+    "execute",
+}
 
 
 def _call_name(node: ast.Call) -> str | None:
@@ -299,24 +281,13 @@ def check_qc_2_3_missing_exception_handling(
                         try_lines.add(lineno)
             self.generic_visit(node)
 
-        # Python 3.11+ adds ast.TryStar for `try*` / `except*` syntax.
-        # The hasattr guard keeps this file importable on older interpreters,
-        # which is why the parameter is annotated as ast.AST: ast.TryStar
-        # cannot be referenced in annotations evaluated on Python < 3.11.
-        # The method only runs on 3.11+ where the argument is always a
-        # real ast.TryStar node.
-        if hasattr(ast, "TryStar"):
-
-            def visit_TryStar(self, node: ast.AST) -> None:
-                # Runtime-guaranteed ast.TryStar on 3.11+; the ast.AST
-                # annotation is a compatibility concession, hence the
-                # ignore below.
-                for stmt in node.body:  # type: ignore[union-attr]
-                    for child in ast.walk(stmt):
-                        lineno = getattr(child, "lineno", None)
-                        if isinstance(lineno, int):
-                            try_lines.add(lineno)
-                self.generic_visit(node)
+        def visit_TryStar(self, node: ast.TryStar) -> None:  # Python 3.11+
+            for stmt in node.body:
+                for child in ast.walk(stmt):
+                    lineno = getattr(child, "lineno", None)
+                    if isinstance(lineno, int):
+                        try_lines.add(lineno)
+            self.generic_visit(node)
 
     TryCollector().visit(tree)
 

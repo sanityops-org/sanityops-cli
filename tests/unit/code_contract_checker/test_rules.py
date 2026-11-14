@@ -145,10 +145,10 @@ class TestExtractCodeBlocks:
         content = "text\n\n```python\nx = 1\n```\n"
         blocks = extract_code_blocks(content, result, "$")
         assert len(blocks) == 1
-        code, lang, line = blocks[0]
-        assert code.strip() == "x = 1"
-        assert lang == "python"
-        assert line == 3
+        block = blocks[0]
+        assert block.code.strip() == "x = 1"
+        assert block.language == "python"
+        assert block.line_number == 3
 
     def test_alias_normalization(self):
         result = _result()

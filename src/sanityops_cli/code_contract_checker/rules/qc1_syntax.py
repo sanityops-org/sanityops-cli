@@ -1,17 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """QC-1 Syntax Validation rules."""
 
 from __future__ import annotations
@@ -48,13 +34,6 @@ def check_qc_1_1_undefined_name(
     - Exception variables (except)
     - With statement context variables
     - Class attributes accessed via self/cls
-
-    Known limitation: definitions are collected into a single flat set
-    without nesting scopes, so a name defined inside one function is
-    treated as defined everywhere in the snippet (e.g. a variable set in
-    ``foo()`` will not be flagged when referenced in ``bar()``). This is
-    an intentional trade-off: false negatives are preferred over the
-    false positives a heuristic scope stack would produce on fragments.
 
     Args:
         code: The code snippet to check.
@@ -106,6 +85,12 @@ def check_qc_1_1_undefined_name(
         # Class definitions
         elif isinstance(node, ast.ClassDef):
             defined_names.add(node.name)
+        # Top-level assignments (module-level variables)
+        elif isinstance(node, ast.Assign):
+            # Only track module-level assignments (those not inside functions)
+            # We need to check the parent, but ast.walk doesn't give us that
+            # So we'll use a different approach with a visitor
+            pass
 
     # Use a scope-aware visitor to collect all defined names
     class ScopeCollector(ast.NodeVisitor):
@@ -125,9 +110,10 @@ def check_qc_1_1_undefined_name(
                     # self.x = ... - don't add x, only check the base
                     pass
 
-        def _collect_function_signature(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-            """Record the function name and all parameter names as defined."""
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            # Function name is defined
             self.defined.add(node.name)
+            # Function parameters are defined within the function
             for arg in node.args.args:
                 self.defined.add(arg.arg)
             for arg in node.args.posonlyargs:
@@ -138,17 +124,12 @@ def check_qc_1_1_undefined_name(
                 self.defined.add(node.args.vararg.arg)
             if node.args.kwarg:
                 self.defined.add(node.args.kwarg.arg)
-
-        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-            self._collect_function_signature(node)
             # Visit function body
             self.generic_visit(node)
 
         def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-            # Same handling as the sync visitor; the union-typed helper
-            # makes the shared signature explicit.
-            self._collect_function_signature(node)
-            self.generic_visit(node)
+            # Same as FunctionDef
+            self.visit_FunctionDef(node)  # type: ignore
 
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
             self.defined.add(node.name)
@@ -267,11 +248,14 @@ def check_qc_1_1_undefined_name(
                 return
 
             # Skip common patterns that are context-dependent
-            # - Private names (start with _), including __dunder__ names
+            # - Private names (start with _)
             # - self, cls (used in methods)
+            # - __dunder__ names
             if name.startswith("_"):
                 return
             if name in ("self", "cls"):
+                return
+            if name.startswith("__") and name.endswith("__"):
                 return
 
             self.undefined.append((name, node.lineno))
@@ -321,9 +305,7 @@ def check_qc_1_4_type_mismatch(
     - String passed to function expecting int (e.g., range("5"))
     - Wrong number of arguments to builtins
 
-    Intentionally narrow scope: only the small table of common builtins
-    below is inspected. This is a heuristic signal, not a type checker —
-    full signature analysis is out of scope for a lightweight lint pass.
+    This is a simplified check using AST pattern matching.
 
     Args:
         code: The code snippet to check.

@@ -1,4 +1,4 @@
-"""Getting Started and Advanced Usage panels for CLI help output."""
+"""Getting Started panel for CLI help output."""
 
 from rich.panel import Panel
 from rich.text import Text
@@ -16,7 +16,7 @@ ADVANCED_USAGE_TEXT = """\
     3. Run 'sanityops-cli inspect' in the pipeline
 
   Config Command (sanityops-cli config --help):
-    View detailed configuration options and usage examples
+    View detailed configuration options and usage examples\
 """
 
 
@@ -24,7 +24,7 @@ def get_getting_started_panel() -> Panel:
     """Create the Getting Started panel for help output.
 
     Returns:
-        A Rich Panel containing the 3-step Getting Started workflow.
+        A Rich Panel containing the 5-step Getting Started workflow.
     """
     return Panel(
         Text(GETTING_STARTED_TEXT, justify="left"),
