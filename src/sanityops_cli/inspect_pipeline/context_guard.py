@@ -68,7 +68,10 @@ class ContextLimitedProvider(LLMProvider):
     """Guard SDK requests and supply the total used by its cumulative budget."""
 
     def __init__(self, provider: LLMProvider, context: ArtifactAwareContext) -> None:
-        super().__init__(api_key=provider.api_key, base_url=provider.base_url, model=provider.model)
+        # LLMProvider is an ABC without its own __init__, so we set attributes directly
+        self.api_key = provider.api_key
+        self.base_url = provider.base_url
+        self.model = provider.model
         self._provider = provider
         self._context = context
 
