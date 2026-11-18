@@ -1411,7 +1411,14 @@ def inspect(
             summary=parsed,
         )
         console.print(Text(f"Report saved: {report_path.resolve()}", style="dim"), soft_wrap=True)
-        portal_url = f"{DEFAULT_SERVER_BASE_URL}/"
+        portal_url = (
+            ConfigResolver(
+                "server.base_url", "SANITYOPS_BASE_URL", DEFAULT_SERVER_BASE_URL
+            ).resolve()
+            or DEFAULT_SERVER_BASE_URL
+        )
+        if not portal_url.endswith("/"):
+            portal_url += "/"
         console.print(f"SaaS portal: [link={portal_url}]{portal_url}[/link]")
         log_manager.info("report", f"Markdown report saved: {report_path}")
     except Exception as e:
