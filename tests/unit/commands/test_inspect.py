@@ -97,6 +97,8 @@ class Harness:
         self.captured = {
             "extract": None,
             "inspect": None,
+            "extract_provider": None,
+            "inspect_provider": None,
             "uploads": 0,
             "llm_resolved": 0,
         }
@@ -130,6 +132,7 @@ class Harness:
             def __init__(self, provider, **kwargs):
                 self.kwargs = kwargs
                 harness.captured["extract"] = kwargs
+                harness.captured["extract_provider"] = provider
 
             def extract_sync(self, prompts, tools, skills):
                 harness.captured["extract_manifest"] = {
@@ -145,6 +148,7 @@ class Harness:
             def __init__(self, provider, **kwargs):
                 self.kwargs = kwargs
                 harness.captured["inspect"] = kwargs
+                harness.captured["inspect_provider"] = provider
 
             def inspect_sync(self):
                 if harness.inspect_error:
@@ -197,6 +201,24 @@ def test_inspect_happy_path(monkeypatch, tmp_path):
     ir_batch_dir = tmp_path / "results" / "ir" / run_id
     assert ir_batch_dir.is_dir()
     assert list(ir_batch_dir.glob("*.ir.md"))
+
+
+def test_inspect_uses_a_fresh_provider_per_stage(monkeypatch, tmp_path):
+    """Each agent stage runs in its own event loop.
+
+    A provider's HTTP client binds its connection pool to the loop of the
+    first request; reusing the extract-stage provider in the inspect stage
+    raises "RuntimeError: Event loop is closed" once a pooled connection from
+    the closed extract loop is closed.
+    """
+    harness = Harness(monkeypatch, tmp_path)
+    result = harness.run(tmp_path)
+    assert result.exit_code == 0, result.output
+    extract_provider = harness.captured["extract_provider"]
+    inspect_provider = harness.captured["inspect_provider"]
+    assert extract_provider is not None
+    assert inspect_provider is not None
+    assert extract_provider is not inspect_provider
 
 
 def test_inspect_isolates_ir_by_run_batch(monkeypatch, tmp_path):

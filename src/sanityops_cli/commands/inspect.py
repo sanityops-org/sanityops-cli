@@ -1048,10 +1048,13 @@ def inspect(
         token_budget if token_budget != 200000 else max(agent_cfg.get("token_budget", 0), 200000)
     )
 
+    # Each agent stage runs in its own anyio event loop, and a provider binds
+    # its HTTP client's connection pool to the loop of its first request, so
+    # the stages must not share one provider instance.
     provider_config = _build_provider_config(
         llm_config, enable_thinking=settings["enable_thinking"]
     )
-    provider = _create_provider(provider_config)
+    extract_provider = _create_provider(provider_config)
 
     # Step 5: Materialize vendored skills (design §10)
     from sanityops_cli.inspect_pipeline.skill_runtime import (
@@ -1096,7 +1099,7 @@ def inspect(
                 f"using {EXTRACT_TOKEN_BUDGET_FLOOR}.[/yellow]"
             )
         extract_agent = ExtractAgent(
-            provider,
+            extract_provider,
             skills_dir=skills_dir,
             timeout=effective_timeout,
             token_budget=extract_budget,
@@ -1265,8 +1268,11 @@ def inspect(
         "project": project_id or "not set",
     }
 
+    # Fresh provider for this stage: reusing the extract stage's would hit a
+    # connection pooled on the now-closed extract loop and raise
+    # "RuntimeError: Event loop is closed".
     inspect_agent = InspectAgent(
-        provider,
+        _create_provider(provider_config),
         skills_dir=skills_dir,
         injection_payload=injection_payload,
         header_data=header_data,
