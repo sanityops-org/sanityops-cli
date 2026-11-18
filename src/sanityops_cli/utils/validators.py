@@ -1,18 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-
 """local validators for sanityops-cli"""
 
 import json
@@ -33,6 +18,7 @@ EXCLUDED_DIRS = {
     ".idea",
     ".vscode",
 }
+
 
 def validate_inspect_directory(directory: str) -> None:
     """validate inspect directory"""
@@ -108,10 +94,8 @@ def validate_artifact_inputs(
             parsed = json.loads(content)
         except json.JSONDecodeError:
             raise ValidationError(f"Tools Schema is not valid JSON: {path_str}") from None
-        if not isinstance(parsed, (dict, list)):
+        if not isinstance(parsed, dict | list):
             raise ValidationError(f"Tools Schema must be a JSON object or array: {path_str}")
 
     if level.upper() not in ("L1", "L2", "L3"):
         raise ValidationError(f"Level must be one of L1/L2/L3, current value: {level}")
-
-

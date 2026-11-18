@@ -1,0 +1,24 @@
+{
+  "source": {
+    "url": "https://github.com/sanityops-org/sanityops-inspect-lite.git",
+    "commit": "036e6233a95e1c725cde2237cb31912c4879516e",
+    "synced_at": "2026-11-14T09:37:01+00:00"
+  },
+  "items": {
+    "sanityops-inspect-lite": {
+      "type": "synced",
+      "version": "1.3.1",
+      "sha256": "58383974a42b6219ce7499801ee9a921c671c569ace88332c902ab90e40b721f"
+    },
+    "code-contract-checklist.v2": {
+      "type": "synced",
+      "version": "v2",
+      "sha256": "2655bb59c607d064f310be2c70f217ebcc76e72b7c63a8c3ff5f844b920d4003"
+    },
+    "pre-inspect-extract": {
+      "type": "synced",
+      "version": "1.3.1",
+      "sha256": "7183d9d84fd4a32698166550d19c6522b7767ed8d26bc6ea4cafb3af3cb884d4"
+    }
+  }
+}

@@ -1,17 +1,3 @@
-# Copyright 2026 zipsonken
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 """Generate Markdown report for Code Contract inspection results."""
 
 from __future__ import annotations
@@ -20,8 +6,6 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
-
-from .models import RULE_DEFINITIONS, QCRuleID
 
 if TYPE_CHECKING:
     from .models import QCArtifactResult, QCInspectionResult
@@ -49,9 +33,7 @@ def save_qc_report(
         output_dir = output_dir.expanduser().resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Microsecond precision matches the main inspect report naming and
-        # prevents filename collisions for reports saved within the same second.
-        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         filename = f"qc-inspect-{timestamp}.md"
         path = output_dir / filename
 
@@ -145,6 +127,8 @@ def _generate_markdown(
             "|---------|------|----------|-------------|",
         ]
     )
+
+    from .models import RULE_DEFINITIONS, QCRuleID
 
     for rule_id in QCRuleID:
         if rule_id in RULE_DEFINITIONS:

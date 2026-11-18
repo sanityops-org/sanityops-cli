@@ -51,11 +51,12 @@ class TestCodeContractChecker:
             encoding="utf-8",
         )
         result = CodeContractChecker().check_from_paths([], [], [str(skill)])
-        # Both defects found; the H3 block is checked under its own section
+        # Both defects are found; each section contributes its own code block.
         assert result.skills[0].total_defects >= 2
         locations = [d.location for d in result.skills[0].defects]
-        assert any("$.sections.Sub." in loc for loc in locations)
-        assert any("$.sections.Other." in loc for loc in locations)
+        assert all(loc.startswith("$.code_blocks") for loc in locations)
+        evidence = " ".join(d.evidence for d in result.skills[0].defects)
+        assert "missing_a" in evidence and "missing_b" in evidence
 
     def test_clean_artifact_has_no_defects(self, tmp_path: Path):
         skill = tmp_path / "SKILL.md"
