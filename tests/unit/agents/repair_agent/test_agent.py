@@ -48,7 +48,9 @@ class TestRepairAgentInit:
         """Agent has sensible defaults."""
         agent = RepairAgent(provider=None)
         assert agent.max_loops == 30
-        assert agent.timeout == 300
+        # Aligned with the extract/inspect stages: reasoning-heavy models need
+        # longer than the SDK's 300s default to rewrite whole artifacts.
+        assert agent.timeout == 1800
         assert agent.token_budget is None
         assert agent.llm_retries == 3
         assert agent.retry_delay == 65

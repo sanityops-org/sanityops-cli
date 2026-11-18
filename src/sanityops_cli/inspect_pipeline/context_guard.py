@@ -139,10 +139,12 @@ class _DelegatingLLMProvider(LLMProvider):
     """Base wrapper delegating connection metadata and ``extra_body`` to an inner provider."""
 
     def __init__(self, provider: LLMProvider) -> None:
-        # LLMProvider is an ABC without its own __init__, so we set attributes directly
-        self.api_key = provider.api_key
-        self.base_url = provider.base_url
-        self.model = provider.model
+        # LLMProvider is an ABC without its own __init__ and does not declare
+        # connection metadata, so delegate it only when the wrapped provider
+        # exposes it (test doubles legitimately do not).
+        self.api_key = getattr(provider, "api_key", None)
+        self.base_url = getattr(provider, "base_url", None)
+        self.model = getattr(provider, "model", None)
         self._provider = provider
 
     @property

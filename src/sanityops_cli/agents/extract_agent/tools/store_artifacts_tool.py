@@ -346,10 +346,12 @@ class StoreArtifactsTool(Tool):
                 f"{total}; set final=true on it"
             )
         if not is_last and artifact.get("final"):
-            # The model decided this is the end: honour it (seq is contiguous at
-            # this point) rather than burning a retry on a counting mistake.
-            total = seq + 1
-            is_last = True
+            # Guard content integrity: accepting an early `final` would silently
+            # truncate the artifact, so reject it with a corrective message.
+            return self._error(
+                f"artifact {a_type}/{name}: final=true on chunk {seq} but "
+                f"total_chunks={total} (final must be seq={total - 1})"
+            )
 
         record = None
         if is_last:

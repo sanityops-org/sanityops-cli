@@ -8,7 +8,7 @@ import json
 import pytest
 
 from sanityops_cli.agents.extract_agent.tools.store_artifacts_tool import (
-    MAX_CHUNK_CHARS,
+    MAX_CHUNK_HARD_CHARS,
     StoreArtifactsTool,
 )
 
@@ -173,13 +173,13 @@ class TestChunkSequence:
             artifact={
                 "type": "prompt",
                 "name": "p",
-                "content": "x" * (MAX_CHUNK_CHARS + 1),
+                "content": "x" * (MAX_CHUNK_HARD_CHARS + 1),
                 "total_chunks": 2,
                 "seq": 0,
             },
         )
         assert not result.success
-        assert "split into chunks" in result.error
+        assert "hard limit" in result.error
 
 
 class TestResendSemantics:

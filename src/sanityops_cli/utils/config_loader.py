@@ -76,7 +76,7 @@ def read_file_with_encoding_fallback(path: Path) -> str | None:
 class InspectConfigLoader:
     """Load and validate inspect_config.yaml, resolve all artifact paths to absolute."""
 
-    def __init__(self, config_path: str | None = None, require_project_id: bool = True):
+    def __init__(self, config_path: str | None = None, require_project_id: bool = False):
         """Initialize the config loader.
 
         Args:
@@ -129,7 +129,7 @@ class InspectConfigLoader:
 
         # project_id may be None/placeholder if not bound
         project_id = self._config.get("project", {}).get("id")
-        if project_id == "00000000-0000-0000-0000-000000000000":
+        if project_id == PROJECT_ID_PLACEHOLDER:
             project_id = None
 
         return {
@@ -204,7 +204,7 @@ class InspectConfigLoader:
             if not _UUID_RE.match(str(project_id)):
                 raise ValidationError(f"'project.id' is not a valid UUID: {project_id}")
             # Check it's not the placeholder UUID
-            if str(project_id) == "00000000-0000-0000-0000-000000000000":
+            if str(project_id) == PROJECT_ID_PLACEHOLDER:
                 raise ValidationError(
                     "'project.id' is still a placeholder. "
                     "Run 'sanityops-cli project create <name>' or 'sanityops-cli project bind <id>'"
@@ -212,7 +212,7 @@ class InspectConfigLoader:
         else:
             # When not requiring project_id, just check the format if it's set
             project_id = project.get("id")
-            if project_id and str(project_id) != "00000000-0000-0000-0000-000000000000":
+            if project_id and str(project_id) != PROJECT_ID_PLACEHOLDER:
                 if not _UUID_RE.match(str(project_id)):
                     raise ValidationError(f"'project.id' is not a valid UUID: {project_id}")
 

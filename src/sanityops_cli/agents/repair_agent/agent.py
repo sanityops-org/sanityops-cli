@@ -32,8 +32,8 @@ class RepairAgent:
         provider,
         max_loops: int = 30,
         timeout: int = 1800,
-        token_budget: int = 100000,
-        llm_retries: int = 2,
+        token_budget: int | None = None,
+        llm_retries: int = 3,
         retry_delay: float = 65.0,
         verbose: bool = False,
         console: Console | None = None,
@@ -133,12 +133,14 @@ class RepairAgent:
             artifact_list="\n".join(artifact_lines),
         )
 
-        config = AgentConfig(
-            max_loops=self.max_loops,
-            total_timeout=self.timeout,
-            token_budget=self.token_budget,
-            system_prompt=system_prompt,
-        )
+        config_kwargs: dict = {
+            "max_loops": self.max_loops,
+            "total_timeout": self.timeout,
+            "system_prompt": system_prompt,
+        }
+        if self.token_budget:
+            config_kwargs["token_budget"] = self.token_budget
+        config = AgentConfig(**config_kwargs)
 
         hook_executor = HookExecutor()
         if self.verbose or self.log_manager:

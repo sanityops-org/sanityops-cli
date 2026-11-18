@@ -36,7 +36,9 @@ app = typer.Typer(
 
 def version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"sanityops-cli version {__version__}")
+        typer.echo(f"sanityops-cli v{__version__}")
+        typer.echo("Copyright (C) 2026 zipsonken / Sanity AI Labs")
+        typer.echo("License: Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0)")
         raise typer.Exit()
 
 
@@ -76,16 +78,17 @@ app.command("init")(init_config)
 
 def main():
     """Entrance function for the sanityops CLI application."""
-    # Check if --help is requested for the main app only (no subcommand)
-    # This means: --help present, no subcommand (first arg after flags would be a command)
-    is_help = "--help" in sys.argv or "-h" in sys.argv
-    is_version = "--version" in sys.argv or "-V" in sys.argv
-    # No subcommand if: only flags, or only the app name
-    has_subcommand = any(arg and not arg.startswith("-") for arg in sys.argv[1:])
-    # Also show panel when no args (no_args_is_help=True will show help)
+    # Show panels only when --help is the sole flag or there are no args.
+    # This narrow trigger avoids showing panels on usage errors (-h, --bogus).
+    #
+    # Note: --version/-V doesn't need explicit handling here because:
+    # - `--version` won't match the exact `["--help"]` check
+    # - Single-arg `--version` has len > 1, so is_no_args_help is False
+    # - It falls through to the normal app() path, which prints version and exits.
+    is_only_help = sys.argv[1:] == ["--help"]
     is_no_args_help = len(sys.argv) == 1
 
-    if (is_help or is_no_args_help) and not is_version and not has_subcommand:
+    if is_only_help or is_no_args_help:
         # Use a custom console to capture and extend help output
         console = Console()
         try:

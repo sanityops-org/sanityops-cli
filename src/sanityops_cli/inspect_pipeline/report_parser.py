@@ -35,6 +35,10 @@ KNOWN_MODULES = set(MODULE_STAGE)
 
 _MAX_DESCRIPTION = 120
 
+#: Cap for the best-effort section scan; the structured tail/parts carry the
+#: authoritative list.
+_MAX_FINDINGS = 20
+
 #: Best-effort line pattern when the tail JSON is missing: a severity next to
 #: a module/rule id in a report section line.
 _MODULE_PATTERN = "|".join(re.escape(module) for module in sorted(KNOWN_MODULES))
@@ -122,7 +126,7 @@ def parse_summary(
     elif section_parts:
         source = "sections"
         warnings.append("structured findings unavailable; counts estimated from report sections")
-        findings = _findings_from_sections(section_parts)
+        findings = _findings_from_sections(section_parts, warnings)
     else:
         source = "none"
         findings = []
@@ -243,7 +247,9 @@ def _normalize_findings(findings: list, warnings: list[str]) -> list[dict]:
     return normalized
 
 
-def _findings_from_sections(section_parts: dict[str, list[str]]) -> list[dict]:
+def _findings_from_sections(
+    section_parts: dict[str, list[str]], warnings: list[str]
+) -> list[dict]:
     """Best-effort severity/module scan over the section markdown."""
     findings: list[dict] = []
     for section in sorted(section_parts):
@@ -265,6 +271,9 @@ def _findings_from_sections(section_parts: dict[str, list[str]]) -> list[dict]:
                         "description": re.sub(r"[*_`|]", "", line)[:_MAX_DESCRIPTION],
                     }
                 )
+                if len(findings) >= _MAX_FINDINGS:
+                    warnings.append(f"section scan capped at {_MAX_FINDINGS} findings")
+                    return findings
     return findings
 
 
