@@ -130,11 +130,18 @@ def inspect_script() -> list[LLMResponse]:
         )
     ]
     for stage, line in stage_content.items():
+        # Finding sections (A, B, D, E, F) require a structured `findings`
+        # array; empty here because this run's findings arrive via the tail.
+        extra = {"findings": []} if stage in "ABDEF" else {}
         script.append(
             response(
                 TextBlock(text=f"stage {stage}"),
                 tool_call(
-                    "i2", "write_report", section=stage, content=f"## Stage {stage}\n\n{line}"
+                    "i2",
+                    "write_report",
+                    section=stage,
+                    content=f"## Stage {stage}\n\n{line}",
+                    **extra,
                 ),
             )
         )

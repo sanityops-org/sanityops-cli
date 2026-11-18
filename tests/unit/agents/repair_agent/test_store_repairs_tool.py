@@ -12,9 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import asyncio
+
 import pytest
 
 from sanityops_cli.agents.repair_agent.tools.store_repairs_tool import StoreRepairsTool
+
+
+def _store(tool, **kwargs):
+    """Run the async store_repair tool from a sync test."""
+    return asyncio.run(tool.execute(**kwargs))
 
 
 class TestStoreRepairsTool:
@@ -34,7 +41,8 @@ class TestStoreRepairsTool:
     def test_add_repair_success(self):
         """Adding a valid repair succeeds."""
         tool = StoreRepairsTool()
-        result = tool._add_repair(
+        result = _store(
+            tool,
             artifact_type="prompt",
             artifact_path="/abs/path/to/prompt.md",
             repaired_content="# Fixed prompt content",
@@ -47,13 +55,15 @@ class TestStoreRepairsTool:
     def test_add_repair_updates_existing(self):
         """Adding same artifact twice updates the entry."""
         tool = StoreRepairsTool()
-        tool._add_repair(
+        _store(
+            tool,
             artifact_type="prompt",
             artifact_path="/abs/path/to/prompt.md",
             repaired_content="version 1",
             summary="First fix",
         )
-        tool._add_repair(
+        _store(
+            tool,
             artifact_type="prompt",
             artifact_path="/abs/path/to/prompt.md",
             repaired_content="version 2",
@@ -66,7 +76,8 @@ class TestStoreRepairsTool:
     def test_add_repair_rejects_invalid_type(self):
         """Invalid artifact_type is rejected."""
         tool = StoreRepairsTool()
-        result = tool._add_repair(
+        result = _store(
+            tool,
             artifact_type="invalid_type",
             artifact_path="/abs/path/to/file.md",
             repaired_content="content",
@@ -78,7 +89,8 @@ class TestStoreRepairsTool:
     def test_add_repair_rejects_relative_path(self):
         """Relative path is rejected."""
         tool = StoreRepairsTool()
-        result = tool._add_repair(
+        result = _store(
+            tool,
             artifact_type="prompt",
             artifact_path="relative/path.md",
             repaired_content="content",
@@ -90,7 +102,8 @@ class TestStoreRepairsTool:
     def test_add_repair_rejects_empty_content(self):
         """Empty repaired_content is rejected."""
         tool = StoreRepairsTool()
-        result = tool._add_repair(
+        result = _store(
+            tool,
             artifact_type="prompt",
             artifact_path="/abs/path/to/file.md",
             repaired_content="",
@@ -102,13 +115,15 @@ class TestStoreRepairsTool:
     def test_clear_removes_all_repairs(self):
         """Clear removes all stored repairs."""
         tool = StoreRepairsTool()
-        tool._add_repair(
+        _store(
+            tool,
             artifact_type="prompt",
             artifact_path="/abs/path/1.md",
             repaired_content="content",
             summary="fix",
         )
-        tool._add_repair(
+        _store(
+            tool,
             artifact_type="skill",
             artifact_path="/abs/path/2.md",
             repaired_content="content",
