@@ -307,9 +307,7 @@ class TestTerminationMessages:
     def test_idle_loop_produces_hook_blocked_message(self):
         from sanityops_agent.core.agent import TerminationReason
 
-        from sanityops_cli.agents.extract_agent.agent import (
-            _termination_message,
-        )
+        from sanityops_cli.agents.termination import _termination_message
 
         msg = _termination_message(
             "extraction", TerminationReason.HOOK_BLOCKED, ["conn error"]
@@ -320,7 +318,7 @@ class TestTerminationMessages:
     def test_timeout_message_is_specific(self):
         from sanityops_agent.core.agent import TerminationReason
 
-        from sanityops_cli.agents.extract_agent.agent import _termination_message
+        from sanityops_cli.agents.termination import _termination_message
 
         msg = _termination_message("extraction", TerminationReason.TIMEOUT, [])
         assert "(timeout)" in msg
@@ -339,7 +337,7 @@ class TestIdleTurnGuard:
             def print(self, *a, **k):
                 pass
 
-        hook = LoggingProgressHook(console=_C(), logger=None, verbose=False)
+        hook = LoggingProgressHook(console=_C(), log_manager=None, verbose=False)
         events = hook._get_events()
 
         async def drive():
@@ -375,7 +373,7 @@ class TestIdleTurnGuard:
             def print(self, *a, **k):
                 pass
 
-        hook = LoggingProgressHook(console=_C(), logger=None, verbose=False)
+        hook = LoggingProgressHook(console=_C(), log_manager=None, verbose=False)
         events = hook._get_events()
 
         async def drive():

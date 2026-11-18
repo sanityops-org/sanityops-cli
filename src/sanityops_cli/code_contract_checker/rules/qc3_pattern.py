@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 # Weak credential patterns
 WEAK_CREDENTIAL_PATTERNS = [
-    (re.compile(r'password\s*=\s*["\'](\d{4,6})["\']'), "sequential digits"),
-    (re.compile(r'password\s*=\s*["\']123{2,}["\']'), "sequential digits"),
+    (re.compile(r'password\s*=\s*["\'](\d{4,6})["\']'), "short numeric password"),
+    (re.compile(r'password\s*=\s*["\']123{2,}["\']'), "repeated digits"),
     (re.compile(r'password\s*=\s*["\'](password|passwd|pwd)["\']', re.I), "common password"),
     (re.compile(r'api_key\s*=\s*["\']xxx["\']'), "placeholder value"),
     (re.compile(r'api_key\s*=\s*["\']your[_-]?api[_-]?key["\']', re.I), "placeholder value"),
@@ -321,6 +321,11 @@ def check_qc_3_3_hardcoded_demo_value(
     lines = code.split("\n")
 
     for i, line in enumerate(lines):
+        # Skip comment-only lines to avoid flagging documentation examples
+        # like "# password = 'password'".
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
         for pattern, pattern_type in WEAK_CREDENTIAL_PATTERNS:
             match = pattern.search(line)
             if match:

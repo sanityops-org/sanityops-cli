@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import inspect as inspect_mod
 import os
+import platform
+import sys
 from contextlib import nullcontext
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
@@ -51,6 +53,16 @@ MAX_MANIFEST_FILES = 50
 #: Design §6.6 effective token-budget floors per agent.
 EXTRACT_TOKEN_BUDGET_FLOOR = 200_000
 INSPECT_TOKEN_BUDGET_FLOOR = 300_000
+
+
+def _banner_line() -> str:
+    """Return a one-line run banner: program version, Python version, platform."""
+    from sanityops_cli import __version__
+
+    return (
+        f"sanityops-cli v{__version__} | Python {platform.python_version()} "
+        f"| {sys.platform}/{platform.machine()}"
+    )
 
 
 def _count_label(count: int, singular: str) -> str:
@@ -961,6 +973,7 @@ def inspect(
     input_counts = _format_artifact_counts(
         prompts=len(prompt_files), tools=len(tool_files), skills=len(skill_files)
     )
+    console.print(f"[dim]{_banner_line()}[/dim]")
     console.print(f"[dim]Configured sources: {input_counts}[/dim]")
 
     log_manager.info(
@@ -1253,6 +1266,10 @@ def inspect(
         InspectionFailedError,
     )
     from sanityops_cli.inspect_pipeline.ir_writer import render_injection_payload
+    from sanityops_cli.inspect_pipeline.token_estimator import (
+        derive_injection_budget,
+        estimate_skill_reserve,
+    )
 
     injection_payload = render_injection_payload(extraction_result)
     injection_payload += "\n\n" + _qc_payload_block(qc_result, qc_skipped=qc_result is None)
@@ -1263,6 +1280,30 @@ def inspect(
         _qc_findings_and_candidates(qc_result) if qc_result is not None else ([], [])
     )
     _ = qc_findings  # program-channel findings merge into the summary later
+
+    inspectable_types = {
+        a.type for a in extraction_result.artifacts if a.completeness != "not inspectable"
+    }
+    skill_reserve = estimate_skill_reserve(inspectable_types)
+    injection_budget = derive_injection_budget(
+        context_window=settings["context_window"],
+        system_prompt="a" * 12_000,  # ≈3k-token appendix + skills list allowance
+        skill_reserve=skill_reserve,
+    )
+    payload_tokens = estimate_tokens(injection_payload)
+    if payload_tokens > injection_budget:
+        _print_user_error(
+            "Injection Budget Exceeded",
+            f"Extraction payload needs ≈{payload_tokens} tokens but only "
+            f"≈{injection_budget} fit (context window {settings['context_window']}, "
+            f"skill reserve ≈{skill_reserve}).",
+            hint="Split inspect_config.yaml into smaller runs, or raise "
+            "context_window in the config",
+            log_path=log_manager.log_file,
+        )
+        flow_status.stop()
+        log_manager.end_session("failed", {"error": "injection_budget"})
+        raise typer.Exit(code=EXIT_FAILURE)
 
     inspect_budget = max(effective_budget, INSPECT_TOKEN_BUDGET_FLOOR)
     if effective_budget < INSPECT_TOKEN_BUDGET_FLOOR:

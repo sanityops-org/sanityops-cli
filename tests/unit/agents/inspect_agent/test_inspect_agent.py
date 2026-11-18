@@ -69,20 +69,26 @@ def full_script() -> list[LLMResponse]:
         response(
             TextBlock(text="header"),
             tool_call("t3", "write_report", section="header", content="# Report"),
-            tool_call("t4", "write_report", section="A", content="## Stage A\nQD-P findings"),
+            tool_call(
+                "t4", "write_report", section="A", content="## Stage A\nQD-P findings", findings=[]
+            ),
         ),
         response(
             TextBlock(text="stage B"),
             tool_call(
-                "t5", "write_report", section="B", content="Stage B: Not Executed — collection mode"
+                "t5",
+                "write_report",
+                section="B",
+                content="Stage B: Not Executed — collection mode",
+                findings=[],
             ),
         ),
         response(
             TextBlock(text="stages C-G"),
             tool_call("t6", "write_report", section="C", content="C"),
-            tool_call("t7", "write_report", section="D", content="D"),
-            tool_call("t8", "write_report", section="E", content="E"),
-            tool_call("t9", "write_report", section="F", content="F"),
+            tool_call("t7", "write_report", section="D", content="D", findings=[]),
+            tool_call("t8", "write_report", section="E", content="E", findings=[]),
+            tool_call("t9", "write_report", section="F", content="F", findings=[]),
             tool_call("t10", "write_report", section="G", content="G"),
             tool_call("t11", "write_report", section="status_board", content="board"),
             tool_call("t12", "write_report", section="self_verification", content="verified"),

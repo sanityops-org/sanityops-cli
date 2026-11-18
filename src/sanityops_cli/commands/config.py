@@ -2,7 +2,7 @@
 
 Config keys use dot notation, e.g. ``server.base_url``. They correspond to
 the sanityops SaaS backend (NOT the LLM model config, which lives under
-``model.*``). Precedence: project-level > global > env var > default.
+``model.*``). Precedence: environment variable > project-level > global > default.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ config_app = typer.Typer(
     name="config",
     help="Get and set sanityops configuration (server base URL, API key, etc.)",
     no_args_is_help=False,  # We handle help ourselves to add usage panel
+    add_help_option=False,  # We handle --help ourselves to add usage panel
+    context_settings={"allow_interspersed_args": True},
 )
 
 # Registry of known config keys: metadata for reading defaults / masking.
@@ -87,6 +89,12 @@ def _flatten_config(data: dict[str, Any], prefix: str = "") -> list[tuple[str, A
     return result
 
 
+def _help_callback(help_requested: bool) -> None:
+    """Custom help callback placeholder - actual handling in callback body."""
+    # This is a placeholder to enable -h flag; the actual help display is in config_callback
+    pass
+
+
 @config_app.callback(invoke_without_command=True)
 def config_callback(
     ctx: typer.Context,
@@ -95,7 +103,8 @@ def config_callback(
         "--help",
         "-h",
         is_eager=True,
-        callback=lambda v: None,  # Placeholder, real handling in function body
+        callback=_help_callback,
+        help="Show this message and exit",
     ),
     key: str = typer.Argument(None, help="Config key, e.g. server.base_url"),
     value: str = typer.Argument(None, help="Config value (omit to read)"),
@@ -113,16 +122,26 @@ def config_callback(
     ),
 ) -> None:
     """Get, set, or list sanityops configuration values."""
-    # Hide the unused --global flag from linters while keeping it documented.
-    del global_config
-    del help_flag  # Handled by Typer's built-in help
+    # --global and --local are mutually exclusive scope selectors.
+    # --global is the default (and is explicit); --local targets project config.
+    if global_config and local_config:
+        console.print("[red]Error: --global and --local are mutually exclusive[/red]")
+        raise typer.Exit(code=EXIT_FAILURE)
+
+    use_local = local_config  # --local overrides; default is global
+
+    # Handle --help/-h
+    if help_flag:
+        console.print(ctx.get_help())
+        console.print(_get_config_usage_panel())
+        raise typer.Exit()
 
     if list_all:
         _list_config()
         return
 
     if unset:
-        _unset_config(unset, local=local_config)
+        _unset_config(unset, local=use_local)
         return
 
     if not key:
@@ -130,8 +149,6 @@ def config_callback(
         console.print(ctx.get_help())
         console.print(_get_config_usage_panel())
         raise typer.Exit()
-
-    use_local = local_config  # --local overrides; default is global
 
     if value is None:
         # Interactive masked input for sensitive keys on a TTY.

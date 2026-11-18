@@ -20,6 +20,47 @@ def estimate_tokens(text: str) -> int:
     return cjk + other // 4
 
 
+def derive_injection_budget(
+    context_window: int,
+    system_prompt: str,
+    skill_reserve: int,
+    output_reserve: int = 8192,
+    work_margin: int = 16384,
+) -> int:
+    """Tokens available for the injected payload (task message).
+
+    skill_reserve: expected lazy skill loads for this run (design §6.6 table);
+    the caller estimates it from the artifact-type combination.
+    """
+    return max(
+        0,
+        context_window
+        - estimate_tokens(system_prompt)
+        - skill_reserve
+        - output_reserve
+        - work_margin,
+    )
+
+
+def estimate_skill_reserve(artifact_types: set[str]) -> int:
+    """Expected lazy-load reserve per the §6.6 table (approximate, CJK-aware).
+
+    Only the SKILL.md (~42k) plus the domain checklists the artifact
+    combination requires. Values measured on the vendored skill.
+    """
+    reserve = 42_000  # SKILL.md
+    if "prompt" in artifact_types:
+        reserve += 16_000  # prompt-checklist
+    if "tool" in artifact_types:
+        reserve += 11_000  # tool-checklist
+    if len(artifact_types & {"prompt", "skill", "tool"}) >= 2:
+        reserve += 12_000  # cross-checklist
+        reserve += 5_000  # _meta guidance
+    if "skill" in artifact_types:
+        reserve += 16_000  # skill-checklist
+    return reserve
+
+
 def usage_breakdown(usage) -> dict[str, int]:
     """Use the provider's total when available, deriving it for Anthropic."""
 

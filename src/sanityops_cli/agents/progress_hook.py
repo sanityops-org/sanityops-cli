@@ -27,6 +27,12 @@ LLM_WAIT_UPDATE_SECONDS = 30
 class LoggingProgressHook:
     """Hook to report agent progress to console and log manager."""
 
+    #: Consecutive LLM turns without any tool call after which the hook
+    #: blocks the loop. A healthy agent loop calls a tool every turn; a run
+    #: of bare-text turns means the model is ignoring the tool protocol and
+    #: burning the timeout without producing anything auditable.
+    MAX_IDLE_TURNS = 5
+
     def __init__(
         self,
         console: Console,
@@ -58,6 +64,8 @@ class LoggingProgressHook:
         self._llm_started_at: float | None = None
         self._llm_wait_task: asyncio.Task[None] | None = None
         self._events = None
+        self._idle_turns = 0
+        self._tool_calls_at_last_llm = 0
 
         self._active_tools: dict[str, tuple[float, dict[str, Any]]] = {}
 
@@ -117,6 +125,22 @@ class LoggingProgressHook:
         elif event == events.BEFORE_LLM_CALL:
             iteration = data.get("iteration", self._iteration)
             self._iteration = iteration
+            # A turn with no tool calls since the last LLM response means the
+            # model answered in bare text and the loop will re-prompt with an
+            # unchanged context. Block after MAX_IDLE_TURNS such turns.
+            if self._tool_calls == self._tool_calls_at_last_llm:
+                self._idle_turns += 1
+            else:
+                self._idle_turns = 0
+            self._tool_calls_at_last_llm = self._tool_calls
+            if self._idle_turns >= self.MAX_IDLE_TURNS:
+                if self.log_manager:
+                    self.log_manager.error(
+                        "agent",
+                        f"Agent idle: {self._idle_turns} consecutive LLM turns "
+                        "without any tool call",
+                    )
+                ctx.blocked = True
             self._on_loop_start()
             self.stop_waiting()
             self._llm_started_at = perf_counter()
