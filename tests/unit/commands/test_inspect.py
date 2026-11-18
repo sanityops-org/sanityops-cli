@@ -221,6 +221,62 @@ def test_inspect_uses_a_fresh_provider_per_stage(monkeypatch, tmp_path):
     assert extract_provider is not inspect_provider
 
 
+def test_inspect_maps_enable_thinking_to_extra_body(monkeypatch, tmp_path):
+    """model.enable_thinking becomes gateway-specific EXTRA_BODY.
+
+    ProviderConfig has no ENABLE_THINKING field, so the flag is useless unless
+    it is mapped into EXTRA_BODY before the provider is built.
+    """
+    harness = Harness(monkeypatch, tmp_path)
+    created_configs = []
+    created_providers = []
+    from sanityops_agent.llm.factory import ProviderFactory
+
+    import sanityops_cli.commands.inspect as inspect_module
+    from sanityops_cli.inspect_pipeline.context_guard import ExtraBodyFallbackProvider
+    from sanityops_cli.utils.llm_config import resolve_llm_config as real_resolve_llm_config
+
+    real_create = ProviderFactory.create
+    real_create_provider = inspect_module._create_provider
+
+    def spy_create(provider_config):
+        created_configs.append(provider_config)
+        return real_create(provider_config)
+
+    def spy_create_provider(provider_config, timeout=inspect_module.DEFAULT_LLM_TIMEOUT):
+        provider = real_create_provider(provider_config, timeout=timeout)
+        created_providers.append(provider)
+        return provider
+
+    monkeypatch.setattr(ProviderFactory, "create", spy_create)
+    monkeypatch.setattr(inspect_module, "resolve_llm_config", real_resolve_llm_config)
+    monkeypatch.setattr(inspect_module, "_create_provider", spy_create_provider)
+
+    result = harness.run(
+        tmp_path,
+        config_text=(
+            "project:\n  id: 00000000-0000-0000-0000-000000000000\n"
+            "model:\n"
+            "  provider: anthropic\n"
+            "  api_key: test-key\n"
+            "  model_id: glm-5.3-flash\n"
+            "  base_url: https://open.bigmodel.cn/api/anthropic\n"
+            "  context_window: 1000000\n"
+            "  enable_thinking: false\n"
+            f"skills:\n  - file: {tmp_path / 'skill.md'}\n"
+        ),
+    )
+
+    assert result.exit_code == 0, result.output
+    expected_extra = {"thinking": {"type": "enabled"}, "reasoning_effort": "low"}
+    # One provider per agent stage, each built from the same mapped config.
+    assert len(created_configs) == 2
+    assert all(config.EXTRA_BODY == expected_extra for config in created_configs)
+    assert harness.captured["extract"]["context_window"] == 1_000_000
+    assert isinstance(created_providers[0], ExtraBodyFallbackProvider)
+    assert created_providers[0].extra_body == expected_extra
+
+
 def test_inspect_isolates_ir_by_run_batch(monkeypatch, tmp_path):
     harness = Harness(monkeypatch, tmp_path)
 

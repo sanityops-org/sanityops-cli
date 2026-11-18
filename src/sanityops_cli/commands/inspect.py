@@ -198,22 +198,31 @@ def _load_inspect_settings(config_path: Path) -> dict:
 
 
 def _build_provider_config(llm_config: dict[str, str], enable_thinking: bool | None = None):
-    """Build aidynamic-agent ProviderConfig, forwarding enable_thinking only when explicitly set."""
+    """Build sanityops-agent ProviderConfig, mapping enable_thinking into EXTRA_BODY."""
     from sanityops_agent.config import ProviderConfig
 
+    from sanityops_cli.utils.thinking_config import resolve_thinking_extra_body
+
+    base_url = llm_config["llm_base_url"] or None
     kwargs: dict = {
         "PROVIDER": llm_config["llm_provider"],
         "API_KEY": llm_config["llm_api_key"],
         "MODEL_ID": llm_config["llm_model_id"],
-        "BASE_URL": llm_config["llm_base_url"] or None,
+        "BASE_URL": base_url,
     }
-    if enable_thinking is not None:
-        kwargs["ENABLE_THINKING"] = enable_thinking
+    resolved_extra_body = resolve_thinking_extra_body(
+        provider=llm_config["llm_provider"],
+        model_id=llm_config["llm_model_id"],
+        base_url=base_url,
+        enable_thinking=enable_thinking,
+    )
+    if resolved_extra_body is not None or enable_thinking is not None:
+        kwargs["EXTRA_BODY"] = resolved_extra_body
     return ProviderConfig(**kwargs)
 
 
 def _create_provider(provider_config, timeout: float = DEFAULT_LLM_TIMEOUT):
-    """Build the LLM provider and widen its per-request timeout.
+    """Build the LLM provider, widen its per-request timeout, and wrap extra_body fallback.
 
     ProviderFactory.create() does not forward a timeout, so providers keep
     their 120s default. The underlying client is created lazily on first use,
@@ -232,6 +241,10 @@ def _create_provider(provider_config, timeout: float = DEFAULT_LLM_TIMEOUT):
             provider.temperature = 0.0
         except (AttributeError, TypeError):
             pass
+    if getattr(provider, "extra_body", None):
+        from sanityops_cli.inspect_pipeline.context_guard import ExtraBodyFallbackProvider
+
+        provider = ExtraBodyFallbackProvider(provider)
     return provider
 
 

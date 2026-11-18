@@ -64,15 +64,124 @@ def _estimate_json(value: object) -> int:
     return estimate_tokens(json.dumps(value, ensure_ascii=False, default=str))
 
 
-class ContextLimitedProvider(LLMProvider):
-    """Guard SDK requests and supply the total used by its cumulative budget."""
+def _can_fallback_from_extra_body(provider: Any, exc: LLMError, kwargs: dict[str, Any]) -> bool:
+    return type(exc) is LLMError and bool(
+        getattr(provider, "extra_body", None) or kwargs.get("extra_body")
+    )
 
-    def __init__(self, provider: LLMProvider, context: ArtifactAwareContext) -> None:
+
+async def _create_with_extra_body_fallback(
+    provider: Any,
+    messages: list[Message],
+    tools: list[ToolDefinition] | None = None,
+    **kwargs: Any,
+) -> LLMResponse:
+    try:
+        return await provider.create(messages, tools=tools, **kwargs)
+    except LLMError as exc:
+        if not _can_fallback_from_extra_body(provider, exc, kwargs):
+            raise
+        logger.warning(
+            "Provider rejected extra_body (%s); dropping extra_body and retrying.",
+            exc,
+        )
+        has_attr = hasattr(provider, "extra_body")
+        original_extra_body = getattr(provider, "extra_body", None)
+        if has_attr:
+            provider.extra_body = None
+        retry_kwargs = dict(kwargs)
+        retry_kwargs.pop("extra_body", None)
+        try:
+            return await provider.create(messages, tools=tools, **retry_kwargs)
+        except Exception:
+            if has_attr:
+                provider.extra_body = original_extra_body
+            raise
+
+
+async def _stream_with_extra_body_fallback(
+    provider: Any,
+    messages: list[Message],
+    tools: list[ToolDefinition] | None = None,
+    **kwargs: Any,
+) -> AsyncIterator[StreamChunk]:
+    yielded = False
+    try:
+        async for chunk in provider.stream(messages, tools=tools, **kwargs):
+            yielded = True
+            yield chunk
+        return
+    except LLMError as exc:
+        if yielded or not _can_fallback_from_extra_body(provider, exc, kwargs):
+            raise
+        logger.warning(
+            "Provider rejected extra_body (%s); dropping extra_body and retrying stream.",
+            exc,
+        )
+        has_attr = hasattr(provider, "extra_body")
+        original_extra_body = getattr(provider, "extra_body", None)
+        if has_attr:
+            provider.extra_body = None
+        retry_kwargs = dict(kwargs)
+        retry_kwargs.pop("extra_body", None)
+        retry_yielded = False
+        try:
+            async for chunk in provider.stream(messages, tools=tools, **retry_kwargs):
+                retry_yielded = True
+                yield chunk
+        except Exception:
+            if has_attr and not retry_yielded:
+                provider.extra_body = original_extra_body
+            raise
+
+
+class _DelegatingLLMProvider(LLMProvider):
+    """Base wrapper delegating connection metadata and ``extra_body`` to an inner provider."""
+
+    def __init__(self, provider: LLMProvider) -> None:
         # LLMProvider is an ABC without its own __init__, so we set attributes directly
         self.api_key = provider.api_key
         self.base_url = provider.base_url
         self.model = provider.model
         self._provider = provider
+
+    @property
+    def extra_body(self) -> Any:
+        return getattr(self._provider, "extra_body", None)
+
+    @extra_body.setter
+    def extra_body(self, value: Any) -> None:
+        inner: Any = self._provider
+        inner.extra_body = value
+
+    async def close(self) -> None:
+        await self._provider.close()
+
+
+class ExtraBodyFallbackProvider(_DelegatingLLMProvider):
+    """Retry once without ``extra_body`` if the endpoint rejects it with ``LLMError``."""
+
+    async def create(
+        self, messages: list[Message], tools: list[ToolDefinition] | None = None, **kwargs
+    ) -> LLMResponse:
+        return await _create_with_extra_body_fallback(
+            self._provider, messages, tools=tools, **kwargs
+        )
+
+    async def stream(
+        self, messages: list[Message], tools: list[ToolDefinition] | None = None, **kwargs
+    ) -> AsyncIterator[StreamChunk]:
+        async for chunk in _stream_with_extra_body_fallback(
+            self._provider, messages, tools=tools, **kwargs
+        ):
+            yield chunk
+
+
+class ContextLimitedProvider(_DelegatingLLMProvider):
+    """Guard SDK requests and supply the total used by its cumulative budget."""
+
+    def __init__(self, provider: LLMProvider, context: ArtifactAwareContext) -> None:
+        super().__init__(provider)
         self._context = context
 
     async def _check_input(
@@ -96,29 +205,16 @@ class ContextLimitedProvider(LLMProvider):
                 f"context_window={context.context_window:,} after SDK compaction."
             )
 
-    def _can_fallback_from_disable_thinking(self, exc: LLMError) -> bool:
-        return type(exc) is LLMError and getattr(self._provider, "enable_thinking", True) is False
-
     async def create(
         self, messages: list[Message], tools: list[ToolDefinition] | None = None, **kwargs
     ) -> LLMResponse:
         await self._check_input(messages, tools)
-        try:
+        if isinstance(self._provider, ExtraBodyFallbackProvider):
             response = await self._provider.create(messages, tools=tools, **kwargs)
-        except LLMError as exc:
-            if not self._can_fallback_from_disable_thinking(exc):
-                raise
-            logger.warning(
-                "Provider rejected disable-thinking request (%s); retrying with default thinking.",
-                exc,
+        else:
+            response = await _create_with_extra_body_fallback(
+                self._provider, messages, tools=tools, **kwargs
             )
-            provider: Any = self._provider
-            provider.enable_thinking = True
-            try:
-                response = await self._provider.create(messages, tools=tools, **kwargs)
-            except Exception:
-                provider.enable_thinking = False
-                raise
         if response.usage and not response.usage.get("total_tokens"):
             response.usage = {
                 **response.usage,
@@ -130,8 +226,11 @@ class ContextLimitedProvider(LLMProvider):
         self, messages: list[Message], tools: list[ToolDefinition] | None = None, **kwargs
     ) -> AsyncIterator[StreamChunk]:
         await self._check_input(messages, tools)
-        async for chunk in self._provider.stream(messages, tools=tools, **kwargs):
-            yield chunk
-
-    async def close(self) -> None:
-        await self._provider.close()
+        if isinstance(self._provider, ExtraBodyFallbackProvider):
+            async for chunk in self._provider.stream(messages, tools=tools, **kwargs):
+                yield chunk
+        else:
+            async for chunk in _stream_with_extra_body_fallback(
+                self._provider, messages, tools=tools, **kwargs
+            ):
+                yield chunk

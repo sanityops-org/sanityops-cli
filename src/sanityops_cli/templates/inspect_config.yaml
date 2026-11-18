@@ -22,7 +22,7 @@ project:
 # Model configuration (required unless configured via LLM_* environment variables)
 # Configure your LLM provider and credentials here.
 # Alternatively, you can use environment variables:
-#   LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_ID, LLM_BASE_URL, LLM_ENABLE_THINKING
+#   LLM_PROVIDER, LLM_API_KEY, LLM_MODEL_ID, LLM_BASE_URL
 model:
   provider: anthropic                 # Required: anthropic, openai, dashscope
   api_key: ""                         # Required: your API key (keep this file out of git)
@@ -32,7 +32,7 @@ model:
   # Adjust to match your model endpoint (e.g., 200000 for Claude, 1000000 for 1M-context models).
   context_window: 200000
   # Optional: enable model thinking/reasoning mode (default: true).
-  # Set to false to disable thinking; falls back automatically if the endpoint rejects it.
+  # Mapped to gateway-specific extra_body parameters; retries without extra_body if rejected.
   enable_thinking: true
 
 # Logging configuration
