@@ -65,9 +65,9 @@ def test_sync_skills_idempotency(tmp_path: Path) -> None:
     skill_dir = (
         dummy_source
         / "plugins"
-        / "sanityops-inspect-lite"
+        / "sanityops-inspector"
         / "skills"
-        / "sanityops-inspect-lite"
+        / "sanityops-inspect-only"
     )
     ref_dir = skill_dir / "references"
     ref_dir.mkdir(parents=True)
@@ -98,9 +98,9 @@ def test_sync_skills_with_extract_skill(tmp_path: Path) -> None:
     skill_dir = (
         dummy_source
         / "plugins"
-        / "sanityops-inspect-lite"
+        / "sanityops-inspector"
         / "skills"
-        / "sanityops-inspect-lite"
+        / "sanityops-inspect-only"
     )
     ref_dir = skill_dir / "references"
     ref_dir.mkdir(parents=True)
@@ -110,9 +110,9 @@ def test_sync_skills_with_extract_skill(tmp_path: Path) -> None:
     extract_dir = (
         dummy_source
         / "plugins"
-        / "sanityops-inspect-lite"
+        / "sanityops-inspector"
         / "skills"
-        / "pre-inspect-extract"
+        / "sanityops-extract-only"
     )
     extract_dir.mkdir(parents=True)
     (extract_dir / "SKILL.md").write_text("---\nversion: 1.3.1\n---\n# Extract")

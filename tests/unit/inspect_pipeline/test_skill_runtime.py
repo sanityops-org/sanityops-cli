@@ -144,8 +144,14 @@ class TestCliSkillTool:
         assert "`cat " not in result.content
         assert "`rg " not in result.content
         assert "use the read tool" in result.content
-        # Skill body itself is intact.
-        assert "# SanityOps Inspect Lite" in result.content
+        # Skill body itself is intact: the vendored H1 comes through verbatim.
+        # Read the title from the file rather than pinning a title string, so a
+        # skill content update does not fail this runtime test.
+        skill_md = SRC / "sanityops-inspect-lite" / "SKILL.md"
+        h1 = next(
+            line for line in skill_md.read_text(encoding="utf-8").splitlines() if line.startswith("# ")
+        )
+        assert h1 in result.content
 
     def test_load_pre_inspect_extract(self, tool_and_manager) -> None:
         import asyncio

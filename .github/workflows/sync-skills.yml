@@ -44,9 +44,14 @@ jobs:
 
       - name: Update vendored skills
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The workflow's own GITHUB_TOKEN cannot open pull requests while the
+          # organization forbids "GitHub Actions to create or approve pull
+          # requests"; a pull-requests-scoped PAT in SKILL_SYNC_TOKEN takes over
+          # the PR call when present. The branch push still uses the checkout's
+          # token, so the fallback keeps the run useful either way.
+          GITHUB_TOKEN: ${{ secrets.SKILL_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-          UPSTREAM_SKILL_URL: https://github.com/sanityops-org/sanityops-inspect-lite.git
+          UPSTREAM_SKILL_URL: https://github.com/sanityops-org/sanityops-inspector.git
         run: |
           FLAGS=""
           if [ "${{ inputs.force }}" = "true" ]; then FLAGS="$FLAGS --force"; fi
