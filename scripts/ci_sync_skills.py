@@ -30,7 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEST_DIR = REPO_ROOT / "src" / "sanityops_cli" / "skills"
 VERSION_FILE = DEST_DIR / "VERSION.json"
 
-DEFAULT_UPSTREAM_URL = "https://github.com/sanityops-org/sanityops-inspect-lite.git"
+DEFAULT_UPSTREAM_URL = "https://github.com/sanityops-org/sanityops-inspector.git"
 DEFAULT_BRANCH = "main"
 
 

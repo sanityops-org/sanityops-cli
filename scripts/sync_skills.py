@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
-"""Sync vendor skills from the sanityops-inspect-lite repository into the CLI package.
+"""Sync vendor skills from the sanityops-inspector repository into the CLI package.
 
-Copies the ``sanityops-inspect-lite`` skill (SKILL.md + references/) and the
+Copies the ``sanityops-inspect-only`` skill (SKILL.md + references/) and the
 code-contract checklist into ``src/sanityops_cli/skills/`` and records the
 source provenance (remote URL, commit SHA, content hashes) in ``VERSION.json``.
+
+The upstream plugin renamed to ``sanityops-inspector`` and split its skills per
+stage; this CLI still vendors them under the historical directory names
+``sanityops-inspect-lite`` / ``pre-inspect-extract``, which the agents, the
+prompt contracts and the skill runtime all reference by name.
 
 Both skill directories are vendored from upstream; ``--check`` verifies that
 the vendored content has not drifted from the recorded state.
 
 Usage:
-    python scripts/sync_skills.py --source /path/to/sanityops-inspect-lite
+    python scripts/sync_skills.py --source /path/to/sanityops-inspector
     python scripts/sync_skills.py --source ... --check   # CI drift check
 """
 
@@ -28,14 +33,18 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEST_DIR = REPO_ROOT / "src" / "sanityops_cli" / "skills"
 VERSION_FILE = DEST_DIR / "VERSION.json"
 
-# Path inside the source repo holding the skill packages.
-SOURCE_SKILL_REL = "plugins/sanityops-inspect-lite/skills/sanityops-inspect-lite"
-SOURCE_EXTRACT_SKILL_REL = "plugins/sanityops-inspect-lite/skills/pre-inspect-extract"
+# Path inside the source repo holding the skill packages. Upstream renamed the
+# plugin to ``sanityops-inspector`` and split it into one skill per stage
+# (``sanityops-inspect-only`` / ``sanityops-extract-only``); the 1.x layout was
+# ``plugins/sanityops-inspect-lite/skills/{sanityops-inspect-lite,
+# pre-inspect-extract}``. Vendored directory names below are intentionally
+# unchanged — the CLI loads skills by directory name.
+SOURCE_SKILLS_PREFIX = "plugins/sanityops-inspector/skills"
+SOURCE_SKILL_REL = f"{SOURCE_SKILLS_PREFIX}/sanityops-inspect-only"
+SOURCE_EXTRACT_SKILL_REL = f"{SOURCE_SKILLS_PREFIX}/sanityops-extract-only"
 SOURCE_CHECKLIST_CANDIDATES = (
-    "plugins/sanityops-inspect-lite/skills/sanityops-inspect-lite/references/"
-    "code-contract-checklist.v2.md",
-    "plugins/sanityops-inspect-lite/skills/sanityops-inspect-lite/references/"
-    "code-contract-checklist.md",
+    f"{SOURCE_SKILL_REL}/references/code-contract-checklist.v2.md",
+    f"{SOURCE_SKILL_REL}/references/code-contract-checklist.md",
 )
 # Vendored names inside src/sanityops_cli/skills/.
 VENDORED_SKILL_DIR = "sanityops-inspect-lite"
@@ -99,9 +108,15 @@ def sync(source: Path, force: bool = False) -> bool:
             checklist_src = p
             break
     if not (skill_src / "SKILL.md").is_file():
-        sys.exit(f"error: skill not found at {skill_src}")
+        sys.exit(
+            f"error: skill not found at {skill_src}\n"
+            f"       expected {SOURCE_SKILL_REL}/SKILL.md in the upstream checkout"
+        )
     if checklist_src is None:
-        sys.exit(f"error: checklist not found in candidates under {source}")
+        sys.exit(
+            f"error: checklist not found under {source}; looked for: "
+            + ", ".join(SOURCE_CHECKLIST_CANDIDATES)
+        )
 
     upstream_commit = _git(["rev-parse", "HEAD"], source)
     if not force and VERSION_FILE.is_file():
@@ -247,7 +262,7 @@ def main() -> None:
         "--source",
         type=Path,
         required=True,
-        help="Path to the sanityops-inspect-lite repository checkout",
+        help="Path to the sanityops-inspector repository checkout",
     )
     parser.add_argument(
         "--check",

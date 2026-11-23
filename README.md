@@ -212,7 +212,7 @@ CLI flags (`--timeout`, `--token-budget`) override these values when explicitly 
 
 ### Inspect Skills
 
-The inspection rules are maintained in the [`sanityops-inspect-lite`](https://github.com/sanityops-org/sanityops-inspect-lite) repository and vendored into this package (`src/sanityops_cli/skills/`). The vendored copy records its upstream commit in `src/sanityops_cli/skills/VERSION.json`; a scheduled GitHub Actions workflow updates it and opens a pull request when upstream changes.
+The inspection rules are maintained in the [`sanityops-inspector`](https://github.com/sanityops-org/sanityops-inspector) repository and vendored into this package (`src/sanityops_cli/skills/`). The vendored copy records its upstream commit in `src/sanityops_cli/skills/VERSION.json`; a scheduled GitHub Actions workflow updates it and opens a pull request when upstream changes.
 
 ### Logging
 
