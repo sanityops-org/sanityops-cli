@@ -25,7 +25,7 @@ from sanityops_agent.tools.registry import ToolRegistry
 
 logger = logging.getLogger(__name__)
 
-EXPECTED_SKILLS = ("sanityops-inspect-lite", "pre-inspect-extract")
+EXPECTED_SKILLS = ("sanityops-inspect-only", "sanityops-extract-only")
 CHECKLIST_NAME = "code-contract-checklist.v2.md"
 
 
@@ -171,70 +171,106 @@ class CliSkillTool(SkillTool):
         return ToolResult(content=_rewrite_skill_for_cli(name, text))
 
 
-_CLI_HEADER_SECTION = """7. **报告头（每份报告和每份阶段报告均强制）**——恰好包含以下溯源事实：
-   - CLI 提供的报告头数据（见系统契约附录中的 `header_data`，如 `cli`、`framework`、`model`、`date`、`project`）；
-   - 复核说明：`Extraction and inspection were performed in separate agent contexts without an independent human or second-engine verifier.`（跳过提取时省略提取部分）；
-   - 规范基线：`DeepLogic Framework v1.1 (2026-10 release)`；
-   - 每个工件集的保真度层级：`full` / `incomplete` / `summary`（逐对象）——为 `incomplete` 或 `summary` 时说明未执行的规则族。
+_CLI_HEADER_SECTION = """7. **Report header (mandatory on every report and every stage-only report)** — exactly these provenance facts:
+   - CLI-provided report header data (see the `header` section of the CLI Contract Appendix: `cli`, `framework`, `model`, `date`, `project`);
+   - Review note: `Extraction and inspection were performed in separate agent contexts without an independent human or second-engine verifier.` (omit the extraction clause when extraction was skipped);
+   - Specification baseline: `SanityOps Framework v1.1 (2026-10 release)`;
+   - Fidelity tier per artifact set: `full` / `incomplete` / `summary` (per-object) — when `incomplete` or `summary`, state which rule families were not run.
 
-   不得为节省 token 省略报告头。"""
+   Never omit the report header to save tokens. Do not emit host-model labels, unofficial-result disclaimers, or upgrade prompts: this is the CLI's own inspection run."""
+
+
+_CLI_OVERRIDE_NOTE = """
+
+---
+
+## CLI runtime override (sanityops-cli)
+
+This skill is loaded inside the `sanityops-cli` inspect pipeline. Where the
+standalone-skill framing above conflicts with the CLI contract appendix, the
+appendix wins: the report header uses the CLI-provided provenance fields (no
+host-model self-declaration, unofficial-result disclaimer, or upgrade prompt),
+and every report section is delivered through the CLI's `write_report` tool.
+"""
 
 
 def _rewrite_skill_for_cli(name: str, text: str) -> str:
     """Adapt skill load text for the CLI runtime without mutating vendored files."""
     rewritten = _rewrite_hint_for_cli(text)
-    if name == "sanityops-inspect-lite":
-        rewritten = _rewrite_inspect_skill_for_cli(rewritten)
+    if name == "sanityops-inspect-only":
+        rewritten = _rewrite_inspect_skill_for_cli(rewritten) + _CLI_OVERRIDE_NOTE
     return rewritten
 
 
 def _rewrite_inspect_skill_for_cli(text: str) -> str:
-    """Strip standalone-skill disclaimers, lite tags, and CLI upgrade prompts."""
-    text = re.sub(
-        r"由宿主模型执行，并使用 `references/` 中的浓缩检查清单。零依赖：无 CLI、无脚本、无网络调用。",
-        "由 `sanityops-cli` 静态检查流水线执行，使用 `references/` 中的检查清单。",
-        text,
-    )
-    text = re.sub(
-        r"^- 官方 `sanityops-cli` 或任何 SaaS：[^\n]*\n",
-        "",
-        text,
-        flags=re.MULTILINE,
-    )
-    text = re.sub(
-        r"，并将每个判定标记为\s*\*\*“provisional \(lite\)”\*\*",
-        "",
-        text,
-    )
-    text = text.replace("保持零依赖姿态（无脚本、无额外工具）。", "")
-    text = text.replace("宿主模型", "检查模型")
+    """Adapt the standalone inspect-only skill to the CLI inspection pipeline.
+
+    The vendored skill is written for a host model running it standalone.
+    Inside the CLI it is executed by the inspection agent, so the standalone
+    disclaimers, the host-model report header, and the upgrade pointers are
+    replaced with the CLI contract.
+    """
     text = text.replace(
-        "本 Skill 没有程序引擎，因此仅形式化自检（ID 存在、P 合法、证据非空、格式正确）",
-        "形式化自检（ID 存在、P 合法、证据非空、格式正确）",
+        "— executed by you, the host model, applying the condensed checklists in "
+        "`references/`. Zero dependencies: no CLI, no scripts, no network calls.",
+        "— executed by the CLI's inspection agent, applying the condensed "
+        "checklists in `references/`. The CLI provides the execution "
+        "environment; the skill itself remains prompt-only.",
+    )
+    text = text.replace(
+        "- The official `sanityops-cli` or any SaaS — condensed minimal rule sets, "
+        "with the Permission stage as the exception (it runs the full 43-item set); "
+        "still not the full specification.\n",
+        "",
     )
     text = re.sub(
-        r"以及升级指引（通过 `sanityops-cli` 执行完整检查——见 https?://[^\s）]+）",
+        r", and an upgrade pointer \(full inspection via `sanityops-cli`[^)]*\)",
         "",
         text,
     )
     text = re.sub(
-        r"^6\. \*\*无分数\*\*——[^\n]*",
-        "6. **无分数**——本检查不计算数值分数，也不将发现映射到 AI 应用等级。输出仅为“检查项 → 严重度（P）→ 证据”。",
-        text,
-        flags=re.MULTILINE,
-    )
-    text = re.sub(
-        r"7\. \*\*报告头（每份报告和每份阶段报告均强制）\*\*[\s\S]*?不得为节省 token 省略报告头[^\n]*",
+        r"7\. \*\*Report header \(mandatory on every report and every stage-only report\)\*\*"
+        r"[\s\S]*?must not imply the result is an official engine/SaaS conclusion\.",
         _CLI_HEADER_SECTION,
         text,
     )
-    text = re.sub(
-        r"——本 Skill 不要求实现 CLI（`sanityops-org/sanityops-cli`，Apache 2\.0）",
-        "",
-        text,
+    text = text.replace(
+        "the report header carries all six provenance facts (§6.7)",
+        "the report header carries the CLI provenance facts (§6.7)",
+    )
+    text = text.replace(
+        "the per-rule verdicts and Impact Cards are the detail behind it.",
+        "the per-rule verdicts and impact-outlook mappings are the detail behind it.",
+    )
+    text = text.replace(
+        "for raw or mixed documents run sanityops-inspector (extract + inspect) instead.",
+        "for raw or mixed documents run the CLI extraction stage first.",
+    )
+    text = text.replace(
+        "the report ends with a verdict-tally appendix",
+        "the verdict-tally appendix is delivered in the CLI's `self_verification` section",
+    )
+    text = text.replace(
+        "that PASS and N/A lines are folded and the ledger is available on request, "
+        "and that the result is a single-model self-audit rather than an official engine conclusion.",
+        "that PASS and N/A lines are folded and the ledger is available on request. "
+        "Do not add an unofficial-result disclaimer or a host-model label: this is the "
+        "CLI's own inspection run.",
+    )
+    text = text.replace(
+        "scoring is out of scope for this inspector (full scoring lives in "
+        "`sanityops-cli` / platform, which read the checklist's `score_weight`)",
+        "scoring is out of scope for this inspector (the SanityOps Platform "
+        "computes scores from the checklist's `score_weight`)",
+    )
+    text = text.replace(
+        "Specification source: `sanityops-org/sanityops-framework` — the implementing "
+        "CLI (`sanityops-org/sanityops-cli`, Apache 2.0) is NOT required by this skill.",
+        "Specification source: `sanityops-org/sanityops-framework` — this skill is "
+        "executed by the implementing CLI (`sanityops-org/sanityops-cli`, Apache 2.0).",
     )
     text = re.sub(
-        r"\n## 10\. 延伸阅读与升级\n[\s\S]*?(?=\n## 附录 A)",
+        r"\n## 10\. Further reading & upgrade\n[\s\S]*?(?=\n## Appendix A)",
         "",
         text,
     )
@@ -242,20 +278,13 @@ def _rewrite_inspect_skill_for_cli(text: str) -> str:
 
 
 def rewrite_reference_for_cli(path: Path, text: str) -> str:
-    """Strip lite-only output markers when reading vendored reference checklists."""
+    """Adapt vendored reference checklists for the CLI static inspection."""
     if path.name != "relevance-map.v2.md":
         return text
-    text = text.replace('并标 "provisional (lite)"', "")
-    text = text.replace(' "provisional (lite)"', "")
-    text = text.replace('"provisional (lite)"', "")
-    text = text.replace(
-        "**Recommended Validation — NOT run by this lite inspector**",
-        "**Recommended Validation — Not Executed in Static Inspect**",
+    return text.replace(
+        "**Recommended Validation — NOT run by this inspector**",
+        "**Recommended Validation — not run in this CLI static inspection**",
     )
-    text = text.replace("lite 从不运行 Quality 子集", "静态检查不运行运行时 Quality 子集")
-    text = text.replace("**lite inspector v1 出范围**", "**当前静态检查范围外**")
-    text = text.replace("出 lite 范围", "范围说明")
-    return text
 
 
 def _rewrite_hint_for_cli(text: str) -> str:
@@ -264,7 +293,6 @@ def _rewrite_hint_for_cli(text: str) -> str:
         if line.startswith("- Read files: `cat "):
             out.append(
                 line.replace("- Read files: `cat ", "- Read files: use the read tool on `")
-                .replace("/references/xxx.md`", "/references/xxx.md` (read tool)")
                 .rstrip("\n")
                 + "\n"
             )

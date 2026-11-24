@@ -17,7 +17,7 @@ title: Relevance Map (v2 unified engine edition)
 - **No check_engine / applicability.fact / per-item severity**: this domain is a lookup table, the row key is the QD ID (source anchor), the columns are AS/Impact/Strength/Validation metadata. The `Applies` column retains the source specification scope (AC-L/OR-L), not a unified applicability structural fact.
 - **Explicitly record "not run"**: each impact area must declare that the Risk Implicit and runtime Quality subsets are **not run** (dynamic exploitability not verified), and per §1.4 must not assume compensating controls outside the artifact are missing; Risk Explicit is not reclassified in this outlook (already run in Stage E, Stage F only does candidate mapping).
 - **Automatic inference of EX is forbidden** (§2.3.1): `QD-P-2.5.2` ≠ automatic hit of `NL-A-7`; `QD-T-1.4` ≠ `NR-S-3`; `QD-PS-1.3` ≠ `NL-B-9`. EX codes are judged only independently by Risk Explicit in Stage E.
-- **Defect chain out of lite scope** (§1.5): only single-defect candidate mapping is supported; no defect chains are constructed/asserted/reported (SC-*/QC-TA-*/QC-RA-*).
+- **Defect chain out of inspector scope** (§1.5): only single-defect candidate mapping is supported; no defect chains are constructed/asserted/reported (SC-*/QC-TA-*/QC-RA-*).
 - **Physical separation**: the impact outlook is separated from Gate/verdict conclusions, is advisory context, and must not change/soften/upgrade any Inspect conclusion.
 
 ## 2. Mapping strength (strength, not severity, §1.3)
@@ -29,7 +29,7 @@ title: Relevance Map (v2 unified engine edition)
 | Conditional | Requires external knowledge base/runtime environment/model behavior/business rules | As a candidate investigation direction, no automatic conclusion |
 | Not Applicable | The current Agent type/artifact type/runtime conditions lack the prerequisite for association | Do not output this recommendation |
 
-> lite convention: the source Appendix A already has per-row strength; the table below copies it verbatim. When outputting an Impact Card, copy that row's strength and mark "provisional (lite)".
+> inspector convention: the source Appendix A already has per-row strength; the table below copies it verbatim. When outputting an Impact Card, copy that row's strength and mark "provisional (condensed)".
 
 ## 3. Attack surface legend (AS-*, §2.2)
 
@@ -259,7 +259,7 @@ title: Relevance Map (v2 unified engine edition)
 
 ## 6. Candidate RAG-Agent quality metrics (source Appendix C.1)
 
-> RAG-Agent quality assessment evaluates "user-visible content output and boundary handling", and does not directly score Prompt/retrieval/knowledge base/model/Tool internal components. Mapping is **candidate**: "may affect" = worth prioritizing the design of additional tests, not necessarily a score loss. lite never runs the Quality subset.
+> RAG-Agent quality assessment evaluates "user-visible content output and boundary handling", and does not directly score Prompt/retrieval/knowledge base/model/Tool internal components. Mapping is **candidate**: "may affect" = worth prioritizing the design of additional tests, not necessarily a score loss. inspector never runs the Quality subset.
 
 | QD category | Candidate affected metrics | Recommended additional tests (condensed) |
 |---|---|---|
@@ -293,7 +293,7 @@ The following inferences are all invalid:
 
 Source closing rule: "Only when an explicit expression satisfying the EX definition exists in the artifact can Risk Explicit independently judge the corresponding EX classification." Stage F never derives EX codes.
 
-## 8. Impact Card template (single-defect lite form, §5.5)
+## 8. Impact Card template (single-defect condensed form, §5.5)
 
 ```markdown
 ### Impact Card: <QD-ID> | <short defect name> | <P0/P1/P2> (scope)
@@ -306,10 +306,10 @@ Source closing rule: "Only when an explicit expression satisfying the EX definit
 **Potential Security Associations**  <!-- candidate association, not confirmed impact -->
 - Candidate Attack Surface: AS-xx <name> [, AS-yy ...]
 - Potential Impact: D1 / D2 / D3 / Availability / Integrity / Auditability
-- Mapping Strength: <Strong|Medium|Conditional> "provisional (lite)" — association confidence only, not severity
+- Mapping Strength: <Strong|Medium|Conditional> "provisional (condensed)" — association confidence only, not severity
 - Note: This conclusion indicates validation priority, and does not yet indicate backend exploitability.
 
-**Recommended Validation — NOT run by this lite inspector**
+**Recommended Validation — NOT run by this inspector**
 - Risk Explicit: Stage E already run, not reclassified here.
 - Risk Implicit: not run — dynamic exploitability not verified.
 - External controls: existence unknown; per §1.4 must not assume compensating controls outside the artifact are missing.
@@ -339,7 +339,7 @@ Source closing rule: "Only when an explicit expression satisfying the EX definit
 | "Relies on compensating controls" | "Completely secure" |
 | "Not reproduced under current test conditions" | "Absolutely unexploitable" |
 
-### 8.1 Compact template (grouped by impact category, optional in lite)
+### 8.1 Compact template (grouped by impact category, optional in the inspector)
 
 When defects are numerous and the abbreviation density affects readability, the **grouped form** in the table below may replace per-defect cards (the full template in §8 can still be used for single defects that need detail). Hard requirements unchanged: candidate language, Strength ≠ severity, Risk Implicit / runtime Quality not run, physical separation from the verdict.
 
@@ -360,6 +360,6 @@ When defects are numerous and the abbreviation density affects readability, the 
 
 > Constraint: within each row each defect must inline its own `AS / impact / strength / FM`; strengths may differ within a group (e.g. Strong and Conditional coexist) and must not be lost due to grouping; P0 defects are bolded.
 
-## 9. Defect chain — out of lite scope (§1.5)
+## 9. Defect chain — out of inspector scope (§1.5)
 
-Defect chains are used to identify candidate exploitation/failure paths formed by combinations of multiple defects, requiring a unique `chain_id`, retained member defects and cross-artifact relations, end-to-end Risk Implicit validation, etc. **Out of scope for lite inspector v1**: this reference supports only single-defect candidate mapping, does not construct/assert/report defect chains (SC-*/QC-TA-*/QC-RA-*), and does not upgrade separate single-defect candidate associations into chain paths.
+Defect chains are used to identify candidate exploitation/failure paths formed by combinations of multiple defects, requiring a unique `chain_id`, retained member defects and cross-artifact relations, end-to-end Risk Implicit validation, etc. **Out of scope for inspector v1**: this reference supports only single-defect candidate mapping, does not construct/assert/report defect chains (SC-*/QC-TA-*/QC-RA-*), and does not upgrade separate single-defect candidate associations into chain paths.

@@ -62,7 +62,7 @@ def happy_script(project: Path) -> list[LLMResponse]:
     return [
         response(
             TextBlock(text="loading skill"),
-            tool_call("t1", "skill", operation="load", name="pre-inspect-extract"),
+            tool_call("t1", "skill", operation="load", name="sanityops-extract-only"),
         ),
         response(TextBlock(text="reading file"), tool_call("t2", "read", file_path=prompt_path)),
         response(
@@ -148,11 +148,13 @@ class TestHappyPath:
         assert system.role.value == "system"
         text = "".join(getattr(b, "text", "") for b in system.content)
         assert "CLI Contract Appendix" in text
-        assert "pre-inspect-extract" in text  # mandatory-first-step mandate
+        assert 'skill(operation="load", name="sanityops-extract-only")' in text
         assert "zh" in text  # report language propagated
+        assert "Scope confirmation" in text
+        assert "concatenated exactly as sent" in text
         # Factory injected the Available Skills manifest after the appendix.
         assert "Available Skills" in text
-        assert "sanityops-inspect-lite" in text
+        assert "sanityops-inspect-only" in text
         # The task message follows as the user turn.
         assert first_call_messages[1].role.value == "user"
 
@@ -221,7 +223,7 @@ class TestDeterministicCandidates:
         script = [
             response(
                 TextBlock(text="load"),
-                tool_call("t1", "skill", operation="load", name="pre-inspect-extract"),
+                tool_call("t1", "skill", operation="load", name="sanityops-extract-only"),
             ),
             response(
                 TextBlock(text="store covered only"),

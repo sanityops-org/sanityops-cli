@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from sanityops_cli.inspect_pipeline.report_parser import parse_summary
+from sanityops_cli.inspect_pipeline.report_parser import counts_from_findings, parse_summary
 
 TAIL_OK = (
     "preceding prose\n<!-- inspect-summary -->\n"
@@ -129,3 +129,14 @@ class TestSectionScan:
         lines = [f"- P0 QD-P-{i} finding {i}" for i in range(30)]
         parsed = parse_summary("", {"A": ["\n".join(lines)]})
         assert len(parsed.findings) == 20
+
+
+def test_counts_ignore_stage_f_mappings():
+    findings = [
+        {"module": "QD-P", "severity": "P0"},
+        {"module": "AS-FM", "severity": "P0"},
+        {"module": "EX", "severity": "P1"},
+    ]
+    counts = counts_from_findings(findings)
+    assert counts["inspect"]["p0"] == 1
+    assert counts["risk_explicit"]["p1"] == 1

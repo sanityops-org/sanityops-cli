@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """Sync vendor skills from the sanityops-inspector repository into the CLI package.
 
-Copies the ``sanityops-inspect-only`` skill (SKILL.md + references/) and the
-code-contract checklist into ``src/sanityops_cli/skills/`` and records the
-source provenance (remote URL, commit SHA, content hashes) in ``VERSION.json``.
+Copies the ``sanityops-inspect-only`` skill (SKILL.md + references/), the
+``sanityops-extract-only`` skill (SKILL.md), and the code-contract checklist
+into ``src/sanityops_cli/skills/`` and records the source provenance (remote
+URL, commit SHA, content hashes) in ``VERSION.json``.
 
-The upstream plugin renamed to ``sanityops-inspector`` and split its skills per
-stage; this CLI still vendors them under the historical directory names
-``sanityops-inspect-lite`` / ``pre-inspect-extract``, which the agents, the
-prompt contracts and the skill runtime all reference by name.
+The vendored directory names match the upstream skill names, which are also
+the names the CLI agents, the prompt contracts, and the skill runtime use.
 
 Both skill directories are vendored from upstream; ``--check`` verifies that
 the vendored content has not drifted from the recorded state.
 
 Usage:
     python scripts/sync_skills.py --source /path/to/sanityops-inspector
-    python scripts/sync_skills.py --source ... --check   # CI drift check
+    python scripts/sync_skills.py --check                    # hash-only drift check
+    python scripts/sync_skills.py --source ... --check       # drift + upstream commit
 """
 
 from __future__ import annotations
@@ -33,12 +33,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 DEST_DIR = REPO_ROOT / "src" / "sanityops_cli" / "skills"
 VERSION_FILE = DEST_DIR / "VERSION.json"
 
-# Path inside the source repo holding the skill packages. Upstream renamed the
-# plugin to ``sanityops-inspector`` and split it into one skill per stage
-# (``sanityops-inspect-only`` / ``sanityops-extract-only``); the 1.x layout was
-# ``plugins/sanityops-inspect-lite/skills/{sanityops-inspect-lite,
-# pre-inspect-extract}``. Vendored directory names below are intentionally
-# unchanged — the CLI loads skills by directory name.
+# Path inside the source repo holding the skill packages. Upstream split the
+# plugin into one skill per stage (``sanityops-inspect-only`` /
+# ``sanityops-extract-only``).
 SOURCE_SKILLS_PREFIX = "plugins/sanityops-inspector/skills"
 SOURCE_SKILL_REL = f"{SOURCE_SKILLS_PREFIX}/sanityops-inspect-only"
 SOURCE_EXTRACT_SKILL_REL = f"{SOURCE_SKILLS_PREFIX}/sanityops-extract-only"
@@ -46,12 +43,16 @@ SOURCE_CHECKLIST_CANDIDATES = (
     f"{SOURCE_SKILL_REL}/references/code-contract-checklist.v2.md",
     f"{SOURCE_SKILL_REL}/references/code-contract-checklist.md",
 )
-# Vendored names inside src/sanityops_cli/skills/.
-VENDORED_SKILL_DIR = "sanityops-inspect-lite"
-VENDORED_EXTRACT_DIR = "pre-inspect-extract"
+# Vendored names inside src/sanityops_cli/skills/. SkillManager keys skills by
+# directory name, so these must match the names in the agent prompts.
+VENDORED_SKILL_DIR = "sanityops-inspect-only"
+VENDORED_EXTRACT_DIR = "sanityops-extract-only"
 VENDORED_CHECKLIST_NAME = "code-contract-checklist.v2.md"
 
-SYNCED_ITEMS = (VENDORED_SKILL_DIR, VENDORED_EXTRACT_DIR, VENDORED_CHECKLIST_NAME)
+#: Canonical upstream URL. The repository was renamed; a clone whose origin
+#: still points at the retired name records the canonical URL instead.
+CANONICAL_UPSTREAM_URL = "https://github.com/sanityops-org/sanityops-inspector.git"
+_RETIRED_REPO_PATH = "sanityops-org/sanityops-inspect-lite"
 
 
 def _sha256_of(data: bytes) -> str:
@@ -67,6 +68,41 @@ def _clean_url(url: str) -> str:
             netloc = f"{netloc}:{parsed.port}"
         return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
     return url
+
+
+def _canonical_source_url(url: str) -> str:
+    """Map the retired repository URL to its renamed canonical URL."""
+    path = urlsplit(url).path.rstrip("/")
+    if path.endswith(".git"):
+        path = path[: -len(".git")]
+    if path.endswith(_RETIRED_REPO_PATH):
+        return CANONICAL_UPSTREAM_URL
+    return url
+
+
+def _recorded_hashes_match(manifest: dict) -> bool:
+    """True when the vendored content still matches VERSION.json."""
+    items = manifest.get("items", {})
+    skill_dir = DEST_DIR / VENDORED_SKILL_DIR
+    if not skill_dir.is_dir():
+        return False
+    if items.get(VENDORED_SKILL_DIR, {}).get("sha256") != _dir_hash(skill_dir):
+        return False
+
+    checklist = DEST_DIR / VENDORED_CHECKLIST_NAME
+    if not checklist.is_file():
+        return False
+    if items.get("code-contract-checklist.v2", {}).get("sha256") != _sha256_of(
+        checklist.read_bytes()
+    ):
+        return False
+
+    extract_item = items.get(VENDORED_EXTRACT_DIR, {})
+    if extract_item.get("type") == "synced":
+        extract_dir = DEST_DIR / VENDORED_EXTRACT_DIR
+        if not extract_dir.is_dir() or extract_item.get("sha256") != _dir_hash(extract_dir):
+            return False
+    return True
 
 
 def _dir_hash(directory: Path) -> str:
@@ -122,9 +158,14 @@ def sync(source: Path, force: bool = False) -> bool:
     if not force and VERSION_FILE.is_file():
         try:
             current_manifest = json.loads(VERSION_FILE.read_text(encoding="utf-8"))
-            if current_manifest.get("source", {}).get("commit") == upstream_commit:
+            if (
+                current_manifest.get("source", {}).get("commit") == upstream_commit
+                and _recorded_hashes_match(current_manifest)
+            ):
                 print(f"already up-to-date at commit {upstream_commit[:12]}")
                 return False
+            if current_manifest.get("source", {}).get("commit") == upstream_commit:
+                print("recorded commit is current but vendored content drifted; re-vendoring")
         except Exception:
             pass
 
@@ -142,7 +183,7 @@ def sync(source: Path, force: bool = False) -> bool:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(item.read_bytes())
 
-    # Vendor pre-inspect-extract skill directory (clean replace if present in source).
+    # Vendor the extract-only skill directory (clean replace if present in source).
     extract_src = source / SOURCE_EXTRACT_SKILL_REL
     extract_dest = DEST_DIR / VENDORED_EXTRACT_DIR
     extract_version = "unknown"
@@ -167,7 +208,7 @@ def sync(source: Path, force: bool = False) -> bool:
 
     version = _frontmatter_version(skill_dest / "SKILL.md") or "unknown"
     raw_url = _git(["remote", "get-url", "origin"], source)
-    clean_url = _clean_url(raw_url)
+    clean_url = _canonical_source_url(_clean_url(raw_url))
     manifest_items = {
         VENDORED_SKILL_DIR: {
             "type": "synced",
@@ -261,13 +302,15 @@ def main() -> None:
     parser.add_argument(
         "--source",
         type=Path,
-        required=True,
-        help="Path to the sanityops-inspector repository checkout",
+        help="Path to the sanityops-inspector repository checkout (required to sync)",
     )
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Verify vendored content matches VERSION.json instead of syncing",
+        help=(
+            "Verify vendored content matches VERSION.json instead of syncing; "
+            "with --source, also verify the recorded commit is current"
+        ),
     )
     parser.add_argument(
         "--force",
@@ -278,11 +321,13 @@ def main() -> None:
 
     source = args.source.resolve() if args.source else None
     if args.check:
-        sys.exit(check(source if source and source.is_dir() else None))
-    if not source.is_dir():
-        sys.exit(f"error: source repo not found: {source}")
-    synced = sync(source, force=args.force)
-    sys.exit(0 if synced else 0)
+        if args.source is not None and not source.is_dir():
+            sys.exit(f"error: source path is not a valid directory: {source}")
+        sys.exit(check(source))
+    if source is None or not source.is_dir():
+        sys.exit(f"error: --source is required for a sync run (got {source})")
+    sync(source, force=args.force)
+    sys.exit(0)
 
 
 if __name__ == "__main__":

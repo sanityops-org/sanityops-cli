@@ -58,12 +58,12 @@ def full_script() -> list[LLMResponse]:
     return [
         response(
             TextBlock(text="loading skill"),
-            tool_call("t1", "skill", operation="load", name="sanityops-inspect-lite"),
+            tool_call("t1", "skill", operation="load", name="sanityops-inspect-only"),
         ),
         response(
             TextBlock(text="checklists"),
             tool_call(
-                "t2", "skill", operation="load", name="sanityops-inspect-lite"
+                "t2", "skill", operation="load", name="sanityops-inspect-only"
             ),  # domain file stand-in
         ),
         response(
@@ -148,12 +148,23 @@ class TestHappyPath:
 
         system = provider.seen_messages[0][0]
         text = "".join(getattr(b, "text", "") for b in system.content)
-        assert "sanityops-inspect-lite" in text
+        assert 'skill(operation="load", name="sanityops-inspect-only")' in text
         assert "Attribution and cross-check gating" in text
         assert "pending" in text
         assert "inspect-summary" in text
         assert "QC-3.3" in text
         assert "en" in text
+        # Always-loaded references and the v2 report-presentation rules.
+        for reference in (
+            "permission-checklist",
+            "explicit-checklist",
+            "relevance-map",
+            "code-contract-checklist",
+        ):
+            assert reference in text
+        assert "ungraded totals" in text
+        assert "reader lead-in" in text
+        assert "scope gate" in text
         # Injection payload reached the agent as the user turn.
         user = provider.seen_messages[0][1]
         assert "Extraction IR payload" in "".join(getattr(b, "text", "") for b in user.content)

@@ -120,9 +120,9 @@ class Harness:
             self.captured["uploads"] += 1
 
         skills_dir = tmp_path / "skills"
-        (skills_dir / "sanityops-inspect-lite").mkdir(parents=True, exist_ok=True)
-        (skills_dir / "sanityops-inspect-lite" / "SKILL.md").write_text(
-            "---\nname: sanityops-inspect-lite\nversion: 1.0.0\ndescription: x\n---\n# S\n",
+        (skills_dir / "sanityops-inspect-only").mkdir(parents=True, exist_ok=True)
+        (skills_dir / "sanityops-inspect-only" / "SKILL.md").write_text(
+            "---\nname: sanityops-inspect-only\nversion: 1.0.0\ndescription: x\n---\n# S\n",
             encoding="utf-8",
         )
 

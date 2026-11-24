@@ -6,7 +6,7 @@ title: Unified Checklist shared meta document (_meta)
 
 > This file is the **shared definition** for the 8 domain checklists: field model, check_engine mapping, applicability structural-fact gate, severity expression, scoring rules, and domain file organization conventions. **Load once, reuse across domains.** Domain files carry only "the check items themselves" and do not repeat this file.
 >
-> Status: v2 unified engine edition (finalized). Design decision records are in the repo root `checklist-unification-design.md` (not distributed with the package, for in-repo reference only).
+> Status: v2 unified engine edition (finalized).
 
 ## 1. Field model (all fields, shared by the three consumers)
 

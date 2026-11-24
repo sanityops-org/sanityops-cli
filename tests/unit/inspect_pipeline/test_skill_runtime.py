@@ -15,8 +15,8 @@ SRC = Path(__file__).resolve().parents[3] / "src" / "sanityops_cli" / "skills"
 class TestMaterialize:
     def test_materializes_both_skills(self, tmp_path: Path) -> None:
         target = skill_runtime.materialize_skills(source=SRC, cache_root=tmp_path)
-        assert (target / "sanityops-inspect-lite" / "SKILL.md").is_file()
-        assert (target / "pre-inspect-extract" / "SKILL.md").is_file()
+        assert (target / "sanityops-inspect-only" / "SKILL.md").is_file()
+        assert (target / "sanityops-extract-only" / "SKILL.md").is_file()
         assert (target / "code-contract-checklist.v2.md").is_file()
 
     def test_idempotent_same_content(self, tmp_path: Path) -> None:
@@ -30,8 +30,8 @@ class TestMaterialize:
         import shutil
 
         shutil.copytree(SRC, mutated)
-        (mutated / "pre-inspect-extract" / "SKILL.md").write_text(
-            (mutated / "pre-inspect-extract" / "SKILL.md").read_text(encoding="utf-8")
+        (mutated / "sanityops-extract-only" / "SKILL.md").write_text(
+            (mutated / "sanityops-extract-only" / "SKILL.md").read_text(encoding="utf-8")
             + "\n<!-- mutated -->",
             encoding="utf-8",
         )
@@ -78,6 +78,11 @@ class TestPackagedDir:
         }
         assert ids == expected
 
+    def test_vendored_skill_names_match_directories(self) -> None:
+        for name in skill_runtime.EXPECTED_SKILLS:
+            text = (SRC / name / "SKILL.md").read_text(encoding="utf-8")
+            assert f"\nname: {name}\n" in text
+
 
 class TestValidateVendor:
     def test_clean_vendor_has_no_warnings(self, tmp_path: Path) -> None:
@@ -86,7 +91,7 @@ class TestValidateVendor:
 
     def test_warns_on_frontmatter_version_mismatch(self, tmp_path: Path) -> None:
         target = skill_runtime.materialize_skills(source=SRC, cache_root=tmp_path)
-        skill_md = target / "sanityops-inspect-lite" / "SKILL.md"
+        skill_md = target / "sanityops-inspect-only" / "SKILL.md"
         current_version = skill_runtime._frontmatter_version(skill_md)
         skill_md.write_text(
             skill_md.read_text(encoding="utf-8").replace(
@@ -102,9 +107,9 @@ class TestValidateVendor:
 
         partial = tmp_path / "partial"
         shutil.copytree(SRC, partial)
-        shutil.rmtree(partial / "pre-inspect-extract")
+        shutil.rmtree(partial / "sanityops-extract-only")
         warnings = skill_runtime.validate_vendor(partial)
-        assert any("'pre-inspect-extract' missing" in w for w in warnings)
+        assert any("'sanityops-extract-only' missing" in w for w in warnings)
 
 
 class TestAttachSkillTools:
@@ -115,7 +120,7 @@ class TestAttachSkillTools:
         assert registry.context.skill_manager is manager
         assert registry.get("skill") is not None
         names = {s["name"] for s in manager.describe_available()}
-        assert names == {"sanityops-inspect-lite", "pre-inspect-extract"}
+        assert names == {"sanityops-inspect-only", "sanityops-extract-only"}
 
 
 class TestCliSkillTool:
@@ -132,34 +137,60 @@ class TestCliSkillTool:
         tool, _ = tool_and_manager
         result = asyncio.run(tool.run(operation="list"))
         assert result.success
-        assert "sanityops-inspect-lite" in result.content
-        assert "pre-inspect-extract" in result.content
+        assert "sanityops-inspect-only" in result.content
+        assert "sanityops-extract-only" in result.content
 
     def test_load_rewrites_bash_hints(self, tool_and_manager) -> None:
         import asyncio
 
         tool, _ = tool_and_manager
-        result = asyncio.run(tool.run(operation="load", name="sanityops-inspect-lite"))
+        result = asyncio.run(tool.run(operation="load", name="sanityops-inspect-only"))
         assert result.success
         assert "`cat " not in result.content
         assert "`rg " not in result.content
-        assert "use the read tool" in result.content
+        assert "use the read tool on" in result.content
+        assert "(read tool)" not in result.content
         # Skill body itself is intact: the vendored H1 comes through verbatim.
         # Read the title from the file rather than pinning a title string, so a
         # skill content update does not fail this runtime test.
-        skill_md = SRC / "sanityops-inspect-lite" / "SKILL.md"
+        skill_md = SRC / "sanityops-inspect-only" / "SKILL.md"
         h1 = next(
             line for line in skill_md.read_text(encoding="utf-8").splitlines() if line.startswith("# ")
         )
         assert h1 in result.content
 
-    def test_load_pre_inspect_extract(self, tool_and_manager) -> None:
+    def test_load_inspect_skill_applies_cli_rewrites(self, tool_and_manager) -> None:
         import asyncio
 
         tool, _ = tool_and_manager
-        result = asyncio.run(tool.run(operation="load", name="pre-inspect-extract"))
+        result = asyncio.run(tool.run(operation="load", name="sanityops-inspect-only"))
         assert result.success
-        assert "pre-inspect-extract" in result.content
+        text = result.content
+        # Standalone-skill framing is replaced by the CLI contract.
+        assert "The official `sanityops-cli`" not in text
+        assert "no CLI, no scripts, no network calls" not in text
+        assert "## 10. Further reading & upgrade" not in text
+        assert "upgrade pointer" not in text
+        assert "CLI-provided report header data" in text
+        assert "SanityOps Framework v1.1" in text
+        assert "## CLI runtime override (sanityops-cli)" in text
+        assert "run sanityops-inspector (extract + inspect)" not in text
+        assert "run the CLI extraction stage first" in text
+        assert "single-model self-audit rather than an official engine conclusion" not in text
+        assert "unofficial-result disclaimer or a host-model label" in text
+        assert "the CLI Contract Appendix" in text
+        assert "six provenance facts" not in text
+        assert "CLI provenance facts" in text
+        assert "Impact Cards" not in text
+        assert "impact-outlook mappings" in text
+
+    def test_load_extract_only_skill(self, tool_and_manager) -> None:
+        import asyncio
+
+        tool, _ = tool_and_manager
+        result = asyncio.run(tool.run(operation="load", name="sanityops-extract-only"))
+        assert result.success
+        assert "sanityops-extract-only" in result.content
 
     def test_load_unknown_skill_errors(self, tool_and_manager) -> None:
         import asyncio
@@ -167,6 +198,20 @@ class TestCliSkillTool:
         tool, _ = tool_and_manager
         result = asyncio.run(tool.run(operation="load", name="nope"))
         assert not result.success
+
+
+class TestReferenceRewrite:
+    def test_relevance_map_labels_validation_as_static(self) -> None:
+        path = SRC / "sanityops-inspect-only" / "references" / "relevance-map.v2.md"
+        text = path.read_text(encoding="utf-8")
+        rewritten = skill_runtime.rewrite_reference_for_cli(path, text)
+        assert "NOT run by this inspector" not in rewritten
+        assert "not run in this CLI static inspection" in rewritten
+
+    def test_other_references_pass_through(self) -> None:
+        path = SRC / "sanityops-inspect-only" / "references" / "_meta.md"
+        text = path.read_text(encoding="utf-8")
+        assert skill_runtime.rewrite_reference_for_cli(path, text) == text
 
 
 def _QC_IDS(text: str) -> list[str]:

@@ -48,5 +48,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
+      - name: Check vendored skill drift
+        run: uv run python scripts/sync_skills.py --check
+
       - name: Run tests
         run: uv run pytest -v

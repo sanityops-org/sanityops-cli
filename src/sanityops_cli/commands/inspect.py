@@ -2,8 +2,8 @@
 
 Skill-based two-agent pipeline (design 2026-11-05):
   Step 1  QC lint (17-item checklist v2, program channel + hybrid pre-screen)
-  Step 2  ExtractAgent (skill pre-inspect-extract, store_artifacts protocol)
-  Step 3  InspectAgent (skill sanityops-inspect-lite, seven-stage flow)
+  Step 2  ExtractAgent (skill sanityops-extract-only, store_artifacts protocol)
+  Step 3  InspectAgent (skill sanityops-inspect-only, seven-stage flow)
   Step 4  CLI render + persist + exit code matrix (design §9)
 """
 
@@ -1316,7 +1316,7 @@ def inspect(
 
     header_data = {
         "cli": f"sanityops-cli v{__version__}",
-        "framework": "DeepLogic Framework v1.1",
+        "framework": "SanityOps Framework v1.1",
         "model": llm_config["llm_model_id"],
         "date": datetime.now().strftime("%Y-%m-%d"),
         "project": project_id or "not set",

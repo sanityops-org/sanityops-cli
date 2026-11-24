@@ -1,7 +1,7 @@
 """ExtractAgent — skill-driven artifact extraction (design §5).
 
 A thin wrapper around the aidynamic-agent loop (same pattern as the other
-CLI agents). The agent loads the vendored ``pre-inspect-extract`` skill on
+CLI agents). The agent loads the vendored ``sanityops-extract-only`` skill on
 its first step and reports artifacts through ``store_artifacts``; this class
 only assembles the tool registry, injects the compaction-safe context, and
 finalizes the records after the run.
