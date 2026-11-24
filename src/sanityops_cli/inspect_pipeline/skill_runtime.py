@@ -77,7 +77,12 @@ def _packaged_skills_context() -> Iterator[Path]:
 
 
 def packaged_skills_dir() -> Path:
-    """Filesystem path of the packaged ``skills/`` directory when already on disk."""
+    """Filesystem path of the packaged ``skills/`` directory when already on disk.
+
+    Zipped/PyInstaller installs have no stable on-disk path here; use
+    ``materialize_skills()``, which keeps the resource extraction alive while
+    copying.
+    """
     try:
         ref = resources.files("sanityops_cli").joinpath("skills")
         if isinstance(ref, Path) and ref.is_dir():
