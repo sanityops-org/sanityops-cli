@@ -106,6 +106,18 @@ class TestPackagedDir:
         assert (target / "sanityops-extract-only" / "SKILL.md").is_file()
         assert (target / "code-contract-checklist.v2.md").is_file()
 
+    def test_packaged_skills_context_falls_back_to_source_tree(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def missing(_package: str):
+            raise FileNotFoundError("package resources unavailable")
+
+        monkeypatch.setattr(skill_runtime.resources, "files", missing)
+
+        with skill_runtime._packaged_skills_context() as path:
+            assert path.is_dir()
+            assert (path / "VERSION.json").is_file()
+
     def test_packaged_skills_context_does_not_swallow_caller_file_not_found(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
