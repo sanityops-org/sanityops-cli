@@ -94,7 +94,7 @@ def packaged_skills_dir() -> Path:
 
     Zipped/PyInstaller installs have no stable on-disk path here; use
     ``materialize_skills()``, which keeps the resource extraction alive while
-    copying.
+    copying. Extracting a packaged skills directory requires Python 3.12+.
     """
     try:
         ref = resources.files("sanityops_cli").joinpath("skills")
