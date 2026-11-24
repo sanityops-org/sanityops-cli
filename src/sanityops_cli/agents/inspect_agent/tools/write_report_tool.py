@@ -116,7 +116,24 @@ class WriteReportTool(Tool):
         self._rejected_parts: dict[str, set[str]] = {}
         self._sections: dict[str, list[_ReportPart]] = {}
         if require_findings:
-            self.parameters = {**self.parameters, "required": ["section", "content", "findings"]}
+            # `findings` is required only for the stages that emit defects.
+            # A global "required" entry would also reject the non-finding
+            # sections (C, G, and the scaffolding) at the framework's schema
+            # validation layer.
+            self.parameters = {
+                **self.parameters,
+                "allOf": [
+                    {
+                        "if": {
+                            "properties": {
+                                "section": {"enum": sorted(_FINDING_SECTIONS)},
+                            },
+                            "required": ["section"],
+                        },
+                        "then": {"required": ["findings"]},
+                    }
+                ],
+            }
 
     async def execute(self, **kwargs) -> ToolResult:  # noqa: ANN003
         section = kwargs.get("section")

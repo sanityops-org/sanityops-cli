@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 
+import pytest
+
 from sanityops_cli.agents.inspect_agent.tools.write_report_tool import (
+    _FINDING_SECTIONS,
     MAX_SECTION_CHARS,
     WriteReportTool,
 )
@@ -62,6 +65,35 @@ class TestValidation:
         result = run(tool, section="A", content="x" * (MAX_SECTION_CHARS + 1))
         assert not result.success
         assert "split into parts" in result.error
+
+
+class TestFindingsSchema:
+    def test_schema_requires_findings_only_for_finding_sections(self):
+        tool = WriteReportTool(require_findings=True)
+        schema = tool.parameters
+        assert "findings" not in schema.get("required", [])
+        conditional = schema["allOf"][0]
+        assert set(conditional["if"]["properties"]["section"]["enum"]) == set(_FINDING_SECTIONS)
+        assert conditional["then"] == {"required": ["findings"]}
+
+    def test_schema_accepts_non_finding_sections_without_findings(self):
+        jsonschema = pytest.importorskip("jsonschema")
+        schema = WriteReportTool(require_findings=True).parameters
+        validator = jsonschema.Draft202012Validator(schema)
+        for section in ("C", "G", "header", "status_board"):
+            assert not list(validator.iter_errors({"section": section, "content": "x"}))
+        for section in ("A", "B", "D", "E", "F"):
+            assert list(validator.iter_errors({"section": section, "content": "x"}))
+        assert not list(
+            validator.iter_errors({"section": "A", "content": "x", "findings": []})
+        )
+
+    def test_execute_enforces_findings_per_section(self):
+        tool = WriteReportTool(require_findings=True)
+        result = run(tool, section="A", content="a")
+        assert not result.success
+        assert "findings is required" in result.error
+        assert run(tool, section="C", content="c").success
 
 
 class TestStageCompleteness:
