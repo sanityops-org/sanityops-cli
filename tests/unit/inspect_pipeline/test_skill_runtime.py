@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 
 import pytest
@@ -83,7 +84,7 @@ class TestPackagedDir:
     def test_vendored_skill_names_match_directories(self) -> None:
         for name in skill_runtime.EXPECTED_SKILLS:
             text = (SRC / name / "SKILL.md").read_text(encoding="utf-8")
-            assert f"\nname: {name}\n" in text
+            assert re.search(rf"^name:\s*{re.escape(name)}\s*$", text, re.MULTILINE)
 
 
 class TestValidateVendor:
