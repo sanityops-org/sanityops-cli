@@ -57,6 +57,62 @@ class TestPackagedDir:
         assert path.is_dir()
         assert (path / "VERSION.json").is_file()
 
+    def test_materialize_from_zip_keeps_as_file_temp_dir_until_copied(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import zipfile
+        from contextlib import contextmanager
+        from importlib import resources
+
+        zip_path = tmp_path / "pkg.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            for item in sorted(SRC.rglob("*")):
+                if item.is_file():
+                    arcname = Path("sanityops_cli") / "skills" / item.relative_to(SRC)
+                    zf.write(item, arcname=arcname.as_posix())
+
+        extracted_paths: list[Path] = []
+        real_as_file = resources.as_file
+
+        @contextmanager
+        def tracking_as_file(traversable):
+            with real_as_file(traversable) as extracted:
+                extracted_paths.append(extracted)
+                yield extracted
+
+        # Disable the repo fallback path so only the zipped resource can succeed.
+        monkeypatch.setattr(
+            skill_runtime,
+            "__file__",
+            str(tmp_path / "missing" / "inspect_pipeline" / "skill_runtime.py"),
+        )
+        monkeypatch.setattr(skill_runtime.resources, "as_file", tracking_as_file)
+
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            pkg_root = zipfile.Path(zf, "sanityops_cli/")
+            monkeypatch.setattr(skill_runtime.resources, "files", lambda _pkg: pkg_root)
+
+            target = skill_runtime.materialize_skills(cache_root=tmp_path / "cache")
+
+        assert len(extracted_paths) == 1
+        assert not extracted_paths[0].exists()
+        assert (target / "VERSION.json").is_file()
+        assert (target / "sanityops-inspect-only" / "SKILL.md").is_file()
+        assert (target / "sanityops-extract-only" / "SKILL.md").is_file()
+        assert (target / "code-contract-checklist.v2.md").is_file()
+
+    def test_packaged_skills_context_does_not_swallow_caller_file_not_found(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            skill_runtime.resources,
+            "files",
+            lambda _pkg: SRC.parent,
+        )
+        with pytest.raises(FileNotFoundError, match="boom"):
+            with skill_runtime._packaged_skills_context():
+                raise FileNotFoundError("boom")
+
     def test_vendored_checklist_matches_17_rule_index(self) -> None:
         checklist = (SRC / "code-contract-checklist.v2.md").read_text(encoding="utf-8")
         ids = set(_QC_IDS(checklist))
