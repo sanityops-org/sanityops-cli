@@ -280,10 +280,12 @@ def _rewrite_inspect_skill_for_cli(text: str) -> str:
         "",
         "executive-summary upgrade pointer",
     )
+    # Item 7 spans from its heading to the next numbered item; anchoring there
+    # keeps the rewrite stable if the closing sentence is reworded.
     text = _sub_expected(
         text,
         r"7\. \*\*Report header \(mandatory on every report and every stage-only report\)\*\*"
-        r"[\s\S]*?must not imply the result is an official engine/SaaS conclusion\.",
+        r"[\s\S]*?(?=\n\n8\. \*\*Self-verification statement\*\*)",
         _CLI_HEADER_SECTION,
         "report header",
     )

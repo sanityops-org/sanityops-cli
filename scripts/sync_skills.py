@@ -358,12 +358,13 @@ def main() -> None:
     if args.check:
         if args.source is not None and not source.is_dir():
             sys.exit(f"error: source path is not a valid directory: {source}")
+        # check() returns the process exit code (0 clean, 1 drift).
         sys.exit(check(source))
     if source is None:
         sys.exit("error: --source is required for a sync run")
     if not source.is_dir():
         sys.exit(f"error: source path is not a valid directory: {source}")
-    # The return value is informational: an up-to-date no-op is still success.
+    # The bool return is informational: a no-op sync (False) is still success.
     sync(source, force=args.force)
     sys.exit(0)
 

@@ -181,6 +181,7 @@ class TestCliSkillTool:
         assert "single-model self-audit rather than an official engine conclusion" not in text
         assert "unofficial-result disclaimer or a host-model label" in text
         assert "the CLI Contract Appendix" in text
+        assert "8. **Self-verification statement**" in text
         assert "six provenance facts" not in text
         assert "CLI provenance facts" in text
         assert "Impact Cards" not in text

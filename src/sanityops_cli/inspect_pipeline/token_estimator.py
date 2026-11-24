@@ -53,6 +53,7 @@ def estimate_skill_reserve(artifact_types: set[str]) -> int:
     measured file sizes. Update the constants whenever the vendored references
     change: the guard only proves coverage of the files present at test time.
     """
+    # An empty artifact set still loads the always-required references below.
     reserve = 18_000  # inspect SKILL.md
     reserve += 3_000  # _meta (shared definitions)
     reserve += 11_000  # permission-checklist (Stage D)
