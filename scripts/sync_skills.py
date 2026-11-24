@@ -136,6 +136,15 @@ def _git(args: list[str], cwd: Path) -> str:
     return result.stdout.strip()
 
 
+def _is_git_checkout(path: Path) -> bool:
+    """True when ``path`` is a git working tree (``.git`` may be a file)."""
+    try:
+        _git(["rev-parse", "--git-dir"], path)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    return True
+
+
 def _frontmatter_version(skill_md: Path) -> str | None:
     for line in skill_md.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
@@ -153,6 +162,8 @@ def sync(source: Path, force: bool = False) -> bool:
     commit and content hashes are already current. A no-op sync is a
     successful run; the return value is informational.
     """
+    if not _is_git_checkout(source):
+        sys.exit(f"error: source path is not a git checkout: {source}")
     skill_src = source / SOURCE_SKILL_REL
     checklist_src = None
     for cand in SOURCE_CHECKLIST_CANDIDATES:
@@ -302,6 +313,8 @@ def check(source: Path | None = None) -> int:
     if source is not None:
         if not source.is_dir():
             problems.append(f"source path is not a valid directory: {source}")
+        elif not _is_git_checkout(source):
+            problems.append(f"source path is not a git checkout: {source}")
         else:
             upstream_commit = _git(["rev-parse", "HEAD"], source)
             if manifest.get("source", {}).get("commit") != upstream_commit:

@@ -222,6 +222,7 @@ class TestRewriteDriftDetection:
             result = skill_runtime._rewrite_inspect_skill_for_cli("standalone text")
         assert result == "standalone text"
         assert "Skill rewrite pattern not found" in caplog.text
+        assert "pattern=" in caplog.text
 
     def test_current_skill_matches_every_rewrite_pattern(self, tmp_path, caplog) -> None:
         import asyncio

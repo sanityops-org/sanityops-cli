@@ -10,9 +10,11 @@ Delivery contract surfaced to the LLM (mirrored by the contract appendix):
 - ``add_artifact`` — upsert one chunk of an artifact record. First chunk must
   declare ``total_chunks``; ``seq`` must arrive in order; ``final=true`` only
   on ``seq == total_chunks - 1`` and must carry the record metadata
-  (completeness/L/evidence/...). Re-sending from ``seq=0`` replaces the
-  earlier stream (last complete stream wins) — but only once the restart
-  itself validates, so a malformed restart never destroys a good stream.
+  (completeness/L/evidence/...). Chunks are concatenated as-is: include every
+  character, including newlines, in the chunk that owns it. Re-sending from
+  ``seq=0`` replaces the earlier stream (last complete stream wins) — but only
+  once the restart itself validates, so a malformed restart never destroys a
+  good stream.
 - ``add_reference`` — one reference-layer record.
 - ``set_attribution`` — the set-level attribution statement.
 - ``list`` — read-only resync of everything stored so far.

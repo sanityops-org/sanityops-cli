@@ -159,8 +159,16 @@ def test_check_hash_only_on_vendored_tree() -> None:
     assert check(None) == 0
 
 
-def test_check_reports_invalid_source(tmp_path: Path) -> None:
+def test_check_reports_invalid_source(tmp_path: Path, capsys) -> None:
     assert check(tmp_path / "missing") == 1
+    assert "source path is not a valid directory" in capsys.readouterr().out
+
+
+def test_check_reports_non_git_source(tmp_path: Path, capsys) -> None:
+    source = tmp_path / "source"
+    source.mkdir()
+    assert check(source) == 1
+    assert "source path is not a git checkout" in capsys.readouterr().out
 
 
 def test_check_reports_missing_version_json(tmp_path: Path) -> None:

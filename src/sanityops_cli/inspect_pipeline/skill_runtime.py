@@ -218,6 +218,16 @@ def _rewrite_skill_for_cli(name: str, text: str) -> str:
     return rewritten
 
 
+def _warn_missing_pattern(label: str, pattern: str) -> None:
+    """Log a missing rewrite pattern with a bounded snippet for debugging."""
+    snippet = pattern if len(pattern) <= 120 else pattern[:117] + "..."
+    logger.warning(
+        "Skill rewrite pattern not found (%s; pattern=%r); the vendored skill may have changed",
+        label,
+        snippet,
+    )
+
+
 def _replace_expected(text: str, old: str, new: str, label: str) -> str:
     """Replace an expected standalone phrase.
 
@@ -226,10 +236,7 @@ def _replace_expected(text: str, old: str, new: str, label: str) -> str:
     the hard failure through ``TestRewriteDriftDetection``.
     """
     if old not in text:
-        logger.warning(
-            "Skill rewrite pattern not found (%s); the vendored skill may have changed",
-            label,
-        )
+        _warn_missing_pattern(label, old)
         return text
     return text.replace(old, new)
 
@@ -238,10 +245,7 @@ def _sub_expected(text: str, pattern: str, repl: str, label: str) -> str:
     """Regex variant of ``_replace_expected`` (same warn-and-continue contract)."""
     rewritten, count = re.subn(pattern, repl, text)
     if count == 0:
-        logger.warning(
-            "Skill rewrite pattern not found (%s); the vendored skill may have changed",
-            label,
-        )
+        _warn_missing_pattern(label, pattern)
     return rewritten
 
 

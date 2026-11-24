@@ -50,7 +50,8 @@ def estimate_skill_reserve(artifact_types: set[str]) -> int:
     per-type checklists and the cross checklist follow the set composition.
     Values are measured on the vendored v2 skill plus a safety margin;
     ``test_reserve_covers_measured_reference_loads`` keeps them above the
-    measured file sizes.
+    measured file sizes. Update the constants whenever the vendored references
+    change: the guard only proves coverage of the files present at test time.
     """
     reserve = 18_000  # inspect SKILL.md
     reserve += 3_000  # _meta (shared definitions)
