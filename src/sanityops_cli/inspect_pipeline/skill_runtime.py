@@ -104,7 +104,10 @@ def packaged_skills_dir() -> Path:
     fallback = Path(__file__).resolve().parent.parent / "skills"
     if fallback.is_dir():
         return fallback
-    raise FileNotFoundError("vendored skills directory not found in package")
+    raise FileNotFoundError(
+        "vendored skills directory not found in package; "
+        "use materialize_skills() for zipped installs"
+    )
 
 
 def dir_hash(directory: Path) -> str:

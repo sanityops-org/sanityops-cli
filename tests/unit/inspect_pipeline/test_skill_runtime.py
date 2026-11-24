@@ -67,7 +67,6 @@ class TestPackagedDir:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import zipfile
-        from contextlib import contextmanager
         from importlib import resources
 
         zip_path = tmp_path / "pkg.zip"
@@ -110,12 +109,18 @@ class TestPackagedDir:
     def test_packaged_skills_context_falls_back_when_directory_extraction_is_unsupported(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        @contextmanager
-        def unsupported(traversable):
-            raise IsADirectoryError(traversable)
-            yield  # pragma: no cover
+        class UnsupportedExtraction:
+            def __enter__(self):
+                raise IsADirectoryError("directory extraction unsupported")
 
-        monkeypatch.setattr(skill_runtime.resources, "as_file", unsupported)
+            def __exit__(self, *exc_info: object) -> bool:
+                return False
+
+        monkeypatch.setattr(
+            skill_runtime.resources,
+            "as_file",
+            lambda _traversable: UnsupportedExtraction(),
+        )
         monkeypatch.setattr(skill_runtime.resources, "files", lambda _pkg: SRC.parent)
 
         with skill_runtime._packaged_skills_context() as path:
