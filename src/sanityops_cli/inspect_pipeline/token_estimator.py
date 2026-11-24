@@ -45,19 +45,29 @@ def derive_injection_budget(
 def estimate_skill_reserve(artifact_types: set[str]) -> int:
     """Expected lazy-load reserve per the §6.6 table (approximate, CJK-aware).
 
-    Only the SKILL.md (~42k) plus the domain checklists the artifact
-    combination requires. Values measured on the vendored skill.
+    Always loaded for any artifact set: the inspect SKILL.md, ``_meta``, and
+    the permission / explicit / relevance-map / code-contract checklists. The
+    per-type checklists and the cross checklist follow the set composition.
+    Values are measured on the vendored v2 skill plus a safety margin;
+    ``test_reserve_covers_measured_reference_loads`` keeps them above the
+    measured file sizes. Update the constants whenever the vendored references
+    change: the guard only proves coverage of the files present at test time.
     """
-    reserve = 42_000  # SKILL.md
+    # An empty artifact set still loads the always-required references below.
+    reserve = 18_000  # inspect SKILL.md
+    reserve += 3_000  # _meta (shared definitions)
+    reserve += 11_000  # permission-checklist (Stage D)
+    reserve += 5_000  # explicit-checklist (Stage E)
+    reserve += 9_000  # relevance-map (Stage F)
+    reserve += 3_000  # code-contract-checklist (Stage A QC)
     if "prompt" in artifact_types:
-        reserve += 16_000  # prompt-checklist
+        reserve += 5_500  # prompt-checklist
     if "tool" in artifact_types:
-        reserve += 11_000  # tool-checklist
-    if len(artifact_types & {"prompt", "skill", "tool"}) >= 2:
-        reserve += 12_000  # cross-checklist
-        reserve += 5_000  # _meta guidance
+        reserve += 4_000  # tool-checklist
     if "skill" in artifact_types:
-        reserve += 16_000  # skill-checklist
+        reserve += 4_500  # skill-checklist
+    if len(artifact_types & {"prompt", "skill", "tool"}) >= 2:
+        reserve += 4_500  # cross-checklist
     return reserve
 
 

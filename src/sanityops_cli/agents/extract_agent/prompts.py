@@ -1,7 +1,7 @@
 """Prompts for the ExtractAgent.
 
 The system prompt is deliberately thin (~3KB): the extraction rules live in
-the vendored ``pre-inspect-extract`` skill, loaded on demand via the skill
+the vendored ``sanityops-extract-only`` skill, loaded on demand via the skill
 tool. This appendix only carries the CLI-side delivery contract.
 """
 
@@ -16,7 +16,7 @@ anything — extraction only.
 
 ## Mandatory first step
 
-Before any extraction, call `skill(operation="load", name="pre-inspect-extract")`.
+Before any extraction, call `skill(operation="load", name="sanityops-extract-only")`.
 That skill defines the classification (Artifact/Carrier/Scaffolding/Reference
 file), per-type extraction method, the six completeness labels, L assignment,
 evidence rules, chunking, the reference layer, and attribution. Producing
@@ -28,7 +28,10 @@ Everything you report must go through `store_artifacts`. Plain-prose output
 cannot be audited and will be discarded.
 
 - One record may span several chunks: declare `total_chunks` on chunk 0,
-  deliver `seq` in order, set `final=true` only on the last chunk.
+  deliver `seq` in order, set `final=true` only on the last chunk. Chunks are
+  concatenated exactly as sent — include every character, including a newline
+  at a split point, in the chunk that owns it; do not add or remove characters
+  at chunk boundaries.
 - The **final chunk must carry the record metadata**: `completeness`, `L`,
   and the absolute `source` path (plus `evidence`/`field_evidence`/`reason`
   as the completeness label requires). Keep each chunk's content under
@@ -54,6 +57,10 @@ cannot be audited and will be discarded.
   rewrite a finished record, restart from `seq=0` — the last complete
   stream wins.
 - Record cross-artifact references with `add_reference` as you see them.
+- The skill's optional "candidate-but-not-extracted" list has no separate
+  bucket in `store_artifacts`: record each such candidate as an artifact with
+  `completeness="not inspectable"` and a specific `reason` (the detection
+  basis and the extraction obstacle), so it stays visible in the IR.
 - End with exactly one `set_attribution` call. Use the `list` operation to
   resync if you lose track of what is stored.
 
@@ -73,6 +80,12 @@ Use the `read` tool with absolute paths. It is restricted to these roots —
 anything outside them is unreadable:
 
 {roots_block}
+
+## Scope confirmation
+
+The manifest in your task message is the confirmed scope: every path was
+selected by the user's `inspect_config.yaml`. Do not run the skill's §4.0
+directory/glob confirmation gate; extract from the listed files only.
 
 Read each manifest file fully before extracting from it. Paths are given
 explicitly in your task message; do not wander.

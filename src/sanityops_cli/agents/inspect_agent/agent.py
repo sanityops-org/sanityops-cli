@@ -1,7 +1,7 @@
 """InspectAgent — skill-driven seven-stage inspection (design §6).
 
 Same wrapper pattern as ExtractAgent: the agent loads the vendored
-``sanityops-inspect-lite`` skill on demand (SKILL.md first, then only the
+``sanityops-inspect-only`` skill on demand (SKILL.md first, then only the
 domain checklists the artifact set needs), applies the checks, and reports
 incrementally through ``write_report``. The CLI renders the assembled
 markdown and parses the tail JSON with a fail-closed ladder.

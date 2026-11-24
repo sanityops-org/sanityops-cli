@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Skill-based two-agent inspect pipeline: an ExtractAgent (vendored
-  `pre-inspect-extract` skill) segments configured documents into inspectable
+  `sanityops-extract-only` skill) segments configured documents into inspectable
   artifacts with per-artifact completeness, tier (L), and verbatim evidence,
-  then an InspectAgent (vendored `sanityops-inspect-lite` skill) runs the
+  then an InspectAgent (vendored `sanityops-inspect-only` skill) runs the
   seven-stage SanityOps Framework inspection flow and emits the markdown
   report plus a machine-readable summary block
 - Vendored inspect skills under `src/sanityops_cli/skills/` with recorded
@@ -37,6 +37,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Vendored inspect skills renamed to match the packaged skill names:
+  `sanityops-extract-only` (extraction) and `sanityops-inspect-only`
+  (inspection), with their content refreshed to the v2.0.x rule packages. The
+  agents, prompt contracts, skill runtime, tests, and sync scripts use the new
+  names; the runtime adapts the standalone-skill framing (disclaimers, report
+  header, upgrade pointers) to the CLI inspection contract in English
+- The inspection contract accommodates the v2 skill's folded PASS/N/A report
+  presentation (verdict-tally appendix delivered in `self_verification`) and
+  the extraction contract maps a candidate-but-not-extracted entry to a
+  `not inspectable` artifact record
 - **Breaking**: `inspect` no longer accepts `--skip-defect-check`; the
   pipeline now always runs extraction followed by inspection
 - `inspect` exit codes: `2` for configuration/manifest errors, extraction
@@ -50,12 +60,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Breaking**: the `defect-check` SDK dependency and the local
   `defect_checker/` module; inspection rules now come from the vendored
-  `sanityops-inspect-lite` skill
+  `sanityops-inspect-only` skill
 - The ScannerAgent (`agents/scanner_agent/`); extraction is performed by the
   skill-driven ExtractAgent
 
 ### Fixed
 
+- Multi-chunk artifact reassembly is now byte-exact: chunks are concatenated
+  without an inserted newline, so verbatim bodies are not corrupted at chunk
+  boundaries
+- Whole-file `content_from_source` records bypass the model chunk-size cap, so
+  large prompts and skills are extracted verbatim instead of being rejected
+- **Note**: Stage F impact mappings (`AS-FM`) are advisory references now:
+  they no longer increment the Inspect defect counts or trip the `--strict`
+  P0 gate
+- `scripts/sync_skills.py --check` now fails on an invalid `--source` and runs
+  hash-only without one; CI runs the drift check on every push and pull request
+- The skill-update workflow retries the pull request when its bot branch
+  already exists, instead of exiting before the PR call
+- A recorded upstream commit no longer suppresses re-vendoring when the
+  vendored content has drifted
 - Tool schema uploads emit the provider-neutral flat format
   `{name, description, parameters}` for all extracted tools
 - Failed module inspections render a CAUTION callout instead of a misleading

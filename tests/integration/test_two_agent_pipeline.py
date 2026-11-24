@@ -75,7 +75,7 @@ def extract_script(prompt_path: str) -> list[LLMResponse]:
     return [
         response(
             TextBlock(text="loading skill"),
-            tool_call("e1", "skill", operation="load", name="pre-inspect-extract"),
+            tool_call("e1", "skill", operation="load", name="sanityops-extract-only"),
         ),
         response(TextBlock(text="reading"), tool_call("e2", "read", file_path=prompt_path)),
         response(
@@ -126,7 +126,7 @@ def inspect_script() -> list[LLMResponse]:
     script: list[LLMResponse] = [
         response(
             TextBlock(text="loading skill"),
-            tool_call("i1", "skill", operation="load", name="sanityops-inspect-lite"),
+            tool_call("i1", "skill", operation="load", name="sanityops-inspect-only"),
         )
     ]
     for stage, line in stage_content.items():
@@ -204,7 +204,7 @@ def test_two_agent_pipeline_end_to_end(tmp_path: Path):
         injection_payload=injection_payload,
         header_data={
             "model": "scripted",
-            "skill": "sanityops-inspect-lite v1",
+            "skill": "sanityops-inspect-only v2",
             "date": "2026-11-06",
         },
         attribution="single",

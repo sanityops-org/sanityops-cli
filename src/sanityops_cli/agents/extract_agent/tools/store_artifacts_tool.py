@@ -10,9 +10,11 @@ Delivery contract surfaced to the LLM (mirrored by the contract appendix):
 - ``add_artifact`` — upsert one chunk of an artifact record. First chunk must
   declare ``total_chunks``; ``seq`` must arrive in order; ``final=true`` only
   on ``seq == total_chunks - 1`` and must carry the record metadata
-  (completeness/L/evidence/...). Re-sending from ``seq=0`` replaces the
-  earlier stream (last complete stream wins) — but only once the restart
-  itself validates, so a malformed restart never destroys a good stream.
+  (completeness/L/evidence/...). Chunks are concatenated as-is: include every
+  character, including newlines, in the chunk that owns it. Re-sending from
+  ``seq=0`` replaces the earlier stream (last complete stream wins) — but only
+  once the restart itself validates, so a malformed restart never destroys a
+  good stream.
 - ``add_reference`` — one reference-layer record.
 - ``set_attribution`` — the set-level attribution statement.
 - ``list`` — read-only resync of everything stored so far.
@@ -274,7 +276,8 @@ class StoreArtifactsTool(Tool):
         if a_type not in ARTIFACT_TYPES:
             return self._error(f"artifact.type must be one of {ARTIFACT_TYPES}, got {a_type!r}")
 
-        if artifact.get("content_from_source"):
+        from_source = bool(artifact.get("content_from_source"))
+        if from_source:
             loaded = self._load_source_content(artifact)
             if isinstance(loaded, ToolResult):
                 return loaded
@@ -331,7 +334,7 @@ class StoreArtifactsTool(Tool):
                 "Put the text in `content`; the final chunk may omit it only if earlier "
                 "chunks already carried the whole text."
             )
-        if len(content) > MAX_CHUNK_HARD_CHARS:
+        if not from_source and len(content) > MAX_CHUNK_HARD_CHARS:
             return self._error(
                 f"artifact {a_type}/{name}: chunk {seq} content is {len(content)} chars "
                 f"(hard limit {MAX_CHUNK_HARD_CHARS}). Split it at {_split_points(len(content))} "
@@ -365,7 +368,7 @@ class StoreArtifactsTool(Tool):
                 record = ExtractedArtifact(
                     type=a_type,
                     name=name,
-                    content="\n".join(chunks) if any(chunks) else "",
+                    content="".join(chunks),
                     schema=artifact.get("schema") or {},
                     completeness=artifact["completeness"],
                     L=artifact["L"],

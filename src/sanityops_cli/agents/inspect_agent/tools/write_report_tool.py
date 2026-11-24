@@ -33,6 +33,8 @@ SECTION_ORDER = (
     "self_verification",
 )
 
+#: Stages that emit structured findings (A/B/D/E/F). C, G, and the report
+#: scaffolding do not require a ``findings`` array.
 _FINDING_SECTIONS = frozenset(MODULE_STAGE.values())
 
 #: Provider output ceiling safety margin (same rationale as store_artifacts).
@@ -116,7 +118,26 @@ class WriteReportTool(Tool):
         self._rejected_parts: dict[str, set[str]] = {}
         self._sections: dict[str, list[_ReportPart]] = {}
         if require_findings:
-            self.parameters = {**self.parameters, "required": ["section", "content", "findings"]}
+            # `findings` is required only for the stages that emit defects.
+            # A global "required" entry would also reject the non-finding
+            # sections (C, G, and the scaffolding) at the framework's schema
+            # validation layer. The conditional is the schema-level guard;
+            # execute() enforces the same rule for providers or validators
+            # that ignore if/then.
+            self.parameters = {
+                **self.parameters,
+                "allOf": [
+                    {
+                        "if": {
+                            "properties": {
+                                "section": {"enum": sorted(_FINDING_SECTIONS)},
+                            },
+                            "required": ["section"],
+                        },
+                        "then": {"required": ["findings"]},
+                    }
+                ],
+            }
 
     async def execute(self, **kwargs) -> ToolResult:  # noqa: ANN003
         section = kwargs.get("section")
@@ -133,6 +154,9 @@ class WriteReportTool(Tool):
 
         findings = kwargs.get("findings")
         if findings is None:
+            # Runtime fallback: provider adapters and validators may not apply
+            # JSON Schema conditionals, so this check is essential, not merely
+            # defensive.
             error = (
                 "findings is required (use [] when there are no findings)"
                 if self._require_findings and section in _FINDING_SECTIONS

@@ -75,6 +75,30 @@ class TestSingleChunk:
         result = run(tool, operation="add_artifact", artifact=artifact(total_chunks=1, final=True))
         assert result.success
 
+    def test_whole_file_content_from_source_bypasses_chunk_cap(self, tmp_path):
+        """A trusted whole-file read is not limited by the model chunk cap."""
+        body = "x" * (MAX_CHUNK_HARD_CHARS + 500)
+        path = tmp_path / "big.md"
+        path.write_text(body, encoding="utf-8")
+        tool = StoreArtifactsTool(allowed_roots=[tmp_path])
+        result = run(
+            tool,
+            operation="add_artifact",
+            artifact=artifact(
+                name="big",
+                content="",
+                content_from_source=True,
+                source=str(path),
+                total_chunks=1,
+                final=True,
+                seq=0,
+            ),
+        )
+        assert result.success
+        artifacts, incomplete = tool.finalize()
+        assert incomplete == []
+        assert artifacts[0].content == body
+
 
 class TestChunkSequence:
     def test_multi_chunk_stream(self):
@@ -100,7 +124,45 @@ class TestChunkSequence:
         assert r1.success
         artifacts, incomplete = tool.finalize()
         assert incomplete == []
-        assert artifacts[0].content == "part-one \npart-two"
+        assert artifacts[0].content == "part-one part-two"
+
+    def test_multi_chunk_reassembly_is_verbatim(self):
+        """Chunk boundaries are character offsets: joining must add nothing."""
+        tool = StoreArtifactsTool()
+        source = "line-1\nline-2 with a mid-token split\nline-3"
+        cut1, cut2 = 7, 19
+        run(
+            tool,
+            operation="add_artifact",
+            artifact={
+                "type": "prompt",
+                "name": "p",
+                "content": source[:cut1],
+                "total_chunks": 3,
+                "seq": 0,
+            },
+        )
+        run(
+            tool,
+            operation="add_artifact",
+            artifact={
+                "type": "prompt",
+                "name": "p",
+                "content": source[cut1:cut2],
+                "total_chunks": 3,
+                "seq": 1,
+            },
+        )
+        run(
+            tool,
+            operation="add_artifact",
+            artifact=artifact(
+                name="p", content=source[cut2:], total_chunks=3, seq=2, final=True
+            ),
+        )
+        artifacts, incomplete = tool.finalize()
+        assert incomplete == []
+        assert artifacts[0].content == source
 
     def test_out_of_order_seq_rejected_without_consuming(self):
         tool = StoreArtifactsTool()
@@ -230,7 +292,7 @@ class TestResendSemantics:
         )
         artifacts, incomplete = tool.finalize()
         assert incomplete == []
-        assert artifacts[0].content == "good-a \ngood-b"
+        assert artifacts[0].content == "good-a good-b"
         assert tool.resend_log == ["prompt/p"]
 
     def test_failed_restart_preserves_old_stream(self):
@@ -265,7 +327,7 @@ class TestResendSemantics:
         assert good.success
         artifacts, incomplete = tool.finalize()
         assert incomplete == []
-        assert artifacts[0].content == "a\nb"
+        assert artifacts[0].content == "ab"
         assert tool.resend_log == []
 
 

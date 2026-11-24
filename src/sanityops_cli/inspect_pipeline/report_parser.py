@@ -220,6 +220,10 @@ def counts_from_findings(findings: list[dict]) -> dict:
         if severity not in SEVERITY_RANK:
             continue
         module = str(finding.get("module", ""))
+        if module == "AS-FM":
+            # Stage F maps earlier defects to candidate impacts; a mapping is a
+            # reference, not a new defect, so it never increments the counts.
+            continue
         bucket = "risk_explicit" if module == "EX" else "inspect"
         key = severity.lower()
         counts[bucket][key] = counts[bucket].get(key, 0) + 1

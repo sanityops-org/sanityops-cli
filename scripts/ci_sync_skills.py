@@ -148,6 +148,32 @@ def run_quality_gates() -> None:
     _log("Quality gates passed (ruff + pytest green).")
 
 
+def _find_open_pull_request(repo: str, token: str, head: str) -> str:
+    """Return the URL of an open pull request for ``head``, or an empty string."""
+    owner = repo.split("/", 1)[0]
+    query = quote(f"{owner}:{head}", safe=":")
+    request = urllib.request.Request(
+        f"https://api.github.com/repos/{repo}/pulls?state=open&head={query}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "sanityops-cli-skill-updater",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            data = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        _log(f"Could not list pull requests (GitHub API {exc.code}); continuing.")
+        return ""
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        _log(f"Could not list pull requests ({exc}); continuing.")
+        return ""
+    if isinstance(data, list) and data:
+        return str(data[0].get("html_url", ""))
+    return ""
+
+
 def _open_pull_request(repo: str, token: str, head: str, base: str, title: str, body: str) -> str:
     """Create a pull request through the GitHub REST API; return its URL."""
     payload = json.dumps({"title": title, "head": head, "base": base, "body": body}).encode()
@@ -202,15 +228,19 @@ def main() -> None:
         upstream_commit = _run(["git", "rev-parse", "HEAD"], cwd=temp_path).stdout.strip()
         _log(f"Upstream HEAD commit: {upstream_commit}")
 
-        if not args.force and VERSION_FILE.is_file():
-            try:
-                manifest = json.loads(VERSION_FILE.read_text(encoding="utf-8"))
-                current_commit = manifest.get("source", {}).get("commit", "")
-                if current_commit == upstream_commit:
-                    _log(f"Vendored skills are already at {upstream_commit[:8]}. Nothing to do.")
-                    sys.exit(0)
-            except Exception as exc:
-                _log(f"Could not read existing VERSION.json ({exc}); continuing.")
+        # Exit before touching the tree when the recorded commit and vendored
+        # hashes are already current; this avoids a no-op branch and empty PR.
+        check_cmd = [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "sync_skills.py"),
+            "--source",
+            str(temp_path),
+            "--check",
+        ]
+        check_res = subprocess.run(check_cmd, capture_output=True, text=True)
+        if not args.force and check_res.returncode == 0:
+            _log("Vendored skills are current; nothing to do.")
+            sys.exit(0)
 
         _log("Updating vendored skills...")
         sync_cmd = [
@@ -239,7 +269,7 @@ def main() -> None:
 
     manifest = json.loads(VERSION_FILE.read_text(encoding="utf-8"))
     skill_version = (
-        manifest.get("items", {}).get("sanityops-inspect-lite", {}).get("version", "unknown")
+        manifest.get("items", {}).get("sanityops-inspect-only", {}).get("version", "unknown")
     )
     short_sha = upstream_commit[:8]
     branch_name = f"bot/sync-inspect-skills-v{skill_version}-{short_sha}"
@@ -247,50 +277,83 @@ def main() -> None:
     _log(f"Skill version: {skill_version} (commit {short_sha})")
     _log(f"Target branch name: {branch_name}")
 
+    title = f"chore(skills): update vendored inspect skills to v{skill_version}"
     existing = _run(["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch_name}"], check=False)
-    if existing.stdout.strip():
-        _log(f"Remote branch '{branch_name}' already exists; skipping.")
-        sys.exit(0)
+    branch_exists = bool(existing.stdout.strip())
 
+    if branch_exists:
+        _log(
+            f"Remote branch '{branch_name}' already exists; reusing it and attempting "
+            "the pull request (a prior run may have pushed it before the PR call failed)."
+        )
+    else:
+        _git_config_if_missing()
+
+    # Run the gates on both paths: a reused branch may come from an older run,
+    # and the PR body must not claim tests passed when they were never re-run.
     if not args.skip_tests:
         run_quality_gates()
     else:
         _log("Skipping quality gates (--skip-tests).")
 
-    _git_config_if_missing()
-
     if args.dry_run:
         _log("DRY-RUN mode:")
-        _log(f"  Would create branch: {branch_name}")
-        _log("  Would commit changes under src/sanityops_cli/skills/")
+        if branch_exists:
+            existing_pr = (
+                _find_open_pull_request(args.repo, args.token, branch_name)
+                if args.repo and args.token
+                else ""
+            )
+            if existing_pr:
+                _log(f"  Pull request already open: {existing_pr}")
+            else:
+                _log(f"  Would open a pull request for existing branch: {branch_name}")
+        else:
+            _log(f"  Would create branch: {branch_name}")
+            _log("  Would commit changes under src/sanityops_cli/skills/")
         _log(f"  Would open a pull request targeting {args.target_branch}")
         sys.exit(0)
 
-    _log(f"Creating branch {branch_name}...")
-    _run(["git", "checkout", "-b", branch_name])
-    _run(["git", "add", "src/sanityops_cli/skills/"])
+    if not branch_exists:
+        _log(f"Creating branch {branch_name}...")
+        _run(["git", "checkout", "-b", branch_name])
+        _run(["git", "add", "src/sanityops_cli/skills/"])
+        gate_line = (
+            "- Quality gates: `ruff check` and `pytest` passed"
+            if not args.skip_tests
+            else "- Quality gates: skipped (`--skip-tests`)"
+        )
+        body_lines = [
+            f"Vendored inspect skill content updated to version {skill_version}.",
+            "",
+            f"- Content commit: `{upstream_commit}`",
+            gate_line,
+        ]
+        commit = _run(
+            ["git", "commit", "-m", title, "-m", "\n".join(body_lines)],
+            check=False,
+        )
+        if commit.returncode != 0:
+            _log(f"git commit failed:\n{commit.stdout}{commit.stderr}")
+            sys.exit(1)
 
-    title = f"chore(skills): update vendored inspect skills to v{skill_version}"
-    body_lines = [
-        f"Vendored inspect skill content updated to version {skill_version}.",
-        "",
-        f"- Content commit: `{upstream_commit}`",
-        "- Quality gates: `ruff check` and `pytest` passed",
-    ]
-    _run(["git", "commit", "-m", title, "-m", "\n".join(body_lines)])
-
-    _log(f"Pushing branch {branch_name}...")
-    push = _run(["git", "push", "origin", branch_name], check=False)
-    if push.returncode != 0:
-        _log(f"git push failed:\n{_redact_secrets(push.stderr, args.token)}")
-        sys.exit(1)
+        _log(f"Pushing branch {branch_name}...")
+        push = _run(["git", "push", "origin", branch_name], check=False)
+        if push.returncode != 0:
+            _log(f"git push failed:\n{_redact_secrets(push.stderr, args.token)}")
+            sys.exit(1)
 
     if not args.repo:
-        _log("GITHUB_REPOSITORY is not set; branch pushed without a pull request.")
+        _log("GITHUB_REPOSITORY is not set; branch exists but no pull request was opened.")
         sys.exit(0)
 
     if not args.token:
-        _log("GITHUB_TOKEN is not set; branch pushed without a pull request.")
+        _log("GITHUB_TOKEN is not set; branch exists but no pull request was opened.")
+        sys.exit(0)
+
+    existing_pr = _find_open_pull_request(args.repo, args.token, branch_name)
+    if existing_pr:
+        _log(f"A pull request is already open for branch '{branch_name}': {existing_pr}")
         sys.exit(0)
 
     pr_body = "\n".join(
@@ -298,7 +361,11 @@ def main() -> None:
             f"Updates the vendored inspect skills to version **{skill_version}**.",
             "",
             f"- Content commit: `{upstream_commit}`",
-            "- `ruff check` and `pytest` passed before the branch was created.",
+            *(
+                ["- `ruff check` and `pytest` passed before the branch was created."]
+                if not args.skip_tests
+                else ["- Quality gates were skipped (`--skip-tests`)."]
+            ),
             "",
             "Review the skill diff and merge when ready.",
         ]
