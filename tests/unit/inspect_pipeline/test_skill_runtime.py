@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -105,6 +106,21 @@ class TestPackagedDir:
         assert (target / "sanityops-inspect-only" / "SKILL.md").is_file()
         assert (target / "sanityops-extract-only" / "SKILL.md").is_file()
         assert (target / "code-contract-checklist.v2.md").is_file()
+
+    def test_packaged_skills_context_falls_back_when_directory_extraction_is_unsupported(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        @contextmanager
+        def unsupported(traversable):
+            raise IsADirectoryError(traversable)
+            yield  # pragma: no cover
+
+        monkeypatch.setattr(skill_runtime.resources, "as_file", unsupported)
+        monkeypatch.setattr(skill_runtime.resources, "files", lambda _pkg: SRC.parent)
+
+        with skill_runtime._packaged_skills_context() as path:
+            assert path.is_dir()
+            assert (path / "VERSION.json").is_file()
 
     def test_packaged_skills_context_falls_back_to_source_tree(
         self, monkeypatch: pytest.MonkeyPatch

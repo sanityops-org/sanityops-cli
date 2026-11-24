@@ -69,7 +69,14 @@ def _packaged_skills_context() -> Iterator[Path]:
             candidate = stack.enter_context(resources.as_file(traversable))
             if candidate.is_dir():
                 path = candidate
-        except (ModuleNotFoundError, FileNotFoundError, NotADirectoryError):
+        except (
+            ModuleNotFoundError,
+            FileNotFoundError,
+            NotADirectoryError,
+            IsADirectoryError,
+        ):
+            # IsADirectoryError: Python < 3.12 cannot extract a directory
+            # traversable; fall back to the source tree when it exists.
             path = None
 
         if path is None:
