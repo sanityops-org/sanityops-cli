@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from sanityops_agent.tools.registry import ToolRegistry
 from sanityops_cli.inspect_pipeline import skill_runtime
 
 SRC = Path(__file__).resolve().parents[3] / "src" / "sanityops_cli" / "skills"
+LOGGER = "sanityops_cli.inspect_pipeline.skill_runtime"
 
 
 class TestMaterialize:
@@ -212,6 +214,32 @@ class TestReferenceRewrite:
         path = SRC / "sanityops-inspect-only" / "references" / "_meta.md"
         text = path.read_text(encoding="utf-8")
         assert skill_runtime.rewrite_reference_for_cli(path, text) == text
+
+
+class TestRewriteDriftDetection:
+    def test_missing_pattern_logs_warning(self, caplog) -> None:
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            result = skill_runtime._rewrite_inspect_skill_for_cli("standalone text")
+        assert result == "standalone text"
+        assert "Skill rewrite pattern not found" in caplog.text
+
+    def test_current_skill_matches_every_rewrite_pattern(self, tmp_path, caplog) -> None:
+        import asyncio
+
+        target = skill_runtime.materialize_skills(source=SRC, cache_root=tmp_path)
+        registry = ToolRegistry()
+        skill_runtime.attach_skill_tools(registry, target)
+        tool = registry.get("skill")
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            result = asyncio.run(tool.run(operation="load", name="sanityops-inspect-only"))
+        assert result.success
+        assert "Skill rewrite pattern not found" not in caplog.text
+
+    def test_reference_rewrite_warns_on_missing_pattern(self, tmp_path, caplog) -> None:
+        path = tmp_path / "relevance-map.v2.md"
+        with caplog.at_level(logging.WARNING, logger=LOGGER):
+            assert skill_runtime.rewrite_reference_for_cli(path, "changed text") == "changed text"
+        assert "relevance-map validation label" in caplog.text
 
 
 def _QC_IDS(text: str) -> list[str]:

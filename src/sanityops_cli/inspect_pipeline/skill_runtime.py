@@ -202,6 +202,28 @@ def _rewrite_skill_for_cli(name: str, text: str) -> str:
     return rewritten
 
 
+def _replace_expected(text: str, old: str, new: str, label: str) -> str:
+    """Replace an expected standalone phrase, warning when it is not found."""
+    if old not in text:
+        logger.warning(
+            "Skill rewrite pattern not found (%s); the vendored skill may have changed",
+            label,
+        )
+        return text
+    return text.replace(old, new)
+
+
+def _sub_expected(text: str, pattern: str, repl: str, label: str) -> str:
+    """Regex variant of ``_replace_expected``."""
+    rewritten, count = re.subn(pattern, repl, text)
+    if count == 0:
+        logger.warning(
+            "Skill rewrite pattern not found (%s); the vendored skill may have changed",
+            label,
+        )
+    return rewritten
+
+
 def _rewrite_inspect_skill_for_cli(text: str) -> str:
     """Adapt the standalone inspect-only skill to the CLI inspection pipeline.
 
@@ -210,69 +232,90 @@ def _rewrite_inspect_skill_for_cli(text: str) -> str:
     disclaimers, the host-model report header, and the upgrade pointers are
     replaced with the CLI contract.
     """
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "— executed by you, the host model, applying the condensed checklists in "
         "`references/`. Zero dependencies: no CLI, no scripts, no network calls.",
         "— executed by the CLI's inspection agent, applying the condensed "
         "checklists in `references/`. The CLI provides the execution "
         "environment; the skill itself remains prompt-only.",
+        "standalone introduction",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "- The official `sanityops-cli` or any SaaS — condensed minimal rule sets, "
         "with the Permission stage as the exception (it runs the full 43-item set); "
         "still not the full specification.\n",
         "",
+        "official-cli bullet",
     )
-    text = re.sub(
+    text = _sub_expected(
+        text,
         r", and an upgrade pointer \(full inspection via `sanityops-cli`[^)]*\)",
         "",
-        text,
+        "executive-summary upgrade pointer",
     )
-    text = re.sub(
+    text = _sub_expected(
+        text,
         r"7\. \*\*Report header \(mandatory on every report and every stage-only report\)\*\*"
         r"[\s\S]*?must not imply the result is an official engine/SaaS conclusion\.",
         _CLI_HEADER_SECTION,
-        text,
+        "report header",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "the report header carries all six provenance facts (§6.7)",
         "the report header carries the CLI provenance facts (§6.7)",
+        "Stage G header count",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "the per-rule verdicts and Impact Cards are the detail behind it.",
         "the per-rule verdicts and impact-outlook mappings are the detail behind it.",
+        "Impact Cards wording",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "for raw or mixed documents run sanityops-inspector (extract + inspect) instead.",
         "for raw or mixed documents run the CLI extraction stage first.",
+        "wrapper reference",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "the report ends with a verdict-tally appendix",
         "the verdict-tally appendix is delivered in the CLI's `self_verification` section",
+        "verdict-tally appendix",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "that PASS and N/A lines are folded and the ledger is available on request, "
         "and that the result is a single-model self-audit rather than an official engine conclusion.",
         "that PASS and N/A lines are folded and the ledger is available on request. "
         "Do not add an unofficial-result disclaimer or a host-model label: this is the "
         "CLI's own inspection run.",
+        "reader lead-in disclaimer",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "scoring is out of scope for this inspector (full scoring lives in "
         "`sanityops-cli` / platform, which read the checklist's `score_weight`)",
         "scoring is out of scope for this inspector (the SanityOps Platform "
         "computes scores from the checklist's `score_weight`)",
+        "scoring note",
     )
-    text = text.replace(
+    text = _replace_expected(
+        text,
         "Specification source: `sanityops-org/sanityops-framework` — the implementing "
         "CLI (`sanityops-org/sanityops-cli`, Apache 2.0) is NOT required by this skill.",
         "Specification source: `sanityops-org/sanityops-framework` — this skill is "
         "executed by the implementing CLI (`sanityops-org/sanityops-cli`, Apache 2.0).",
+        "implementing-CLI note",
     )
-    text = re.sub(
+    text = _sub_expected(
+        text,
         r"\n## 10\. Further reading & upgrade\n[\s\S]*?(?=\n## Appendix A)",
         "",
-        text,
+        "further reading section",
     )
     return text
 
@@ -281,9 +324,11 @@ def rewrite_reference_for_cli(path: Path, text: str) -> str:
     """Adapt vendored reference checklists for the CLI static inspection."""
     if path.name != "relevance-map.v2.md":
         return text
-    return text.replace(
+    return _replace_expected(
+        text,
         "**Recommended Validation — NOT run by this inspector**",
         "**Recommended Validation — not run in this CLI static inspection**",
+        "relevance-map validation label",
     )
 
 
