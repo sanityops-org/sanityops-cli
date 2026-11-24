@@ -120,7 +120,7 @@ def test_sync_skills_with_extract_skill(tmp_path: Path) -> None:
     )
     ref_dir = skill_dir / "references"
     ref_dir.mkdir(parents=True)
-    (skill_dir / "SKILL.md").write_text("---\nversion: 1.3.1\n---\n")
+    (skill_dir / "SKILL.md").write_text("---\nversion: 2.0.2\n---\n")
     (ref_dir / "code-contract-checklist.v2.md").write_text("# Checklist")
 
     extract_dir = (
@@ -131,7 +131,7 @@ def test_sync_skills_with_extract_skill(tmp_path: Path) -> None:
         / "sanityops-extract-only"
     )
     extract_dir.mkdir(parents=True)
-    (extract_dir / "SKILL.md").write_text("---\nversion: 1.3.1\n---\n# Extract")
+    (extract_dir / "SKILL.md").write_text("---\nversion: 2.0.0\n---\n# Extract")
 
     dummy_dest = tmp_path / "dest_skills"
     dummy_dest.mkdir()
@@ -147,9 +147,10 @@ def test_sync_skills_with_extract_skill(tmp_path: Path) -> None:
         ):
             assert sync(dummy_source, force=True) is True
             manifest = json.loads(version_file.read_text(encoding="utf-8"))
+            assert manifest["items"]["sanityops-inspect-only"]["version"] == "2.0.2"
             extract_item = manifest["items"]["sanityops-extract-only"]
             assert extract_item["type"] == "synced"
-            assert extract_item["version"] == "1.3.1"
+            assert extract_item["version"] == "2.0.0"
             assert (dummy_dest / "sanityops-extract-only" / "SKILL.md").is_file()
 
 

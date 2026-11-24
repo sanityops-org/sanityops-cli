@@ -39,6 +39,13 @@ CHECKLIST_NAME = "code-contract-checklist.v2.md"
 
 
 def default_cache_root() -> Path:
+    """Root of the content-keyed skill cache.
+
+    Entries are keyed by content hash, so a skill update writes a new
+    directory and the old one is never reused. Old entries are harmless and
+    can be deleted at any time (``rm -rf ~/.cache/sanityops-cli/skills``);
+    materialization recreates the current entry on the next run.
+    """
     override = os.environ.get("SANITYOPS_SKILL_CACHE")
     if override:
         return Path(override)

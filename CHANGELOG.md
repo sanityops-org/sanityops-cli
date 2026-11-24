@@ -71,8 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boundaries
 - Whole-file `content_from_source` records bypass the model chunk-size cap, so
   large prompts and skills are extracted verbatim instead of being rejected
-- Stage F impact mappings (`AS-FM`) no longer increment the Inspect defect
-  counts or trip the `--strict` P0 gate
+- **Note**: Stage F impact mappings (`AS-FM`) are advisory references now:
+  they no longer increment the Inspect defect counts or trip the `--strict`
+  P0 gate
 - `scripts/sync_skills.py --check` now fails on an invalid `--source` and runs
   hash-only without one; CI runs the drift check on every push and pull request
 - The skill-update workflow retries the pull request when its bot branch

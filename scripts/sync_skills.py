@@ -90,21 +90,28 @@ def _recorded_hashes_match(manifest: dict) -> bool:
     skill_dir = DEST_DIR / VENDORED_SKILL_DIR
     if not skill_dir.is_dir():
         return False
-    if items.get(VENDORED_SKILL_DIR, {}).get("sha256") != _dir_hash(skill_dir):
+    recorded_skill_sha = items.get(VENDORED_SKILL_DIR, {}).get("sha256")
+    if not recorded_skill_sha or recorded_skill_sha != _dir_hash(skill_dir):
         return False
 
     checklist = DEST_DIR / VENDORED_CHECKLIST_NAME
     if not checklist.is_file():
         return False
-    if items.get("code-contract-checklist.v2", {}).get("sha256") != _sha256_of(
+    recorded_checklist_sha = items.get("code-contract-checklist.v2", {}).get("sha256")
+    if not recorded_checklist_sha or recorded_checklist_sha != _sha256_of(
         checklist.read_bytes()
     ):
         return False
 
     extract_item = items.get(VENDORED_EXTRACT_DIR, {})
     if extract_item.get("type") == "synced":
+        recorded_extract_sha = extract_item.get("sha256")
         extract_dir = DEST_DIR / VENDORED_EXTRACT_DIR
-        if not extract_dir.is_dir() or extract_item.get("sha256") != _dir_hash(extract_dir):
+        if (
+            not recorded_extract_sha
+            or not extract_dir.is_dir()
+            or recorded_extract_sha != _dir_hash(extract_dir)
+        ):
             return False
     return True
 
@@ -339,8 +346,10 @@ def main() -> None:
         if args.source is not None and not source.is_dir():
             sys.exit(f"error: source path is not a valid directory: {source}")
         sys.exit(check(source))
-    if source is None or not source.is_dir():
-        sys.exit(f"error: --source is required for a sync run (got {source})")
+    if source is None:
+        sys.exit("error: --source is required for a sync run")
+    if not source.is_dir():
+        sys.exit(f"error: source path is not a valid directory: {source}")
     # The return value is informational: an up-to-date no-op is still success.
     sync(source, force=args.force)
     sys.exit(0)
