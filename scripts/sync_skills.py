@@ -143,10 +143,15 @@ def _git(args: list[str], cwd: Path) -> str:
 
 
 def _is_git_checkout(path: Path) -> bool:
-    """True when ``path`` is a git working tree (``.git`` may be a file)."""
+    """True when ``path`` is a git working tree (``.git`` may be a file).
+
+    ``_git`` uses ``check=True``, so a failed probe raises
+    ``CalledProcessError``. ``SystemExit`` is caught defensively in case the
+    probe is ever changed to exit instead of raising.
+    """
     try:
         _git(["rev-parse", "--git-dir"], path)
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (subprocess.CalledProcessError, FileNotFoundError, SystemExit):
         return False
     return True
 

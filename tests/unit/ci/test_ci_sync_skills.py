@@ -18,6 +18,7 @@ from scripts.sync_skills import (
     CANONICAL_UPSTREAM_URL,
     _canonical_source_url,
     _clean_url,
+    _is_git_checkout,
     check,
     sync,
 )
@@ -171,6 +172,14 @@ def test_check_reports_non_git_source(tmp_path: Path, capsys) -> None:
     source.mkdir()
     assert check(source) == 1
     assert "source path is not a git checkout" in capsys.readouterr().out
+
+
+def test_is_git_checkout_true_for_repo_root() -> None:
+    assert _is_git_checkout(Path.cwd()) is True
+
+
+def test_is_git_checkout_false_for_plain_directory(tmp_path: Path) -> None:
+    assert _is_git_checkout(tmp_path) is False
 
 
 def test_check_reports_missing_version_json(tmp_path: Path) -> None:

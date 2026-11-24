@@ -299,7 +299,15 @@ def main() -> None:
     if args.dry_run:
         _log("DRY-RUN mode:")
         if branch_exists:
-            _log(f"  Would open a pull request for existing branch: {branch_name}")
+            existing_pr = (
+                _find_open_pull_request(args.repo, args.token, branch_name)
+                if args.repo and args.token
+                else ""
+            )
+            if existing_pr:
+                _log(f"  Pull request already open: {existing_pr}")
+            else:
+                _log(f"  Would open a pull request for existing branch: {branch_name}")
         else:
             _log(f"  Would create branch: {branch_name}")
             _log("  Would commit changes under src/sanityops_cli/skills/")
