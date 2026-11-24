@@ -31,7 +31,7 @@ SanityOps Framework checks and emit the seven-stage report.
      - Tool Schemas → load `tool-checklist.v2.md` → check & `write_report`
      - Embedded code (QC) → load `code-contract-checklist.v2.md` → check & `write_report`
    - Stage B → load `cross-checklist.v2.md` → check & `write_report`
-   - Stage C–D → load `permission-checklist.v2.md` → check & `write_report`
+   - Stage C–D (Gate-0 and permission proportionality) → load `permission-checklist.v2.md` → check & `write_report`
    - Stage E → load `explicit-checklist.v2.md` → check & `write_report`
    - Stage F → load `relevance-map.v2.md` → check & `write_report`
    - Stage G → no new checklist needed.

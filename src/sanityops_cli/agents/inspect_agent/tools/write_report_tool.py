@@ -37,7 +37,9 @@ SECTION_ORDER = (
 #: scaffolding do not require a ``findings`` array.
 _FINDING_SECTIONS = frozenset(MODULE_STAGE.values())
 
-#: Hard per-part ceiling (8000 chars) while prompting for ~6000 chars as a soft target.
+#: Hard per-part ceiling while the prompt asks for ~6000 chars as a soft
+#: target. The headroom accepts a slightly oversized part instead of spending a
+#: rejection round-trip on it, and stays well under the provider output limit.
 MAX_SECTION_CHARS = 8000
 
 
