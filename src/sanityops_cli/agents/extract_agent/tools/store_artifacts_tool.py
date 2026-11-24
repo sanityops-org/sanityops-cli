@@ -366,7 +366,7 @@ class StoreArtifactsTool(Tool):
                 record = ExtractedArtifact(
                     type=a_type,
                     name=name,
-                    content="".join(chunks) if any(chunks) else "",
+                    content="".join(chunks),
                     schema=artifact.get("schema") or {},
                     completeness=artifact["completeness"],
                     L=artifact["L"],

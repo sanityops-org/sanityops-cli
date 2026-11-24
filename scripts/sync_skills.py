@@ -258,6 +258,11 @@ def sync(source: Path, force: bool = False) -> bool:
 
 
 def check(source: Path | None = None) -> int:
+    """Verify the vendored tree against VERSION.json.
+
+    ``source`` adds the recorded-commit comparison; ``None`` runs the hash-only
+    check used by CI.
+    """
     if not VERSION_FILE.is_file():
         print(f"drift: {VERSION_FILE} missing — run sync_skills.py")
         return 1

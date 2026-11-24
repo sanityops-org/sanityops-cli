@@ -68,6 +68,9 @@ class TestValidation:
 
 
 class TestFindingsSchema:
+    def test_finding_sections_are_a_b_d_e_f(self):
+        assert _FINDING_SECTIONS == frozenset({"A", "B", "D", "E", "F"})
+
     def test_schema_requires_findings_only_for_finding_sections(self):
         tool = WriteReportTool(require_findings=True)
         schema = tool.parameters
@@ -77,6 +80,9 @@ class TestFindingsSchema:
         assert conditional["then"] == {"required": ["findings"]}
 
     def test_schema_accepts_non_finding_sections_without_findings(self):
+        # jsonschema ships with sanityops-agent 0.1.3, which CI resolves. On a
+        # 0.1.2 environment the schema-level test skips while the structural
+        # test above still runs.
         jsonschema = pytest.importorskip("jsonschema")
         schema = WriteReportTool(require_findings=True).parameters
         validator = jsonschema.Draft202012Validator(schema)

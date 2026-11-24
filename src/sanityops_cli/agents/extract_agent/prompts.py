@@ -30,7 +30,8 @@ cannot be audited and will be discarded.
 - One record may span several chunks: declare `total_chunks` on chunk 0,
   deliver `seq` in order, set `final=true` only on the last chunk. Chunks are
   concatenated exactly as sent — include every character, including a newline
-  at a split point, in the chunk that owns it.
+  at a split point, in the chunk that owns it; do not add or remove characters
+  at chunk boundaries.
 - The **final chunk must carry the record metadata**: `completeness`, `L`,
   and the absolute `source` path (plus `evidence`/`field_evidence`/`reason`
   as the completeness label requires). Keep each chunk's content under
