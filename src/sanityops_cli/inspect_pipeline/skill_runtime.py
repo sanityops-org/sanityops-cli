@@ -75,8 +75,9 @@ def _packaged_skills_context() -> Iterator[Path]:
             NotADirectoryError,
             IsADirectoryError,
         ):
-            # IsADirectoryError: Python < 3.12 cannot extract a directory
-            # traversable; fall back to the source tree when it exists.
+            # IsADirectoryError is raised by resources.as_file(): Python < 3.12
+            # cannot extract a directory traversable. Fall back to the source
+            # tree when it exists.
             path = None
 
         if path is None:
@@ -99,7 +100,7 @@ def packaged_skills_dir() -> Path:
         ref = resources.files("sanityops_cli").joinpath("skills")
         if isinstance(ref, Path) and ref.is_dir():
             return ref
-    except (ModuleNotFoundError, FileNotFoundError, NotADirectoryError):
+    except (ModuleNotFoundError, FileNotFoundError):
         pass
     fallback = Path(__file__).resolve().parent.parent / "skills"
     if fallback.is_dir():

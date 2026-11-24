@@ -61,7 +61,10 @@ class TestPackagedDir:
 
     @pytest.mark.skipif(
         sys.version_info < (3, 12),
-        reason="resources.as_file() extracts directories only from Python 3.12",
+        reason=(
+            "the test exercises directory extraction by resources.as_file(), "
+            "supported from Python 3.12"
+        ),
     )
     def test_materialize_from_zip_keeps_as_file_temp_dir_until_copied(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
