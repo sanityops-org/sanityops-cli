@@ -143,7 +143,7 @@ class TestPackagedDir:
             assert (path / "VERSION.json").is_file()
 
     def test_packaged_skills_context_does_not_swallow_caller_file_not_found(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
             skill_runtime.resources,

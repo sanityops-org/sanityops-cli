@@ -58,9 +58,11 @@ def default_cache_root() -> Path:
 def _packaged_skills_context() -> Iterator[Path]:
     """Yield the packaged ``skills/`` directory, keeping temp extraction alive.
 
-    The yielded path is valid only inside the ``with`` block: for zipped or
-    PyInstaller installs it points into a temporary extraction that is removed
-    when the context exits, so copy whatever you need before leaving it.
+    The yielded path is guaranteed to exist only inside the ``with`` block: for
+    zipped or PyInstaller installs it points into a temporary extraction that
+    is removed when the context exits, while the source-tree fallback is
+    stable. If a caller needs the path afterwards, copy it before leaving the
+    block.
     """
     with ExitStack() as stack:
         path: Path | None = None
