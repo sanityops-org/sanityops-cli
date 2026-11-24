@@ -12,6 +12,10 @@ the names the CLI agents, the prompt contracts, and the skill runtime use.
 Both skill directories are vendored from upstream; ``--check`` verifies that
 the vendored content has not drifted from the recorded state.
 
+After changing the vendored content, run the tests: the CLI runtime rewrites in
+``src/sanityops_cli/inspect_pipeline/skill_runtime.py`` are coupled to the
+vendored skill's wording, and the drift test fails when a guarded pattern moves.
+
 Usage:
     python scripts/sync_skills.py --source /path/to/sanityops-inspector
     python scripts/sync_skills.py --check                    # hash-only drift check

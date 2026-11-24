@@ -4,6 +4,15 @@ Vendored skills live inside the wheel (``src/sanityops_cli/skills/``). They must
 be materialized to a real filesystem directory before ``SkillManager`` can scan
 them (PyInstaller/zipimport have no scannable paths), then wired into a
 ``ToolRegistry`` via ``SkillTool`` for on-demand lazy loading by the agents.
+
+**Coupling warning.** ``_rewrite_inspect_skill_for_cli`` adapts the standalone
+``sanityops-inspect-only`` skill to the CLI pipeline with exact-string and
+regex replacements, so it is coupled to the vendored skill's wording. When
+``scripts/sync_skills.py`` refreshes the vendored content, run the tests:
+``_replace_expected`` / ``_sub_expected`` log a warning for any pattern that
+no longer matches, and
+``tests/unit/inspect_pipeline/test_skill_runtime.py::TestRewriteDriftDetection``
+fails when the current skill stops matching every guarded pattern.
 """
 
 from __future__ import annotations

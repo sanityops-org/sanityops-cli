@@ -119,7 +119,9 @@ class WriteReportTool(Tool):
             # `findings` is required only for the stages that emit defects.
             # A global "required" entry would also reject the non-finding
             # sections (C, G, and the scaffolding) at the framework's schema
-            # validation layer.
+            # validation layer. The conditional is the schema-level guard;
+            # execute() enforces the same rule for providers or validators
+            # that ignore if/then.
             self.parameters = {
                 **self.parameters,
                 "allOf": [
