@@ -202,6 +202,20 @@ def main() -> None:
         upstream_commit = _run(["git", "rev-parse", "HEAD"], cwd=temp_path).stdout.strip()
         _log(f"Upstream HEAD commit: {upstream_commit}")
 
+        # Exit before touching the tree when the recorded commit and vendored
+        # hashes are already current; this avoids a no-op branch and empty PR.
+        check_cmd = [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "sync_skills.py"),
+            "--source",
+            str(temp_path),
+            "--check",
+        ]
+        check_res = subprocess.run(check_cmd, capture_output=True, text=True)
+        if not args.force and check_res.returncode == 0:
+            _log("Vendored skills are current; nothing to do.")
+            sys.exit(0)
+
         _log("Updating vendored skills...")
         sync_cmd = [
             sys.executable,
@@ -281,7 +295,13 @@ def main() -> None:
             f"- Content commit: `{upstream_commit}`",
             gate_line,
         ]
-        _run(["git", "commit", "-m", title, "-m", "\n".join(body_lines)])
+        commit = _run(
+            ["git", "commit", "-m", title, "-m", "\n".join(body_lines)],
+            check=False,
+        )
+        if commit.returncode != 0:
+            _log(f"git commit failed:\n{commit.stdout}{commit.stderr}")
+            sys.exit(1)
 
         _log(f"Pushing branch {branch_name}...")
         push = _run(["git", "push", "origin", branch_name], check=False)
