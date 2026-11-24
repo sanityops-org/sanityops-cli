@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,10 @@ class TestPackagedDir:
         assert path.is_dir()
         assert (path / "VERSION.json").is_file()
 
+    @pytest.mark.skipif(
+        sys.version_info < (3, 12),
+        reason="resources.as_file() extracts directories only from Python 3.12",
+    )
     def test_materialize_from_zip_keeps_as_file_temp_dir_until_copied(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
