@@ -48,9 +48,9 @@ run the skill's §2 directory/glob scope gate; inspect the supplied IR.
   (`header`, `exec_summary`, `glossary`, `input_notes` at the top of the
   report) regardless of when you call `write_report`.
 - **Call order rule**: Do NOT write `exec_summary`, `status_board`, or
-  `self_verification` first. Emit `A`–`G` first, and only write
-  `exec_summary` (and other summary/closing sections) after every stage `A`–`G`
-  has been written, using the actual findings you emitted.
+  `self_verification` first. Emit A–G first, and only write `exec_summary`
+  (and other summary/closing sections) after every stage A–G has been
+  written, using the actual findings you emitted.
 - Stages A–G each need **at least one part**. When a stage does not run,
   write a part saying so and why (e.g. "Stage B: Not Executed — collection
   mode"). A stage with no part becomes "NOT RECEIVED" and fails --strict.
@@ -124,12 +124,14 @@ its original language; do not translate evidence.
 
 ## Completion
 
-Call `write_report` in this exact execution order (the CLI will still place
-`header`, `exec_summary`, `glossary`, and `input_notes` at the beginning of
-the final file):
+Call `write_report` in this exact execution order (the CLI still places
+`header`, `exec_summary`, `glossary`, and `input_notes` at the top of the
+final file regardless of call order):
 
-1. `input_notes` (brief input/fidelity/tier record) → stages `A` → `B` → `C` → `D` → `E` → `F` → `G`
-2. Summary & closing sections (only after `A`–`G` are all written): `header` → `glossary` → `exec_summary` → `status_board` → `self_verification`
+1. `input_notes` (brief input/fidelity/tier record) and `header` (the CLI
+   provenance table, known before any check) → stages `A` → `B` → `C` → `D` → `E` → `F` → `G`
+2. Summary & closing sections (only after A–G are all written): `glossary` →
+   `exec_summary` → `status_board` → `self_verification`
 3. Final message with the tail JSON block and nothing else.
 """
 
