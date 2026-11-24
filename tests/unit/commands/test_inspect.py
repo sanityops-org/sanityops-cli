@@ -1,6 +1,7 @@
 """Unit tests for the skill-based inspect command orchestration (design §3/§9)."""
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -650,8 +651,6 @@ def test_inspect_prints_banner_and_log_path(monkeypatch, tmp_path):
 
 
 def test_inspect_non_verbose_shows_stage_status_for_both_agents(monkeypatch, tmp_path):
-    from contextlib import contextmanager
-
     import sanityops_cli.commands.inspect as inspect_module
 
     harness = Harness(monkeypatch, tmp_path)
