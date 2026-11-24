@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 import sys
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
 from scripts.ci_sync_skills import (
     DEFAULT_UPSTREAM_URL,
+    _find_open_pull_request,
     _redact_secrets,
     parse_args,
 )
@@ -174,6 +176,40 @@ def test_check_reports_non_git_source(tmp_path: Path, capsys) -> None:
 def test_check_reports_missing_version_json(tmp_path: Path) -> None:
     with patch("scripts.sync_skills.VERSION_FILE", tmp_path / "missing.json"):
         assert check(None) == 1
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes) -> None:
+        self._payload = payload
+
+    def __enter__(self) -> _FakeResponse:
+        return self
+
+    def __exit__(self, *exc) -> bool:  # noqa: ANN002
+        return False
+
+    def read(self) -> bytes:
+        return self._payload
+
+
+def test_find_open_pull_request_returns_url() -> None:
+    payload = json.dumps([{"html_url": "https://example.test/pull/1"}]).encode()
+    with patch("urllib.request.urlopen", return_value=_FakeResponse(payload)):
+        assert (
+            _find_open_pull_request("owner/repo", "token", "bot/x")
+            == "https://example.test/pull/1"
+        )
+
+
+def test_find_open_pull_request_returns_empty_when_none() -> None:
+    with patch("urllib.request.urlopen", return_value=_FakeResponse(b"[]")):
+        assert _find_open_pull_request("owner/repo", "token", "bot/x") == ""
+
+
+def test_find_open_pull_request_swallows_api_error() -> None:
+    error = urllib.error.HTTPError("https://api.test", 500, "server error", {}, None)
+    with patch("urllib.request.urlopen", side_effect=error):
+        assert _find_open_pull_request("owner/repo", "token", "bot/x") == ""
 
 
 def test_sync_revendors_when_vendored_content_drifted(tmp_path: Path) -> None:

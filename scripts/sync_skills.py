@@ -63,6 +63,12 @@ def _sha256_of(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _fail(message: str) -> None:
+    """Print an error to stderr and exit 1."""
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
 def _clean_url(url: str) -> str:
     """Strip authentication credentials (e.g. tokens/passwords) from URL."""
     parsed = urlsplit(url)
@@ -163,7 +169,7 @@ def sync(source: Path, force: bool = False) -> bool:
     successful run; the return value is informational.
     """
     if not _is_git_checkout(source):
-        sys.exit(f"error: source path is not a git checkout: {source}")
+        _fail(f"source path is not a git checkout: {source}")
     skill_src = source / SOURCE_SKILL_REL
     checklist_src = None
     for cand in SOURCE_CHECKLIST_CANDIDATES:
@@ -172,13 +178,13 @@ def sync(source: Path, force: bool = False) -> bool:
             checklist_src = p
             break
     if not (skill_src / "SKILL.md").is_file():
-        sys.exit(
-            f"error: skill not found at {skill_src}\n"
+        _fail(
+            f"skill not found at {skill_src}\n"
             f"       expected {SOURCE_SKILL_REL}/SKILL.md in the upstream checkout"
         )
     if checklist_src is None:
-        sys.exit(
-            f"error: checklist not found under {source}; looked for: "
+        _fail(
+            f"checklist not found under {source}; looked for: "
             + ", ".join(SOURCE_CHECKLIST_CANDIDATES)
         )
 
@@ -357,13 +363,13 @@ def main() -> None:
     source = args.source.resolve() if args.source else None
     if args.check:
         if args.source is not None and not source.is_dir():
-            sys.exit(f"error: source path is not a valid directory: {source}")
+            _fail(f"source path is not a valid directory: {source}")
         # check() returns the process exit code (0 clean, 1 drift).
         sys.exit(check(source))
     if source is None:
-        sys.exit("error: --source is required for a sync run")
+        _fail("--source is required for a sync run")
     if not source.is_dir():
-        sys.exit(f"error: source path is not a valid directory: {source}")
+        _fail(f"source path is not a valid directory: {source}")
     # The bool return is informational: a no-op sync (False) is still success.
     sync(source, force=args.force)
     sys.exit(0)

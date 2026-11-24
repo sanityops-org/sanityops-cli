@@ -148,6 +148,32 @@ def run_quality_gates() -> None:
     _log("Quality gates passed (ruff + pytest green).")
 
 
+def _find_open_pull_request(repo: str, token: str, head: str) -> str:
+    """Return the URL of an open pull request for ``head``, or an empty string."""
+    owner = repo.split("/", 1)[0]
+    query = quote(f"{owner}:{head}", safe=":")
+    request = urllib.request.Request(
+        f"https://api.github.com/repos/{repo}/pulls?state=open&head={query}",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "sanityops-cli-skill-updater",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            data = json.loads(response.read().decode())
+    except urllib.error.HTTPError as exc:
+        _log(f"Could not list pull requests (GitHub API {exc.code}); continuing.")
+        return ""
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        _log(f"Could not list pull requests ({exc}); continuing.")
+        return ""
+    if isinstance(data, list) and data:
+        return str(data[0].get("html_url", ""))
+    return ""
+
+
 def _open_pull_request(repo: str, token: str, head: str, base: str, title: str, body: str) -> str:
     """Create a pull request through the GitHub REST API; return its URL."""
     payload = json.dumps({"title": title, "head": head, "base": base, "body": body}).encode()
@@ -315,6 +341,11 @@ def main() -> None:
 
     if not args.token:
         _log("GITHUB_TOKEN is not set; branch exists but no pull request was opened.")
+        sys.exit(0)
+
+    existing_pr = _find_open_pull_request(args.repo, args.token, branch_name)
+    if existing_pr:
+        _log(f"A pull request is already open for branch '{branch_name}': {existing_pr}")
         sys.exit(0)
 
     pr_body = "\n".join(

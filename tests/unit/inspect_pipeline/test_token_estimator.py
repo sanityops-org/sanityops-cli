@@ -60,4 +60,5 @@ def _measured_load(types: set[str]) -> int:
     [set(), {"prompt"}, {"tool"}, {"skill"}, {"prompt", "tool"}, {"prompt", "skill", "tool"}],
 )
 def test_reserve_covers_measured_reference_loads(types):
+    """When the vendored files change, update ``estimate_skill_reserve`` too."""
     assert estimate_skill_reserve(types) >= _measured_load(types)

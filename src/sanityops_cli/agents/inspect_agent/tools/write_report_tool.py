@@ -154,8 +154,9 @@ class WriteReportTool(Tool):
 
         findings = kwargs.get("findings")
         if findings is None:
-            # Runtime fallback for provider adapters and validators that do
-            # not apply JSON Schema conditionals.
+            # Runtime fallback: provider adapters and validators may not apply
+            # JSON Schema conditionals, so this check is essential, not merely
+            # defensive.
             error = (
                 "findings is required (use [] when there are no findings)"
                 if self._require_findings and section in _FINDING_SECTIONS
