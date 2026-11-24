@@ -48,7 +48,9 @@ def estimate_skill_reserve(artifact_types: set[str]) -> int:
     Always loaded for any artifact set: the inspect SKILL.md, ``_meta``, and
     the permission / explicit / relevance-map / code-contract checklists. The
     per-type checklists and the cross checklist follow the set composition.
-    Values are measured on the vendored v2 skill plus a safety margin.
+    Values are measured on the vendored v2 skill plus a safety margin;
+    ``test_reserve_covers_measured_reference_loads`` keeps them above the
+    measured file sizes.
     """
     reserve = 18_000  # inspect SKILL.md
     reserve += 3_000  # _meta (shared definitions)

@@ -162,6 +162,11 @@ def test_check_reports_invalid_source(tmp_path: Path) -> None:
     assert check(tmp_path / "missing") == 1
 
 
+def test_check_reports_missing_version_json(tmp_path: Path) -> None:
+    with patch("scripts.sync_skills.VERSION_FILE", tmp_path / "missing.json"):
+        assert check(None) == 1
+
+
 def test_sync_revendors_when_vendored_content_drifted(tmp_path: Path) -> None:
     dummy_source = tmp_path / "upstream"
     skill_dir = (

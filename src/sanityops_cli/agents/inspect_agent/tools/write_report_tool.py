@@ -33,6 +33,8 @@ SECTION_ORDER = (
     "self_verification",
 )
 
+#: Stages that emit structured findings (A/B/D/E/F). C, G, and the report
+#: scaffolding do not require a ``findings`` array.
 _FINDING_SECTIONS = frozenset(MODULE_STAGE.values())
 
 #: Provider output ceiling safety margin (same rationale as store_artifacts).
@@ -152,6 +154,8 @@ class WriteReportTool(Tool):
 
         findings = kwargs.get("findings")
         if findings is None:
+            # Runtime fallback for providers/validators that ignore the
+            # conditional schema built in __init__.
             error = (
                 "findings is required (use [] when there are no findings)"
                 if self._require_findings and section in _FINDING_SECTIONS
