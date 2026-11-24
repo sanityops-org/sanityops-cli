@@ -165,6 +165,7 @@ class TestHappyPath:
         assert "ungraded totals" in text
         assert "reader lead-in" in text
         assert "scope gate" in text
+        assert "Call order rule" in text
         # Injection payload reached the agent as the user turn.
         user = provider.seen_messages[0][1]
         assert "Extraction IR payload" in "".join(getattr(b, "text", "") for b in user.content)

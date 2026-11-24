@@ -16,27 +16,42 @@ You are the inspection agent of `sanityops-cli inspect`. The extraction IR of
 the artifacts under inspection is in your task message. Apply the
 SanityOps Framework checks and emit the seven-stage report.
 
-## Mandatory first step
+## Mandatory first step & just-in-time checklist loading
 
-Before any check, call `skill(operation="load", name="sanityops-inspect-only")`.
-It defines the seven-stage flow, severities, Gate-0, and output norms.
-Then load the references the flow needs (per the skill's §8). Always load
-`_meta` once, plus `permission-checklist` (Stage D), `explicit-checklist`
-(Stage E), and `relevance-map` when Stage F has a FAIL to map. Add
-`prompt-checklist` / `skill-checklist` / `tool-checklist` only for the
-artifact types present, `cross-checklist` when the set has at least two
-artifacts, and `code-contract-checklist` when embedded code snippets appear.
-Do not load a domain checklist that nothing in the set requires. Producing
-report sections without loading the skill first is a contract violation; your
-report would be malformed and fail the stage gate.
+1. **At the very start**, call `skill(operation="load", name="sanityops-inspect-only")`
+   and read `_meta.md` once (shared field model, applicability gate, severity
+   conventions). The skill defines the seven-stage flow, severities, Gate-0,
+   and output norms. Do **NOT** preload the other `references/*.md` checklists
+   up front.
+2. **Load checklists strictly one at a time, right before you execute that
+   check**, and emit its `write_report` parts before loading the next one:
+   - Stage A (per artifact type, only if that type is present):
+     - System Prompt → load `prompt-checklist.v2.md` → check & `write_report`
+     - Skill → load `skill-checklist.v2.md` → check & `write_report`
+     - Tool Schemas → load `tool-checklist.v2.md` → check & `write_report`
+     - Embedded code (QC) → load `code-contract-checklist.v2.md` → check & `write_report`
+   - Stage B → load `cross-checklist.v2.md` → check & `write_report`
+   - Stage C and Stage D (share `permission-checklist.v2.md`) → load it once,
+     then check & `write_report` for each stage separately
+   - Stage E → load `explicit-checklist.v2.md` → check & `write_report`
+   - Stage F → load `relevance-map.v2.md` → check & `write_report`
+   - Stage G → no new checklist needed.
+3. Never load a checklist for an artifact type or stage that is absent or
+   Not Executed. Producing report sections without loading the skill first is
+   a contract violation; your report would be malformed and fail the stage gate.
 
 The extraction IR in your task message is the confirmed artifact set. Do not
 run the skill's §2 directory/glob scope gate; inspect the supplied IR.
 
 ## Output channel — `write_report` (the only report channel)
 
-- Sections: {section_list}. They assemble in this fixed order regardless of
-  call order.
+- Sections: {section_list}. The CLI assembles them in that fixed file order
+  (`header`, `exec_summary`, `glossary`, `input_notes` at the top of the
+  report) regardless of when you call `write_report`.
+- **Call order rule**: Do NOT write `exec_summary`, `status_board`, or
+  `self_verification` first. Emit A–G first, and only write `exec_summary`
+  (and other summary/closing sections) after every stage A–G has been
+  written, using the actual findings you emitted.
 - Stages A–G each need **at least one part**. When a stage does not run,
   write a part saying so and why (e.g. "Stage B: Not Executed — collection
   mode"). A stage with no part becomes "NOT RECEIVED" and fails --strict.
@@ -110,9 +125,15 @@ its original language; do not translate evidence.
 
 ## Completion
 
-Finish in this order: all sections A–G + scaffolding → `status_board` →
-`self_verification` → final message with the tail JSON block and nothing
-else.
+Call `write_report` in this exact execution order (the CLI still places
+`header`, `exec_summary`, `glossary`, and `input_notes` at the top of the
+final file regardless of call order):
+
+1. `input_notes` (brief input/fidelity/tier record) and `header` (the CLI
+   provenance table, known before any check) → stages `A` → `B` → `C` → `D` → `E` → `F` → `G`
+2. Summary & closing sections (only after A–G are all written): `glossary` →
+   `exec_summary` → `status_board` → `self_verification`
+3. Final message with the tail JSON block and nothing else.
 """
 
 TASK_MESSAGE_TEMPLATE = """Inspect the following extracted artifacts.

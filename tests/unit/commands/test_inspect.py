@@ -1,6 +1,7 @@
 """Unit tests for the skill-based inspect command orchestration (design §3/§9)."""
 
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -647,3 +648,34 @@ def test_inspect_prints_banner_and_log_path(monkeypatch, tmp_path):
     assert result.exit_code == 0, result.output
     assert "sanityops-cli v" in result.output
     assert "Log file:" in result.output
+
+
+def test_inspect_non_verbose_shows_stage_status_for_both_agents(monkeypatch, tmp_path):
+    import sanityops_cli.commands.inspect as inspect_module
+
+    harness = Harness(monkeypatch, tmp_path)
+    recorded_stages: list[str] = []
+
+    @contextmanager
+    def fake_stage_status(message: str):
+        recorded_stages.append(message)
+        yield
+
+    monkeypatch.setattr(inspect_module, "_stage_status", fake_stage_status)
+
+    result = harness.run(tmp_path)
+    assert result.exit_code == 0, result.output
+    assert recorded_stages == [
+        "Extracting artifacts (agent loop)...",
+        "Running seven-stage inspection (agent loop)...",
+    ]
+
+    recorded_stages.clear()
+    result_skip = harness.run(tmp_path, "--skip-extract")
+    assert result_skip.exit_code == 0, result_skip.output
+    assert recorded_stages == ["Running seven-stage inspection (agent loop)..."]
+
+    recorded_stages.clear()
+    result_verbose = harness.run(tmp_path, "--verbose")
+    assert result_verbose.exit_code == 0, result_verbose.output
+    assert recorded_stages == []

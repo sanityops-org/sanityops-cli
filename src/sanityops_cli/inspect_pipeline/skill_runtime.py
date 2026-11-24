@@ -24,6 +24,8 @@ import os
 import re
 import shutil
 import tempfile
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from importlib import resources
 from pathlib import Path
 
@@ -52,20 +54,63 @@ def default_cache_root() -> Path:
     return Path.home() / ".cache" / "sanityops-cli" / "skills"
 
 
+@contextmanager
+def _packaged_skills_context() -> Iterator[Path]:
+    """Yield the packaged ``skills/`` directory, keeping temp extraction alive.
+
+    The yielded path is guaranteed to exist only inside the ``with`` block: for
+    zipped or PyInstaller installs it points into a temporary extraction that
+    is removed when the context exits, while the source-tree fallback is
+    stable. If a caller needs the path afterwards, copy it before leaving the
+    block.
+    """
+    with ExitStack() as stack:
+        path: Path | None = None
+        try:
+            traversable = resources.files("sanityops_cli").joinpath("skills")
+            if traversable.is_dir():
+                path = stack.enter_context(resources.as_file(traversable))
+        except (
+            ModuleNotFoundError,
+            FileNotFoundError,
+            NotADirectoryError,
+            IsADirectoryError,
+        ):
+            # NotADirectoryError is a defensive catch for filesystem importers.
+            # IsADirectoryError is raised by resources.as_file(): Python < 3.12
+            # cannot extract a directory traversable. Fall back to the source
+            # tree when it exists.
+            path = None
+
+        if path is None:
+            fallback = Path(__file__).resolve().parent.parent / "skills"
+            if not fallback.is_dir():
+                raise FileNotFoundError("vendored skills directory not found in package")
+            path = fallback
+
+        yield path
+
+
 def packaged_skills_dir() -> Path:
-    """Filesystem path of the packaged ``skills/`` directory."""
+    """Filesystem path of the packaged ``skills/`` directory when already on disk.
+
+    Zipped/PyInstaller installs have no stable on-disk path here; use
+    ``materialize_skills()``, which keeps the resource extraction alive while
+    copying. Extracting a packaged skills directory requires Python 3.12+.
+    """
     try:
-        traverse = resources.as_file(resources.files("sanityops_cli").joinpath("skills"))
-        path = traverse.__enter__()
-        traverse.__exit__(None, None, None)  # copy out below; path needn't outlive
-        if path.is_dir():
-            return path
-    except (ModuleNotFoundError, FileNotFoundError, NotADirectoryError):
+        ref = resources.files("sanityops_cli").joinpath("skills")
+        if isinstance(ref, Path) and ref.is_dir():
+            return ref
+    except (ModuleNotFoundError, FileNotFoundError):
         pass
     fallback = Path(__file__).resolve().parent.parent / "skills"
     if fallback.is_dir():
         return fallback
-    raise FileNotFoundError("vendored skills directory not found in package")
+    raise FileNotFoundError(
+        "vendored skills directory not found in package; "
+        "use materialize_skills() for zipped installs"
+    )
 
 
 def dir_hash(directory: Path) -> str:
@@ -78,13 +123,7 @@ def dir_hash(directory: Path) -> str:
     return hashlib.sha256("\n".join(entries).encode()).hexdigest()
 
 
-def materialize_skills(source: Path | None = None, cache_root: Path | None = None) -> Path:
-    """Copy the packaged skills to a content-keyed cache directory and return it.
-
-    Keyed by content hash so upgrades invalidate automatically; identical
-    content reuses the existing directory (idempotent, safe across runs).
-    """
-    src = source if source is not None else packaged_skills_dir()
+def _materialize_from_dir(src: Path, cache_root: Path | None = None) -> Path:
     root = cache_root if cache_root is not None else default_cache_root()
     key = dir_hash(src)[:12]
     target = root / key
@@ -109,6 +148,18 @@ def materialize_skills(source: Path | None = None, cache_root: Path | None = Non
             shutil.rmtree(staging, ignore_errors=True)
         raise
     return target
+
+
+def materialize_skills(source: Path | None = None, cache_root: Path | None = None) -> Path:
+    """Copy the packaged skills to a content-keyed cache directory and return it.
+
+    Keyed by content hash so upgrades invalidate automatically; identical
+    content reuses the existing directory (idempotent, safe across runs).
+    """
+    if source is not None:
+        return _materialize_from_dir(source, cache_root=cache_root)
+    with _packaged_skills_context() as src:
+        return _materialize_from_dir(src, cache_root=cache_root)
 
 
 def validate_vendor(skills_dir: Path) -> list[str]:

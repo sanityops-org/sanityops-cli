@@ -1357,7 +1357,11 @@ def inspect(
 
     inspect_started = perf_counter()
     try:
-        outcome = inspect_agent.inspect_sync()
+        if verbose:
+            outcome = inspect_agent.inspect_sync()
+        else:
+            with _stage_status("Running seven-stage inspection (agent loop)..."):
+                outcome = inspect_agent.inspect_sync()
     except InspectionFailedError as e:
         # Design §9: report best-effort + prominent warning, exit 2.
         log_manager.exception("inspect", "Inspection agent failed")
