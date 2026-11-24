@@ -140,6 +140,12 @@ def _frontmatter_version(skill_md: Path) -> str | None:
 
 
 def sync(source: Path, force: bool = False) -> bool:
+    """Vendor the skill content.
+
+    Returns ``True`` when files were written and ``False`` when the recorded
+    commit and content hashes are already current. A no-op sync is a
+    successful run; the return value is informational.
+    """
     skill_src = source / SOURCE_SKILL_REL
     checklist_src = None
     for cand in SOURCE_CHECKLIST_CANDIDATES:
@@ -330,6 +336,7 @@ def main() -> None:
         sys.exit(check(source))
     if source is None or not source.is_dir():
         sys.exit(f"error: --source is required for a sync run (got {source})")
+    # The return value is informational: an up-to-date no-op is still success.
     sync(source, force=args.force)
     sys.exit(0)
 

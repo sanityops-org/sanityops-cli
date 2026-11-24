@@ -212,7 +212,12 @@ def _rewrite_skill_for_cli(name: str, text: str) -> str:
 
 
 def _replace_expected(text: str, old: str, new: str, label: str) -> str:
-    """Replace an expected standalone phrase, warning when it is not found."""
+    """Replace an expected standalone phrase.
+
+    The runtime logs a warning and keeps the original text when the pattern is
+    missing, so a wording change does not crash an installed CLI. CI enforces
+    the hard failure through ``TestRewriteDriftDetection``.
+    """
     if old not in text:
         logger.warning(
             "Skill rewrite pattern not found (%s); the vendored skill may have changed",
@@ -223,7 +228,7 @@ def _replace_expected(text: str, old: str, new: str, label: str) -> str:
 
 
 def _sub_expected(text: str, pattern: str, repl: str, label: str) -> str:
-    """Regex variant of ``_replace_expected``."""
+    """Regex variant of ``_replace_expected`` (same warn-and-continue contract)."""
     rewritten, count = re.subn(pattern, repl, text)
     if count == 0:
         logger.warning(

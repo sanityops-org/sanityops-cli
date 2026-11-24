@@ -247,11 +247,14 @@ def main() -> None:
             "the pull request (a prior run may have pushed it before the PR call failed)."
         )
     else:
-        if not args.skip_tests:
-            run_quality_gates()
-        else:
-            _log("Skipping quality gates (--skip-tests).")
         _git_config_if_missing()
+
+    # Run the gates on both paths: a reused branch may come from an older run,
+    # and the PR body must not claim tests passed when they were never re-run.
+    if not args.skip_tests:
+        run_quality_gates()
+    else:
+        _log("Skipping quality gates (--skip-tests).")
 
     if args.dry_run:
         _log("DRY-RUN mode:")
