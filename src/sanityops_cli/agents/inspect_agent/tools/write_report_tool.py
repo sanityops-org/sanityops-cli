@@ -37,8 +37,8 @@ SECTION_ORDER = (
 #: scaffolding do not require a ``findings`` array.
 _FINDING_SECTIONS = frozenset(MODULE_STAGE.values())
 
-#: Provider output ceiling safety margin (same rationale as store_artifacts).
-MAX_SECTION_CHARS = 6000
+#: Hard per-part ceiling (8000 chars) while prompting for ~6000 chars as a soft target.
+MAX_SECTION_CHARS = 8000
 
 
 @dataclass
