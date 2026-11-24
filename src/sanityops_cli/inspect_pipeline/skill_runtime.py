@@ -66,15 +66,15 @@ def _packaged_skills_context() -> Iterator[Path]:
         path: Path | None = None
         try:
             traversable = resources.files("sanityops_cli").joinpath("skills")
-            candidate = stack.enter_context(resources.as_file(traversable))
-            if candidate.is_dir():
-                path = candidate
+            if traversable.is_dir():
+                path = stack.enter_context(resources.as_file(traversable))
         except (
             ModuleNotFoundError,
             FileNotFoundError,
             NotADirectoryError,
             IsADirectoryError,
         ):
+            # NotADirectoryError is a defensive catch for filesystem importers.
             # IsADirectoryError is raised by resources.as_file(): Python < 3.12
             # cannot extract a directory traversable. Fall back to the source
             # tree when it exists.
