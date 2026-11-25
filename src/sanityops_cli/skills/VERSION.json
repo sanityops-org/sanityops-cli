@@ -1,8 +1,8 @@
 {
   "source": {
     "url": "https://github.com/sanityops-org/sanityops-inspector.git",
-    "commit": "b102bb19e3712935d5e0ea5707dbed97ccf7917a",
-    "synced_at": "2026-11-24T03:19:36+00:00"
+    "commit": "468231022bba6af99bfb55058760390d20abedfd",
+    "synced_at": "2026-11-25T13:04:03+00:00"
   },
   "items": {
     "sanityops-inspect-only": {
